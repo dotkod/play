@@ -140,52 +140,42 @@ export function Hub() {
     <div className="relative h-dvh w-full overflow-hidden select-none">
       <World spawn={spawn} onZone={setZone} onNearCat={setNearCat} active={started} />
 
-      {/* Brand + language */}
-      <div className="edge-top pointer-events-none absolute z-20 flex items-start justify-between gap-2">
-        <div className={`pointer-events-auto rounded-2xl bg-ink/85 px-3 py-1.5 text-cream shadow-[0_4px_0_#1f1a17] transition-opacity ${started ? "" : "opacity-0"}`}>
-          <Logo size="sm" />
-          <p className="text-[11px] font-bold opacity-80">{tr.brand}</p>
+      {/* Brand (top-left) */}
+      <div className="edge-tl pointer-events-none absolute z-20">
+        {/* Just the wordmark, game-HUD style: no card, slight tilt, soft drop shadow */}
+        <div className={`-rotate-3 drop-shadow-[0_3px_0_rgba(31,26,23,0.35)] transition-opacity duration-500 ${started ? "" : "opacity-0"}`}>
+          <Logo size="hud" />
         </div>
+      </div>
+
+      {/* Settings + minimap (top-right) */}
+      <div className="edge-tr pointer-events-none absolute z-20 flex flex-col items-end gap-2">
         <div className="pointer-events-auto flex gap-2">
           <MuteButton />
-        <div className="flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg">
-          {(["ms", "en"] as const).map((l) => (
-            <button key={l} type="button" onClick={() => setLang(l)} className={`h-full rounded-lg px-2 ${lang === l ? "bg-amber-300 text-ink" : "text-cream/70"}`}>
-              {l === "ms" ? "BM" : "EN"}
-            </button>
-          ))}
+          <div className="flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg">
+            {(["ms", "en"] as const).map((l) => (
+              <button key={l} type="button" onClick={() => setLang(l)} className={`h-full rounded-lg px-2 ${lang === l ? "bg-amber-300 text-ink" : "text-cream/70"}`}>
+                {l === "ms" ? "BM" : "EN"}
+              </button>
+            ))}
+          </div>
         </div>
-        </div>
+        {started && (
+          <div className="pointer-events-auto">
+            <Minimap size={touch ? 104 : 140} />
+          </div>
+        )}
       </div>
 
       {!started && <StartScreen tr={tr} touch={touch} onStart={start} />}
 
-      {started && (
-        <div className="edge-br absolute">
-          <Minimap size={touch ? 112 : 150} />
-        </div>
-      )}
-
-      {/* Cat nearby: offer a pet (stacked above the door prompt when both apply) */}
-      {started && nearCat !== null && (
-        <div className={`absolute inset-x-0 flex justify-center px-4 ${zone ? "bottom-24" : "bottom-4"}`}>
-          <button
-            type="button"
-            onClick={() => pet(nearCat)}
-            className="animate-pop rounded-2xl bg-cream px-5 py-2.5 text-lg font-extrabold text-ink shadow-[0_5px_0_#1f1a17] active:translate-y-0.5"
-          >
-            🐱 {tr.petCat(CATS[nearCat].name)}
-          </button>
-        </div>
-      )}
-
       {toast && (
-        <div key={toast.id} className="pointer-events-none absolute inset-x-0 top-20 flex justify-center px-4">
+        <div key={toast.id} className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center px-4">
           <p className="animate-pop rounded-2xl bg-[#ff5a7a] px-4 py-2 text-sm font-extrabold text-white shadow-[0_4px_0_#1f1a17]">{toast.text}</p>
         </div>
       )}
 
-      {/* Goal hint, hidden once you're at a door or next to a cat */}
+      {/* Goal hint, hidden once there's something to do right here */}
       {started && !zone && nearCat === null && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1 px-4 text-center">
           <p className="rounded-full bg-amber-300 px-4 py-1.5 text-sm font-extrabold text-ink shadow-[0_4px_0_#1f1a17]">
@@ -195,28 +185,33 @@ export function Hub() {
         </div>
       )}
 
-      {/* Door prompt */}
-      {started && zone && (
-        <div className="absolute inset-x-0 bottom-4 flex justify-center px-4">
-          <div className="flex animate-pop items-center gap-3 rounded-2xl bg-cream p-2 pl-4 shadow-[0_6px_0_#1f1a17]">
-            <div>
-              <p className="text-lg leading-tight font-extrabold">
-                {(zone.game ?? zone.soon)!.emoji} {(zone.game ?? zone.soon)!.title}
-              </p>
-              {zone.soon && <p className="text-xs font-bold text-ink/60">{tr.soonBody}</p>}
-            </div>
-            {zone.game ? (
-              <button
-                type="button"
+      {/* Context actions (bottom-right, in thumb reach): the door is primary, a nearby cat sits above it */}
+      {started && (zone || nearCat !== null) && (
+        <div className="edge-br absolute z-10 flex flex-col items-end gap-3">
+          {nearCat !== null && (
+            <ActionButton
+              icon="🐱"
+              label={tr.petCat(CATS[nearCat].name)}
+              keyHint={!touch && !zone ? "E" : undefined}
+              tone="cream"
+              size={zone ? "sm" : "lg"}
+              onClick={() => pet(nearCat)}
+            />
+          )}
+          {zone &&
+            (zone.game ? (
+              <ActionButton
+                icon="▶"
+                label={`${zone.game.emoji} ${zone.game.title}`}
+                caption={tr.enter}
+                keyHint={!touch ? "E" : undefined}
+                tone="amber"
+                size="lg"
                 onClick={() => enter(zone)}
-                className="rounded-xl bg-amber-300 px-5 py-2.5 text-lg font-extrabold text-ink shadow-[0_4px_0_#1f1a17] active:translate-y-0.5"
-              >
-                {tr.enter} ▶
-              </button>
+              />
             ) : (
-              <span className="rounded-xl bg-ink/10 px-3 py-2 text-sm font-extrabold text-ink/60">🔒 {tr.soon}</span>
-            )}
-          </div>
+              <ActionButton icon="🔒" label={`${zone.soon!.emoji} ${zone.soon!.title}`} caption={tr.soon} sub={tr.soonBody} tone="muted" size="lg" />
+            ))}
         </div>
       )}
 
@@ -249,6 +244,53 @@ function StartScreen({ tr, touch, onStart }: { tr: (typeof HUB_STRINGS)["ms"]; t
       </button>
       {!touch && <p className="text-xs font-bold text-cream/60">{tr.startKey}</p>}
       <p className="text-xs font-bold text-cream/70">{touch ? tr.controlsTouch : tr.controlsDesktop}</p>
+    </div>
+  );
+}
+
+// Round thumb-sized action with a label chip on its left
+function ActionButton({
+  icon,
+  label,
+  caption,
+  sub,
+  keyHint,
+  tone,
+  size,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  caption?: string;
+  sub?: string;
+  keyHint?: string;
+  tone: "amber" | "cream" | "muted";
+  size: "sm" | "lg";
+  onClick?: () => void;
+}) {
+  const circle = size === "lg" ? "size-20 text-3xl" : "size-14 text-2xl";
+  const colors = tone === "amber" ? "bg-amber-300 text-ink" : tone === "cream" ? "bg-cream text-ink" : "bg-ink/60 text-cream/80";
+  return (
+    <div className="flex animate-pop items-center gap-2">
+      <div className="max-w-[46vw] rounded-2xl bg-ink/80 px-3 py-1.5 text-right text-cream shadow-lg">
+        <p className="text-sm leading-tight font-extrabold">{label}</p>
+        {sub && <p className="text-[11px] leading-tight font-bold text-cream/70">{sub}</p>}
+      </div>
+      <button
+        type="button"
+        disabled={!onClick}
+        onClick={onClick}
+        aria-label={caption ? `${caption}: ${label}` : label}
+        className={`relative grid ${circle} shrink-0 place-items-center rounded-full border-4 border-ink font-extrabold shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17] disabled:active:translate-y-0 ${colors}`}
+      >
+        <span className="leading-none">{icon}</span>
+        {caption && <span className="absolute bottom-1.5 text-[10px] leading-none font-extrabold uppercase">{caption}</span>}
+        {keyHint && (
+          <span className="absolute -top-1.5 -right-1.5 grid size-6 place-items-center rounded-md border-2 border-ink bg-cream text-[11px] font-extrabold text-ink">
+            {keyHint}
+          </span>
+        )}
+      </button>
     </div>
   );
 }
