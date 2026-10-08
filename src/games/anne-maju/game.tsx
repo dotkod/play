@@ -99,14 +99,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
       dispatch({ type: "start", now: Date.now() });
     };
     return (
-      <div
-        className="relative h-dvh w-full overflow-hidden select-none"
-        onPointerDown={() => {
-          // First touch anywhere starts the shop music
-          unlockAudio();
-          music.start();
-        }}
-      >
+      <div className="relative h-dvh w-full overflow-hidden select-none">
         <DemoBackdrop />
         {s.phase === "intro" ? <Intro challenge={challenge} onStart={start} /> : <GameOver s={s} onRestart={start} />}
         <div className="absolute top-3 left-3">

@@ -48,24 +48,23 @@ export function Hub() {
 
   useEffect(() => bindKeyboard(), []);
 
-  // City soundscape: starts on the first interaction (or right away if audio was already unlocked in a game)
+  // City soundscape only starts from the start button; coming back from a game resumes it,
+  // since the player already opted in. It always stops when leaving the city.
   useEffect(() => {
-    const begin = () => {
-      unlockAudio();
+    if (returning && audioReady()) {
       music.start("city");
       ambience.start();
-    };
-    if (audioReady()) begin();
-    window.addEventListener("pointerdown", begin, { once: true });
-    window.addEventListener("keydown", begin, { once: true });
+    }
     return () => {
-      window.removeEventListener("pointerdown", begin);
-      window.removeEventListener("keydown", begin);
       music.stop();
       ambience.stop();
     };
-  }, []);
+  }, [returning]);
 
+  // A soft chime whenever you step up to a door
+  useEffect(() => {
+    if (zone) sfx.chime();
+  }, [zone]);
   const start = () => {
     unlockAudio();
     sfx.start();
@@ -88,10 +87,6 @@ export function Hub() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // A soft chime whenever you step up to a door
-  useEffect(() => {
-    if (zone) sfx.chime();
-  }, [zone]);
   useEffect(() => {
     const mq = matchMedia("(pointer: coarse)");
     const sync = () => setTouch(mq.matches);
@@ -108,7 +103,9 @@ export function Hub() {
   const enter = (b: Building) => {
     if (!b.game) return;
     sfx.doorbell();
+    // Silence the city; the game's own music starts with its start button
     ambience.stop();
+    music.stop();
     try {
       sessionStorage.setItem(SPAWN_KEY, b.id);
     } catch {}
