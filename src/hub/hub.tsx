@@ -16,7 +16,7 @@ const World = dynamic(() => import("./world"), {
 
 // Games send players back here with this key so they reappear at the building they left
 export const SPAWN_KEY = "dotkod-play:spawn";
-const DEFAULT_SPAWN = { x: 4.2, z: 4.6, rotY: Math.PI * 0.8 };
+const DEFAULT_SPAWN = { x: 7.5, z: -4.4, rotY: Math.PI / 2 };
 
 function readSpawn() {
   try {

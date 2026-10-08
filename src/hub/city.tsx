@@ -5,7 +5,7 @@ import { memo, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
-import { Ball, Box, Cyl, ToonMaterial, toonGradient } from "@/shared/three/toon";
+import { Ball, Box, Cyl, RBox, ToonMaterial, toonGradient } from "@/shared/three/toon";
 import { streetSpots } from "./colliders";
 import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
 
@@ -124,7 +124,8 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
   // Cutaway: a building between the camera and the street hides itself so it never blocks the view
   useFrame(({ camera }) => {
     if (!group.current) return;
-    const between = b.side === "south" && camera.position.z > f.minZ - 1.5 && Math.abs(camera.position.x - b.x) < b.w / 2 + 5;
+    const near = Math.abs(camera.position.x - b.x) < b.w / 2 + 5;
+    const between = near && (b.side === "south" ? camera.position.z > f.minZ - 1.5 : camera.position.z < f.maxZ + 1.5);
     group.current.visible = !between;
   });
   return (
@@ -146,6 +147,7 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
       {/* Five-foot way awning */}
       <Box size={[b.w, 0.18, 1.6]} position={[b.x, b.kind === "mall" ? 4.2 : 3.1, f.front + f.facing * 0.8]} color={b.kind === "mamak" ? "#2f8f86" : shade(b.color)} />
       {b.kind === "mamak" && <MamakFront b={b} />}
+      {b.kind === "lrt" && <LrtPlatform b={b} />}
       {(b.game || b.soon) && <FloatingLabel b={b} />}
     </group>
   );
@@ -186,6 +188,35 @@ function SeatedDiner({ look, x, z }: { look: Look; x: number; z: number }) {
   return <Person look={look} getPose={getPose} />;
 }
 
+// Elevated platform on pillars above the ticket hall, with a two-car train waiting at it
+function LrtPlatform({ b }: { b: Building }) {
+  const f = footprint(b);
+  const y = b.h + 1.6; // platform deck height
+  const len = b.w + 6;
+  return (
+    <group position={[b.x, 0, f.cz]}>
+      {/* Guideway pillars running beyond the station */}
+      {[-len / 2 + 2, -len / 4, len / 4, len / 2 - 2].map((x) => (
+        <Box key={x} size={[0.9, y, 0.9]} position={[x, y / 2, 0]} color="#c9cdd2" />
+      ))}
+      <Box size={[len, 0.5, 3.4]} position={[0, y, 0]} color="#b9bec4" />
+      {/* Platform canopy */}
+      <Box size={[b.w, 0.25, 4.6]} position={[0, y + 3.1, 0]} color="#1f5fa8" />
+      {[-b.w / 2 + 0.4, b.w / 2 - 0.4].map((x) => (
+        <Box key={x} size={[0.25, 3, 0.25]} position={[x, y + 1.6, 1.9]} color="#9aa1a7" />
+      ))}
+      {/* Two-car train */}
+      {[-2.3, 2.3].map((x) => (
+        <group key={x} position={[x, y + 0.25, 0]}>
+          <RBox size={[4.4, 2.1, 2.6]} radius={0.35} position={[0, 1.05, 0]} color="#f4f6f8" />
+          <Box size={[4.42, 0.35, 2.62]} position={[0, 0.55, 0]} color="#1f5fa8" outline={false} />
+          <Box size={[4.0, 0.7, 2.64]} position={[0, 1.45, 0]} color="#3e5566" outline={false} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
 // A bobbing sign above game buildings: big emoji + title, always facing the camera
 function FloatingLabel({ b }: { b: Building }) {
   const ref = useRef<THREE.Group>(null);
@@ -193,12 +224,12 @@ function FloatingLabel({ b }: { b: Building }) {
   const spot = doorSpot(b);
   useFrame(({ camera, clock }) => {
     if (!ref.current) return;
-    ref.current.position.y = b.h + 2.4 + Math.sin(clock.elapsedTime * 2) * 0.25;
+    ref.current.position.y = labelY(b) + Math.sin(clock.elapsedTime * 2) * 0.25;
     ref.current.quaternion.copy(camera.quaternion);
   });
   return (
     <>
-      <group ref={ref} position={[b.x, b.h + 2.4, footprint(b).cz]}>
+      <group ref={ref} position={[b.x, labelY(b), footprint(b).cz]}>
         <mesh>
           <planeGeometry args={[6, 1.5]} />
           <meshBasicMaterial map={tex} transparent toneMapped={false} depthWrite={false} />
@@ -208,6 +239,9 @@ function FloatingLabel({ b }: { b: Building }) {
     </>
   );
 }
+
+// Float the label clear of the roof (or of the LRT platform canopy)
+const labelY = (b: Building) => (b.kind === "lrt" ? b.h + 7.4 : b.h + 2.4);
 
 // Pulsing ring + bouncing arrow on the doorstep of a playable building
 function DoorMarker({ x, z }: { x: number; z: number }) {

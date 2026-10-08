@@ -10,7 +10,7 @@ const image = { url: "/og/play.jpg", width: 1200, height: 630, alt: "Play: banda
 export const metadata: Metadata = {
   title: { absolute: title },
   description,
-  keywords: ["game malaysia", "game 3d percuma", "browser game malaysia", "anne maju", "game mamak", "lrt sardin", "bandar 3d"],
+  keywords: ["game malaysia", "game 3d percuma", "browser game malaysia", "anne maju", "game mamak", "bandar 3d"],
   alternates: { canonical: "/" },
   openGraph: { title, description, url: "/", images: [image], siteName: site.name, locale: site.locale, type: "website" },
   twitter: { title, description, images: [image] },

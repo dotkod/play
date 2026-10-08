@@ -13,7 +13,7 @@ export const Pedestrians = memo(function Pedestrians() {
   const [walkers] = useState(() =>
       Array.from({ length: 7 }, (_, i): Walker & { look: ReturnType<typeof randomLook> } => ({
         axis: i % 3 === 0 ? "z" : "x",
-        side: (i % 2 ? 1 : -1) * (SIDEWALK_MID - 0.4),
+        side: (i % 2 ? 1 : -1) * (SIDEWALK_MID - 0.8),
         start: Math.random() * 1000,
         speed: 1.1 + Math.random() * 0.5,
         phase: Math.random(),

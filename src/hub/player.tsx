@@ -63,6 +63,10 @@ export function Player({
   const moving = useRef(false);
   const zone = useRef<string | null>(null);
   const stride = useRef({ dist: 0, alt: false });
+  // Camera yaw: 0 looks north (at the north-side shops), PI looks south when you're on the south sidewalk
+  const initialYaw = spawn.z > 3 ? Math.PI : 0;
+  const yaw = useRef(initialYaw);
+  const yawTarget = useRef(initialYaw);
   const ring = useRef<THREE.Mesh>(null);
   const guide = useRef<THREE.Group>(null);
   const camTarget = useMemo(() => new THREE.Vector3(), []);
@@ -73,10 +77,12 @@ export function Player({
     const dt = Math.min(rawDt, 0.05);
     const p = pos.current;
 
-    // Joystick/keys win over tap-to-walk; the camera never rotates, so screen-up is world -z
+    // Joystick/keys win over tap-to-walk; input is relative to where the camera is facing
     const mv = moveVector();
-    let vx = mv.x;
-    let vz = -mv.y;
+    const cy = Math.cos(yaw.current);
+    const sy = Math.sin(yaw.current);
+    let vx = mv.x * cy - mv.y * sy;
+    let vz = -mv.x * sy - mv.y * cy;
     if (vx === 0 && vz === 0 && input.target) {
       const dx = input.target.x - p.x;
       const dz = input.target.z - p.z;
@@ -116,14 +122,20 @@ export function Player({
     playerShared.x = p.x;
     playerShared.z = p.z;
 
-    // Third-person follow camera: higher and further back on tall screens
-    // Steep angle so buildings on the near side of the street don't hide the player
+    // Swing the camera round to face whichever row of shops you're walking along (with hysteresis)
+    if (p.z > 3.4) yawTarget.current = Math.PI;
+    else if (p.z < 2.6) yawTarget.current = 0;
+    yaw.current += (yawTarget.current - yaw.current) * (1 - Math.exp(-dt * 3));
+
+    // Third-person follow camera, steep enough that near-side buildings rarely get in the way
     const back = aspect < 1 ? 11 : 8.5;
     const up = aspect < 1 ? 15 : 12;
     if (followCamera) {
-      camPos.set(p.x, up, p.z + back);
+      const ys = Math.sin(yaw.current);
+      const yc = Math.cos(yaw.current);
+      camPos.set(p.x + ys * back, up, p.z + yc * back);
       camera.position.lerp(camPos, 1 - Math.exp(-dt * 5));
-      camTarget.set(p.x, 1, p.z - 1.5);
+      camTarget.set(p.x - ys * 1.5, 1, p.z - yc * 1.5);
       camera.lookAt(camTarget);
     }
 

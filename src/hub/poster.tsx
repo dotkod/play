@@ -19,7 +19,7 @@ export function HubPoster() {
         <p className="max-w-lg text-3xl font-bold text-cream">Jalan-jalan, masuk kedai, terus main. Percuma dalam browser.</p>
         <div className="mt-1 flex gap-3">
           <span className="rounded-2xl bg-amber-300 px-5 py-2.5 text-2xl font-extrabold text-ink shadow-[0_6px_0_#1f1a17]">🍵 Anne Maju</span>
-          <span className="rounded-2xl bg-cream/90 px-5 py-2.5 text-2xl font-extrabold text-ink/70 shadow-[0_6px_0_#1f1a17]">🚇 LRT Sardin · soon</span>
+          <span className="rounded-2xl bg-cream/90 px-5 py-2.5 text-2xl font-extrabold text-ink/70 shadow-[0_6px_0_#1f1a17]">🚇 Akan datang</span>
         </div>
       </div>
     </div>
