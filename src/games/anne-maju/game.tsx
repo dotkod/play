@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { shareResult, type ShareOutcome } from "@/shared/share";
 import { useBestScore } from "@/shared/use-best-score";
 import {
@@ -13,10 +14,11 @@ import {
   randomLine,
   sameDrink,
 } from "./drinks";
+import { LeaderboardPanel, playerId, savedName, useBoard } from "./leaderboard-panel";
 import { GAME } from "./meta";
 import { encodeResult, rankFor, rm } from "./result";
 import { randomLook } from "./scene/look";
-import { currentStep, difficulty, type GameState, initialState, lines, reducer, type Spawn, type Step, STEPS, timeLeft } from "./state";
+import { currentStep, difficulty, type GameState, initialState, lines, reducer, SHIFT_MS, type Spawn, type Step, STEPS, timeLeft } from "./state";
 
 // WebGL only exists in the browser
 const MamakScene = dynamic(() => import("./scene/mamak-scene"), {
@@ -40,8 +42,21 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
       const cur = stateRef.current;
       const now = Date.now();
       const free = cur.tables.flatMap((c, i) => (c ? [] : [i]));
+      // Sound cues derived from what this tick is about to change
+      const leftBefore = Math.ceil(timeLeft(cur) / 1000);
+      const leftNow = Math.ceil(Math.max(0, SHIFT_MS - (now - cur.startAt)) / 1000);
+      if (leftNow !== leftBefore && leftNow <= 10 && leftNow > 0) {
+        sfx.tick();
+        if (leftNow === 10) music.setTempo(132);
+      }
+      if (leftNow === 0) {
+        sfx.over();
+        music.setTempo(112);
+      }
+      if (cur.tables.some((c) => c && c.leaveAt <= now)) sfx.walkout();
       let spawn: Spawn | null = null;
       if (free.length && now >= cur.nextSpawnAt) {
+        sfx.arrive();
         const order = randomDrink(difficulty(cur));
         spawn = {
           table: free[Math.floor(Math.random() * free.length)],
@@ -59,12 +74,26 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
   if (s.phase !== "playing") {
     const start = () => {
       goLandscape();
+      unlockAudio();
+      sfx.start();
+      music.setTempo(112);
+      music.start();
       dispatch({ type: "start", now: Date.now() });
     };
     return (
-      <div className="relative h-dvh w-full overflow-hidden select-none">
+      <div
+        className="relative h-dvh w-full overflow-hidden select-none"
+        onPointerDown={() => {
+          // First touch anywhere starts the shop music
+          unlockAudio();
+          music.start();
+        }}
+      >
         <DemoBackdrop />
         {s.phase === "intro" ? <Intro challenge={challenge} onStart={start} /> : <GameOver s={s} onRestart={start} />}
+        <div className="absolute top-3 right-3">
+          <MuteButton />
+        </div>
         <RotateHint />
       </div>
     );
@@ -75,9 +104,12 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
     if (!c || s.now < c.seatedAt) return;
     if (isCupComplete(s.cup)) {
       const correct = sameDrink(s.cup, c.order);
+      if (correct) sfx.correct();
+      else sfx.wrong();
       dispatch({ type: "serve", table: i, line: randomLine(correct ? lines.HAPPY_LINES : lines.WRONG_LINES) });
       setServeEvent({ table: i, id: (serveEvent?.id ?? 0) + 1 });
     } else if (s.now >= c.revealUntil) {
+      sfx.tap();
       dispatch({ type: "askAgain", table: i });
     }
   };
@@ -86,14 +118,31 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
     <div className="flex h-dvh w-full overflow-hidden select-none">
       <div className="relative min-w-0 flex-1">
         <MamakScene s={s} cupReady={isCupComplete(s.cup)} serveEvent={serveEvent} onTable={onTable} />
-        <div className="pointer-events-none absolute top-3 left-3">
+        <div className="absolute top-3 left-3 flex items-center gap-2">
           <Hud s={s} />
+          <MuteButton />
         </div>
       </div>
       <div className="flex h-full w-[min(360px,44vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)]">
-        <StepRail cup={s.cup} onRewind={(part) => dispatch({ type: "rewind", part })} onDiscard={() => dispatch({ type: "discard" })} />
+        <StepRail
+          cup={s.cup}
+          onRewind={(part) => {
+            sfx.tap();
+            dispatch({ type: "rewind", part });
+          }}
+          onDiscard={() => {
+            sfx.tap();
+            dispatch({ type: "discard" });
+          }}
+        />
         <div className="relative min-h-0 flex-1">
-          <DrinkStation cup={s.cup} onPick={(part, value) => dispatch({ type: "pick", part, value })} />
+          <DrinkStation
+            cup={s.cup}
+            onPick={(part, value) => {
+              pickSound(part, value);
+              dispatch({ type: "pick", part, value });
+            }}
+          />
           {s.cup.base && (
             <p className="pointer-events-none absolute inset-x-0 bottom-2 truncate px-3 text-center text-base font-extrabold text-white drop-shadow-[0_2px_0_#1f1a17]">
               {cupTitle(s.cup)}
@@ -114,6 +163,31 @@ function Hud({ s }: { s: GameState }) {
       <span>{rm(s.earned)}</span>
       <span>🔥 {s.streak}</span>
     </div>
+  );
+}
+
+function pickSound(part: Step, value: string) {
+  if (part === "temp") sfx.clink();
+  else if (part === "base" || (part === "milk" && value !== "o")) sfx.pour();
+  else if (part === "sugar" && value !== "kosong") sfx.sugar();
+  else sfx.tap();
+}
+
+function MuteButton() {
+  const muted = useMuted();
+  return (
+    <button
+      type="button"
+      aria-label={muted ? "Buka bunyi" : "Tutup bunyi"}
+      onClick={(e) => {
+        e.stopPropagation();
+        unlockAudio();
+        setMuted(!muted);
+      }}
+      className="grid size-9 place-items-center rounded-xl bg-ink/80 text-lg shadow-lg active:scale-95"
+    >
+      {muted ? "🔇" : "🔊"}
+    </button>
   );
 }
 
@@ -203,8 +277,9 @@ const titleStroke = "[-webkit-text-stroke:7px_#1f1a17] [paint-order:stroke_fill]
 
 function Intro({ challenge, onStart }: { challenge?: string; onStart: () => void }) {
   const { best } = useBestScore(GAME.storageKey);
+  const { board } = useBoard();
   return (
-    <div className="absolute inset-0 flex flex-col justify-center overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent px-6 py-4 lg:px-14">
+    <div className="absolute inset-0 flex items-center justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent px-6 py-4 lg:px-14">
       <div className="flex max-w-md flex-col gap-2.5 text-cream">
         <span className="w-fit rounded-full bg-chili px-3 py-1 text-xs font-extrabold tracking-wide uppercase">🇲🇾 Game mamak · 90 saat</span>
         <h1 className={`text-[clamp(2.2rem,7vh,4.5rem)] leading-[0.95] font-extrabold text-amber-300 ${titleStroke}`}>{GAME.name}</h1>
@@ -236,6 +311,9 @@ function Intro({ challenge, onStart }: { challenge?: string; onStart: () => void
         </details>
         {best > 0 && <p className="text-sm font-bold text-cream/80">🏆 Rekod kau: {rm(best)}</p>}
       </div>
+      <div className="hidden w-64 shrink-0 self-end sm:block lg:w-72">
+        <LeaderboardPanel board={board} highlight={savedName()} compact />
+      </div>
     </div>
   );
 }
@@ -244,52 +322,113 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
   const { best, submit } = useBestScore(GAME.storageKey);
   const [prevBest] = useState(best);
   const [shareState, setShareState] = useState<ShareOutcome | null>(null);
+  const { board, refresh } = useBoard();
+  const [name, setName] = useState(savedName);
+  const [saved, setSaved] = useState<{ rank: number | null } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const rank = rankFor(s.earned);
   const isRecord = s.earned > prevBest;
 
   useEffect(() => {
     submit(s.earned);
-  }, [s.earned, submit]);
+    if (s.earned > prevBest && prevBest > 0) sfx.record();
+  }, [s.earned, submit, prevBest]);
 
   const onShare = async () => {
+    sfx.tap();
     const url = `${window.location.origin}/${GAME.slug}/k/${encodeResult({ earned: s.earned, served: s.served })}`;
-    const text = `Aku kutip ${rm(s.earned)} satu shift jadi anne mamak ${rank.emoji} (${rank.title}). Kau boleh lawan?`;
+    const text = `Aku kutip ${rm(s.earned)} satu shift kat ${GAME.name} ${rank.emoji} (${rank.title}). Kau boleh lawan?`;
     setShareState(await shareResult({ title: GAME.name, text, url }));
+  };
+
+  const onSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = name.trim();
+    if (clean.length < 2) return setError("Nama minimum 2 huruf");
+    setSaving(true);
+    setError(null);
+    try {
+      localStorage.setItem("anne-maju:player-name", clean);
+    } catch {}
+    try {
+      const res = await fetch("/api/scores", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ playerId: playerId(), name: clean, earned: s.earned, served: s.served }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Tak dapat simpan");
+      setSaved({ rank: data.weekRank });
+      sfx.correct();
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px]">
-      <div className="flex w-full max-w-2xl animate-pop flex-row items-stretch gap-3">
-        <div className="flex flex-1 flex-col items-center justify-center rounded-3xl bg-cream p-5 text-center shadow-[0_6px_0_#1f1a17]">
+      <div className="flex w-full max-w-4xl animate-pop flex-row items-stretch gap-3">
+        <div className="flex flex-1 flex-col items-center justify-center rounded-3xl bg-cream p-4 text-center shadow-[0_6px_0_#1f1a17]">
           <p className="text-xs font-extrabold tracking-widest text-ink/50 uppercase">Shift habis!</p>
-          <p className="text-6xl">{rank.emoji}</p>
-          <p className="text-lg font-extrabold">{rank.title}</p>
+          <p className="text-5xl">{rank.emoji}</p>
+          <p className="text-base font-extrabold">{rank.title}</p>
           <p className={`text-5xl font-extrabold text-amber-300 ${titleStroke}`}>{rm(s.earned)}</p>
           {isRecord && <p className="mt-1 rounded-full bg-chili px-3 py-0.5 text-xs font-bold text-white">Rekod baru!</p>}
-        </div>
-        <div className="flex flex-1 flex-col gap-2">
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          <div className="mt-3 grid w-full grid-cols-4 gap-1.5 text-center text-xs">
             <Stat label="Hantar" value={s.served} />
             <Stat label="Salah" value={s.wrong} />
             <Stat label="Lari" value={s.walkouts} />
             <Stat label="Streak" value={s.bestStreak} />
           </div>
-          <button
-            type="button"
-            onClick={onShare}
-            className="rounded-2xl bg-chili py-3.5 text-xl font-extrabold text-white shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
-          >
-            Share & cabar kawan
-          </button>
+        </div>
+        <div className="flex flex-1 flex-col gap-2">
+          {s.earned === 0 ? (
+            <p className="rounded-2xl bg-cream/15 px-3 py-2 text-center text-sm font-bold text-cream">Hantar sekurang-kurangnya satu air untuk masuk papan juara</p>
+          ) : saved ? (
+            <p className="rounded-2xl bg-leaf px-3 py-2 text-center text-sm font-extrabold text-white shadow-[0_4px_0_#1f1a17]">
+              {saved.rank ? `Kau nombor ${saved.rank} minggu ni!` : "Skor disimpan!"}
+            </p>
+          ) : (
+            <form onSubmit={onSave} className="flex gap-1.5">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value.slice(0, 16))}
+                placeholder="Nama kau"
+                maxLength={16}
+                className="min-w-0 flex-1 rounded-xl border-2 border-ink bg-cream px-3 py-2 font-bold text-ink outline-none focus:border-amber-400"
+              />
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-xl bg-amber-300 px-3 font-extrabold text-ink shadow-[0_4px_0_#1f1a17] active:translate-y-0.5 disabled:opacity-60"
+              >
+                {saving ? "..." : "Simpan"}
+              </button>
+            </form>
+          )}
+          {error && <p className="text-center text-xs font-bold text-amber-300">{error}</p>}
+          <LeaderboardPanel board={board} highlight={saved ? name.trim() : undefined} compact />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onShare}
+              className="flex-1 rounded-2xl bg-chili py-3 text-lg font-extrabold text-white shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
+            >
+              Cabar kawan
+            </button>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="flex-1 rounded-2xl bg-amber-300 py-3 text-lg font-extrabold text-ink shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
+            >
+              ▶ Main lagi
+            </button>
+          </div>
           {shareState === "copied" && <p className="text-center text-sm font-bold text-cream">Link dah copy. Paste kat Threads!</p>}
-          <button
-            type="button"
-            onClick={onRestart}
-            className="rounded-2xl bg-amber-300 py-3 font-extrabold text-ink shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
-          >
-            ▶ Main lagi
-          </button>
-          <p className="text-center text-sm font-bold text-cream/80">🏆 Rekod kau: {rm(Math.max(best, s.earned))}</p>
         </div>
       </div>
     </div>

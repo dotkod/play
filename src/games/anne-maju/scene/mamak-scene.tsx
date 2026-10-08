@@ -100,7 +100,7 @@ function CameraRig({ demo }: { demo: boolean }) {
       makeDefault
       fov={aspect < 0.7 ? 58 : portrait ? 50 : 44}
       position={[0, portrait ? 6.4 : 6.9, portrait ? 6.6 : 7.4]}
-      onUpdate={(cam) => cam.lookAt(0, 0.3, -0.8)}
+      onUpdate={(cam) => cam.lookAt(0, 0.85, -1.6)}
     />
   );
 }
@@ -313,7 +313,7 @@ const Shop = memo(function Shop() {
       {/* Back wall with green tiles */}
       <Box size={[9, 3.4, 0.2]} position={[0, 1.7, -5.1]} color="#f4efe4" />
       <Box size={[9, 1.1, 0.05]} position={[0, 0.55, -4.98]} color="#3f9a76" outline={false} />
-      <mesh position={[0, 3.05, -4.98]}>
+      <mesh position={[0, 2.85, -4.98]}>
         <planeGeometry args={[5.2, 0.9]} />
         <meshBasicMaterial map={sign} toneMapped={false} />
       </mesh>
