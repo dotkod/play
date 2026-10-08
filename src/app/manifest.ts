@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 
-// "Add to Home Screen" opens the Play MY city fullscreen
+// "Add to Home Screen" opens Kuala Lepak fullscreen
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Play MY",
-    short_name: "Play MY",
-    description: "Bandar 3D ala Malaysia penuh game pendek. Jalan-jalan, masuk kedai, terus main.",
+    name: "Kuala Lepak",
+    short_name: "Kuala Lepak",
+    description: "Bandar paling chill di Malaysia. Hidup, kerja, lepak.",
     start_url: "/",
     display: "fullscreen",
     background_color: "#9fdcd2",

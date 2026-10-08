@@ -8,13 +8,13 @@ const baloo = Baloo_2({ variable: "--font-baloo", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
-  title: { default: "Play MY · Game 3D Malaysia Percuma", template: "%s" },
-  description: "Bandar 3D ala Malaysia penuh game pendek. Jalan-jalan, masuk kedai, terus main. Percuma dalam browser.",
+  title: { default: "Kuala Lepak: Game Bandar 3D Malaysia", template: "%s" },
+  description: "Kau baru pindah ke Kuala Lepak, bandar paling chill di Malaysia. Cari kerja part-time, kenal orang, usap kucing jalanan. Game 3D percuma, terus main dalam browser.",
   applicationName: site.name,
   formatDetection: { telephone: false },
   openGraph: { siteName: site.name, locale: site.locale, type: "website" },
   twitter: { card: "summary_large_image" },
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Play MY" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Kuala Lepak" },
 };
 
 export const viewport: Viewport = {

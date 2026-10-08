@@ -527,7 +527,7 @@ function BackToPlay({ wide = false }: { wide?: boolean }) {
       }}
       className={`flex h-9 items-center justify-center gap-1 rounded-xl bg-ink/80 px-3 text-sm font-extrabold text-amber-300 shadow-lg active:scale-95 ${wide ? "w-full" : ""}`}
     >
-      {wide ? tr.quit : "← PLAY MY"}
+      {wide ? tr.quit : "← KUALA LEPAK"}
     </Link>
   );
 }

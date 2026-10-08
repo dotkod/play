@@ -1,7 +1,7 @@
 import type { Lang } from "@/shared/lang";
 
 const ms = {
-  brand: "Game 3D Malaysia",
+  brand: "Hidup, kerja, lepak.",
   hintDesktop: "WASD / anak panah untuk jalan · klik untuk pergi",
   hintTouch: "Guna joystick atau tap jalan",
   goTo: (name: string) => `Jalan ke ${name} untuk main`,
@@ -11,7 +11,7 @@ const ms = {
   soonBody: "Game ni tengah dibina. Nantikan!",
   you: "KAU",
   loading: "Bandar tengah dibuka...",
-  tagline: "Jalan-jalan dalam bandar, masuk kedai, terus main. Percuma, tak perlu install.",
+  tagline: "Kau baru pindah ke Kuala Lepak. Cari kerja, kenal orang, dan jangan lupa usap Oyen.",
   startCta: "▶ Mula jalan",
   startKey: "atau tekan Enter",
   controlsDesktop: "🎮 WASD / anak panah · klik untuk jalan · Enter untuk masuk",
@@ -23,7 +23,7 @@ const ms = {
 type Strings = typeof ms;
 
 const en: Strings = {
-  brand: "Malaysian 3D games",
+  brand: "Live, work, lepak.",
   hintDesktop: "WASD / arrows to walk · click to go there",
   hintTouch: "Use the joystick or tap to walk",
   goTo: (name) => `Walk to ${name} to play`,
@@ -33,7 +33,7 @@ const en: Strings = {
   soonBody: "This game is being built. Stay tuned!",
   you: "YOU",
   loading: "Opening the city...",
-  tagline: "Walk the city, step into a shop, start playing. Free, nothing to install.",
+  tagline: "You just moved to Kuala Lepak. Find work, make friends, and don't forget to pet Oyen.",
   startCta: "▶ Start exploring",
   startKey: "or press Enter",
   controlsDesktop: "🎮 WASD / arrows · click to walk · Enter to go in",

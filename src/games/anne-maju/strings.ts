@@ -97,7 +97,7 @@ const ms = {
   pause: "Rehat",
   resume: "▶ Sambung",
   restart: "↻ Mula semula",
-  quit: "← Keluar ke Play MY",
+  quit: "← Keluar ke Kuala Lepak",
   language: "Bahasa",
   sound: "Bunyi",
   // Tutorial
@@ -233,7 +233,7 @@ const en: Strings = {
   pause: "Pause",
   resume: "▶ Resume",
   restart: "↻ Restart",
-  quit: "← Back to Play MY",
+  quit: "← Back to Kuala Lepak",
   language: "Language",
   sound: "Sound",
   practice: "Practice",
