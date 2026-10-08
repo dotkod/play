@@ -71,6 +71,7 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
         <RBox size={[0.52, 0.62, 0.3]} radius={0.05} position={[0, 0.33, 0]} color={look.shirt} />
         {/* Baju kurung: long top flaring over the hips */}
         {look.dress && <RBox size={[0.58, 0.3, 0.36]} radius={0.06} position={[0, 0.02, 0]} color={look.shirt} />}
+        {look.apron && <Box size={[0.46, 0.72, 0.04]} position={[0, 0.22, 0.17]} color={look.apron} />}
 
         <group ref={armL} position={[-0.33, 0.58, 0]}>
           <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
@@ -97,6 +98,13 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
             <Box size={[0.09, 0.022, 0.01]} position={[0.09, 0.1, 0.214]} rotation={[0, 0, 0.4]} color="#111" outline={false} />
           </group>
           <Headwear look={look} />
+          {look.glasses && (
+            <>
+              <Box size={[0.14, 0.08, 0.02]} position={[-0.09, 0.03, 0.225]} color="#111" outline={false} />
+              <Box size={[0.14, 0.08, 0.02]} position={[0.09, 0.03, 0.225]} color="#111" outline={false} />
+              <Box size={[0.08, 0.02, 0.02]} position={[0, 0.05, 0.225]} color="#111" outline={false} />
+            </>
+          )}
         </group>
       </group>
     </group>

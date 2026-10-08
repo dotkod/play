@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
-import { type Cup, cupColor } from "../drinks";
+import { type Base, type Cup, cupColor, FULL_MENU, type Menu, type Milk, type Sugar } from "../drinks";
 import { type Lang, t } from "../strings";
 import { currentStep, type Step } from "../state";
 import { Box, Cyl, ToonMaterial, toonGradient } from "@/shared/three/toon";
@@ -57,8 +57,20 @@ const VIEW_H = 3.0;
 type Fx = { id: number; kind: Kind; from: THREE.Vector3 };
 
 // Memoised: the game ticks 10x a second, but the station only needs to update when the cup changes
-export default memo(function DrinkStation({ cup, lang, onPick }: { cup: Cup; lang: Lang; onPick: (step: Step, value: string) => void }) {
+type StationProps = {
+  cup: Cup;
+  lang: Lang;
+  onPick: (step: Step, value: string) => void;
+  // Only stocked items are shown (new players start with a smaller menu)
+  menu?: Menu;
+  // Tutorial: the option to glow
+  hint?: string | null;
+};
+
+export default memo(function DrinkStation({ cup, lang, onPick, menu = FULL_MENU, hint = null }: StationProps) {
   const step = currentStep(cup);
+  const stocked = (o: Option) =>
+    step === "base" ? menu.bases.includes(o.value as Base) : step === "milk" ? menu.milks.includes(o.value as Milk) : step === "sugar" ? menu.sugars.includes(o.value as Sugar) : true;
   const [fx, setFx] = useState<Fx | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const frameloop = useVisibleFrameloop(wrap);
@@ -80,7 +92,7 @@ export default memo(function DrinkStation({ cup, lang, onPick }: { cup: Cup; lan
         <Backdrop />
         <Vessel cup={cup} />
         {/* Remount the shelf per step so each set of items pops in fresh */}
-        <Shelf key={step ?? "done"} options={step ? OPTIONS[step] : []} lang={lang} onPick={pick} />
+        <Shelf key={`${step ?? "done"}:${menu.bases.length}${menu.milks.length}${menu.sugars.length}`} options={step ? OPTIONS[step].filter(stocked) : []} lang={lang} hint={hint} onPick={pick} />
         {!step && <DoneSign text={t(lang).ready} />}
         {fx && <PourFx key={fx.id} fx={fx} />}
       </Canvas>
@@ -114,13 +126,13 @@ function Backdrop() {
   );
 }
 
-function Shelf({ options, lang, onPick }: { options: Option[]; lang: Lang; onPick: (o: Option, from: THREE.Vector3) => void }) {
+function Shelf({ options, lang, hint, onPick }: { options: Option[]; lang: Lang; hint: string | null; onPick: (o: Option, from: THREE.Vector3) => void }) {
   const gap = Math.min(0.95, (VIEW_W - 0.1) / Math.max(options.length, 1));
   return (
     <>
       {options.map((o, i) => {
         const x = (i - (options.length - 1) / 2) * gap;
-        return <Slot key={o.value} option={o} label={t(lang).labels[o.value]} x={x} delay={i * 70} width={gap * 0.92} onPick={onPick} />;
+        return <Slot key={o.value} option={o} label={t(lang).labels[o.value]} x={x} delay={i * 70} width={gap * 0.92} glow={hint === o.value} onPick={onPick} />;
       })}
     </>
   );
@@ -133,6 +145,7 @@ function Slot({
   x,
   delay,
   width,
+  glow,
   onPick,
 }: {
   option: Option;
@@ -140,9 +153,11 @@ function Slot({
   x: number;
   delay: number;
   width: number;
+  glow: boolean;
   onPick: (o: Option, from: THREE.Vector3) => void;
 }) {
   const group = useRef<THREE.Group>(null);
+  const ring = useRef<THREE.Mesh>(null);
   const born = useRef<number | null>(null);
   const card = cardTexture(label);
 
@@ -152,7 +167,9 @@ function Slot({
     const t = Math.min(1, Math.max(0, (performance.now() - born.current - delay) / 260));
     const pop = t < 1 ? 1 - Math.pow(1 - t, 3) * Math.cos(t * 9) : 1;
     group.current.scale.setScalar(Math.max(0.001, pop));
-    group.current.position.y = Math.sin(clock.elapsedTime * 2 + x * 3) * 0.02;
+    // The hinted item hops; everything else just bobs
+    group.current.position.y = glow ? Math.abs(Math.sin(clock.elapsedTime * 5)) * 0.12 : Math.sin(clock.elapsedTime * 2 + x * 3) * 0.02;
+    if (ring.current) ring.current.scale.setScalar(1 + (clock.elapsedTime % 1) * 0.35);
   });
 
   return (
@@ -168,6 +185,12 @@ function Slot({
       <group ref={group}>
         <ItemModel kind={option.kind} />
       </group>
+      {glow && (
+        <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+          <ringGeometry args={[0.3, 0.38, 32]} />
+          <meshBasicMaterial color="#fcd34d" toneMapped={false} />
+        </mesh>
+      )}
       <mesh position={[0, 0.08, 0.55]} rotation={[-0.55, 0, 0]}>
         <planeGeometry args={[width, width / CARD_ASPECT]} />
         <meshBasicMaterial map={card} transparent toneMapped={false} />

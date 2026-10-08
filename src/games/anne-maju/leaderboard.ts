@@ -1,7 +1,7 @@
 import { Redis } from "@upstash/redis";
 
 export type Entry = { name: string; earned: number; served: number };
-export type Board = { week: Entry[]; all: Entry[] };
+export type Board = { today: Entry[]; week: Entry[]; all: Entry[] };
 
 // Payload checks: names stay short and printable, scores stay inside what one 90s shift can earn
 export const NAME_RE = /^[\p{L}\p{N} ._'-]{2,16}$/u;
@@ -32,8 +32,14 @@ export function weekKey(now = new Date()) {
   return `${d.getUTCFullYear()}-w${week}`;
 }
 
+// Malaysia calendar day, e.g. "2026-10-08" (matches the client's daily shift seed)
+export function dayKey(now = new Date()) {
+  return new Date(now.getTime() + 8 * 3600_000).toISOString().slice(0, 10);
+}
+
 export const KEYS = {
   all: "anne-maju:scores:all",
   week: (wk: string) => `anne-maju:scores:${wk}`,
+  daily: (day: string) => `anne-maju:daily:${day}`,
   players: "anne-maju:players",
 };

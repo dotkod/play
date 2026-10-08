@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { randomDrink } from "../drinks";
 import { type GameState, initialState, type Party } from "../state";
-import { randomParty } from "@/shared/three/look";
+import { type Look, randomParty } from "@/shared/three/look";
 import MamakScene from "./mamak-scene";
 
 // The shop keeps running behind the menus: seated regulars, Anne doing rounds, camera slowly orbiting
-export default function DemoBackdrop({ poster = false }: { poster?: boolean }) {
+export default function DemoBackdrop({ poster = false, anneLook }: { poster?: boolean; anneLook?: Look }) {
   const [demo] = useState<GameState>(() => {
     const regular = (id: number, size: number): Party => ({
       id,
@@ -34,7 +34,7 @@ export default function DemoBackdrop({ poster = false }: { poster?: boolean }) {
 
   return (
     <div className="absolute inset-0">
-      <MamakScene s={demo} cupReady={false} serveEvent={poster ? null : serve} onTable={() => {}} demo poster={poster} />
+      <MamakScene s={demo} cupReady={false} serveEvent={poster ? null : serve} onTable={() => {}} demo poster={poster} anneLook={anneLook} />
     </div>
   );
 }

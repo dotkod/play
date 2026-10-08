@@ -1,3 +1,4 @@
+import { pick, rand } from "@/shared/rng";
 import { type Lang, t } from "./strings";
 
 export const BASES = ["teh", "kopi", "milo", "nescafe"] as const;
@@ -55,20 +56,30 @@ export function drinkPrice(d: Drink): number {
   return base + milk + ice;
 }
 
-const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+// What the counter currently stocks; new players start with a smaller menu
+export type Menu = { bases: readonly Base[]; milks: readonly Milk[]; sugars: readonly Sugar[] };
+export const FULL_MENU: Menu = { bases: BASES, milks: MILKS, sugars: SUGARS };
 
 // Difficulty 0..1: early orders lean on the classics, later ones mix in O/C and sugar tweaks
-export function randomDrink(difficulty: number): Drink {
-  for (;;) {
-    const simple = Math.random() > 0.15 + difficulty * 0.55;
+export function randomDrink(difficulty: number, menu: Menu = FULL_MENU): Drink {
+  const classics = menu.bases.filter((b) => b !== "nescafe");
+  for (let i = 0; i < 50; i++) {
+    const simple = rand() > 0.15 + difficulty * 0.55;
     const d: Drink = {
-      base: simple ? pick(["teh", "kopi", "milo"] as const) : pick(BASES),
-      milk: simple ? "susu" : pick(MILKS),
-      sugar: simple && Math.random() < 0.8 ? "biasa" : pick(SUGARS),
+      base: simple && classics.length ? pick(classics) : pick(menu.bases),
+      milk: simple ? "susu" : pick(menu.milks),
+      sugar: simple && rand() < 0.8 ? "biasa" : pick(menu.sugars),
       temp: pick(TEMPS),
     };
     if (isValidDrink(d)) return d;
   }
+  return { base: "teh", milk: "susu", sugar: "biasa", temp: "panas" };
+}
+
+// Which fields differ between what was ordered and what was served
+export function drinkDiff(want: Drink, got: Drink): (keyof Drink)[] {
+  return (["temp", "base", "milk", "sugar"] as const).filter((k) => want[k] !== got[k]);
 }
 
 // Groups say identical drinks once with a count: "teh tarik dua, milo ais satu"
@@ -85,8 +96,9 @@ export function orderPhrase(drinks: Drink[], lang: Lang, seed: number): string {
   return `${call}, ${items.join(", ")}${end}`;
 }
 
+// Flavour text uses plain Math.random so it never disturbs a seeded (daily) run
 export function randomLine(lines: readonly string[]): string {
-  return pick(lines);
+  return lines[Math.floor(Math.random() * lines.length)];
 }
 
 // Liquid colour for the cup preview

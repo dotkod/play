@@ -38,10 +38,17 @@ type Props = {
   demo?: boolean;
   // Frozen hero angle for the OG poster screenshot
   poster?: boolean;
+  // Anne in the player's chosen outfit
+  anneLook?: Look;
+  // Table to draw attention to (tutorial)
+  pulseTable?: number | null;
+  // Lets the game find each table's bubble on screen (coin fly animation)
+  anchorsOut?: RefObject<(HTMLDivElement | null)[]>;
 };
 
-export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = false, poster = false }: Props) {
-  const anchors = useRef<(HTMLDivElement | null)[]>([]);
+export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = false, poster = false, anneLook = ANNE_LOOK, pulseTable = null, anchorsOut }: Props) {
+  const ownAnchors = useRef<(HTMLDivElement | null)[]>([]);
+  const anchors = anchorsOut ?? ownAnchors;
   const wrap = useRef<HTMLDivElement>(null);
   const frameloop = useVisibleFrameloop(wrap);
   const [dpr, setDpr] = useState(1.5);
@@ -72,7 +79,7 @@ export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = fa
           <Table key={i} index={i} pos={pos} onTap={tapTable} />
         ))}
         <Customers s={s} />
-        <Anne serveEvent={serveEvent} />
+        <Anne serveEvent={serveEvent} look={anneLook} />
       </Canvas>
       {!demo &&
         TABLES.map((_, i) => (
@@ -83,7 +90,7 @@ export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = fa
             }}
             className="absolute top-0 left-0 will-change-transform"
           >
-            <TableOverlay table={i} s={s} cupReady={cupReady} onTap={() => onTable(i)} />
+            <TableOverlay table={i} s={s} cupReady={cupReady} pulse={pulseTable === i} onTap={() => onTable(i)} />
           </div>
         ))}
     </div>
@@ -259,7 +266,9 @@ const CustomerActor = memo(
   (a, b) => a.party.id === b.party.id && a.guest === b.guest && a.leftAt === b.leftAt && a.table === b.table,
 );
 
-function TableOverlay({ table, s, cupReady, onTap }: { table: number; s: GameState; cupReady: boolean; onTap: () => void }) {
+const MOOD = (p: number) => (p > 0.6 ? "😊" : p > 0.3 ? "😐" : "😤");
+
+function TableOverlay({ table, s, cupReady, pulse, onTap }: { table: number; s: GameState; cupReady: boolean; pulse: boolean; onTap: () => void }) {
   const tr = useT();
   const lang = useLang();
   const p = s.tables[table];
@@ -267,14 +276,15 @@ function TableOverlay({ table, s, cupReady, onTap }: { table: number; s: GameSta
   const showing = p && s.now < p.revealUntil;
   const patience = p ? patienceLeft(p, s.now) : 0;
   const feedback = s.bubbles.findLast((b) => b.table === table);
-  const asksLeft = p ? 2 - p.asks : 0;
+  const asksLeft = p ? MAX_ASKS - p.asks : 0;
+  const noted = p && s.slip?.partyId === p.id;
 
   return (
-    <div className="flex w-max max-w-40 flex-col items-center gap-1">
+    <div className="flex w-max max-w-48 flex-col items-center gap-1">
       {feedback && (
         <div
           key={feedback.id}
-          className={`animate-pop rounded-xl px-2 py-1 text-center text-xs font-bold shadow ${feedback.kind === "good" ? "bg-leaf text-white" : "bg-chili text-white"}`}
+          className={`max-w-48 animate-pop rounded-xl px-2.5 py-1 text-center text-sm leading-tight font-bold shadow ${feedback.kind === "good" ? "bg-leaf text-white" : "bg-chili text-white"}`}
         >
           {feedback.text}
         </div>
@@ -283,10 +293,11 @@ function TableOverlay({ table, s, cupReady, onTap }: { table: number; s: GameSta
         <button
           type="button"
           onClick={onTap}
-          className={`flex flex-col gap-1 rounded-xl text-center text-xs leading-tight font-bold shadow-md transition active:scale-95 ${
-            showing ? "w-40 bg-white px-2 py-1.5 text-ink" : cupReady ? "min-w-20 bg-leaf px-2 py-1 text-white" : "min-w-20 bg-white/80 px-2 py-1 text-ink/70"
-          }`}
+          className={`relative flex flex-col gap-1 rounded-xl text-center leading-tight font-bold shadow-md transition active:scale-95 ${
+            showing ? "w-48 bg-white px-2.5 py-2 text-sm text-ink" : cupReady ? "min-w-24 bg-leaf px-2.5 py-1.5 text-sm text-white" : "min-w-24 bg-white/85 px-2.5 py-1.5 text-sm text-ink/75"
+          } ${pulse ? "animate-bounce ring-4 ring-amber-300" : ""}`}
         >
+          {noted && <span className="absolute -top-2 -left-2 rounded-full bg-amber-300 px-1.5 text-xs shadow">📝</span>}
           <span>
             {showing
               ? `“${orderPhrase(
@@ -295,20 +306,20 @@ function TableOverlay({ table, s, cupReady, onTap }: { table: number; s: GameSta
                   p.seed,
                 )}”`
               : cupReady
-                ? tr.serveHere
+                ? `${MOOD(patience)} ${tr.serveHere}`
                 : asksLeft > 0
-                  ? tr.askAgain(asksLeft)
-                  : tr.noMoreAsks}
+                  ? `${MOOD(patience)} ${tr.askAgain(asksLeft)}`
+                  : `😤 ${tr.noMoreAsks}`}
           </span>
           {p.guests.length > 1 && (
             <span className="flex justify-center gap-1">
               {p.guests.map((g, i) => (
-                <span key={i} className={`size-2.5 rounded-full ${g.served ? "bg-leaf" : "bg-ink/25"}`} />
+                <span key={i} className={`size-3 rounded-full ${g.served ? "bg-leaf" : "bg-ink/25"}`} />
               ))}
             </span>
           )}
-          <span className="h-1 w-full overflow-hidden rounded-full bg-ink/10">
-            <span className={`block h-full ${patience < 0.3 ? "bg-chili" : "bg-leaf"}`} style={{ width: `${patience * 100}%` }} />
+          <span className="h-1.5 w-full overflow-hidden rounded-full bg-ink/10">
+            <span className={`block h-full ${patience < 0.3 ? "bg-chili" : patience < 0.6 ? "bg-amber-400" : "bg-leaf"}`} style={{ width: `${patience * 100}%` }} />
           </span>
         </button>
       )}
@@ -320,7 +331,7 @@ function TableOverlay({ table, s, cupReady, onTap }: { table: number; s: GameSta
 
 const TRIP_MS = 1300;
 
-const Anne = memo(function Anne({ serveEvent }: { serveEvent: Props["serveEvent"] }) {
+const Anne = memo(function Anne({ serveEvent, look }: { serveEvent: Props["serveEvent"]; look: Look }) {
   const trip = useRef<{ table: number; start: number } | null>(null);
   const lastId = useRef<number | null>(null);
 
@@ -349,7 +360,7 @@ const Anne = memo(function Anne({ serveEvent }: { serveEvent: Props["serveEvent"
     return { x: pos.x, z: pos.y, rotY: Math.atan2(dir.x, dir.y), walking: true, seated: false, carrying: out };
   }, []);
 
-  return <Person look={ANNE_LOOK} getPose={getPose} />;
+  return <Person look={look} getPose={getPose} />;
 });
 
 // ---------- Static set ----------

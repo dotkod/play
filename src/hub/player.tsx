@@ -1,9 +1,10 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { Look } from "@/shared/three/look";
+import { currentOutfit } from "@/games/anne-maju/progress";
 import { sfx } from "@/shared/audio";
 import { Person, type Pose } from "@/shared/three/person";
 import { type Circle, dynamicColliders, staticColliders } from "./colliders";
@@ -13,7 +14,7 @@ import { type Building, BOUNDS, BUILDINGS, doorSpot, footprint } from "./world-d
 
 const SPEED = 6;
 const RADIUS = 0.45;
-const PLAYER_LOOK: Look = { skin: "#c98d60", shirt: "#fcd34d", pants: "#2a2a33", headwear: "cap", hair: "#d8352a" };
+const PLAYER_LOOK: Look = { skin: "#c98d60", shirt: "#fcd34d", pants: "#2a2a33", headwear: "short", hair: "#2b2018" };
 
 // Solid footprints, slightly inflated so the player doesn't clip into walls
 const solids = BUILDINGS.map((b) => {
@@ -179,11 +180,14 @@ export function Player({
     }
   });
 
+  // Wear whatever outfit was picked in Anne Maju
+  const [look] = useState<Look>(() => ({ ...PLAYER_LOOK, ...currentOutfit().look }));
+
   const getPose = useMemo(() => (): Pose => ({ x: pos.current.x, z: pos.current.z, rotY: rot.current, walking: moving.current, seated: false }), []);
 
   return (
     <>
-      <Person look={PLAYER_LOOK} getPose={getPose} />
+      <Person look={look} getPose={getPose} />
       {/* Ground ring so you can always spot yourself */}
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.55, 0.72, 32]} />

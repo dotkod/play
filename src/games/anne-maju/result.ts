@@ -15,6 +15,12 @@ export function rankFor(earnedSen: number, lang: Lang = "ms") {
   return { ...RANKS[i], title: t(lang).ranks[i] };
 }
 
+// The next rank up, for the "RM x more to become ..." nudge
+export function nextRank(earnedSen: number, lang: Lang = "ms") {
+  const i = RANKS.findIndex((r) => r.min > earnedSen);
+  return i < 0 ? null : { min: RANKS[i].min, title: t(lang).ranks[i] };
+}
+
 export const rm = (sen: number) => `RM${(sen / 100).toFixed(2)}`;
 
 // Share URLs look like /anne-maju/k/4720-12; only digits so OG images can't render arbitrary text
