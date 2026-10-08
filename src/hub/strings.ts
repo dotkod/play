@@ -14,8 +14,6 @@ const ms = {
   tagline: "Jalan-jalan dalam bandar, masuk kedai, terus main. Percuma, tak perlu install.",
   startCta: "▶ Mula jalan",
   startKey: "atau tekan Enter",
-  inCity: "Dalam bandar",
-  playNow: "Main sekarang",
   controlsDesktop: "🎮 WASD / anak panah · klik untuk jalan · Enter untuk masuk",
   controlsTouch: "🎮 Joystick atau tap untuk jalan",
 };
@@ -36,8 +34,6 @@ const en: Strings = {
   tagline: "Walk the city, step into a shop, start playing. Free, nothing to install.",
   startCta: "▶ Start exploring",
   startKey: "or press Enter",
-  inCity: "In the city",
-  playNow: "Play now",
   controlsDesktop: "🎮 WASD / arrows · click to walk · Enter to go in",
   controlsTouch: "🎮 Joystick or tap to walk",
 };

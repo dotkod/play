@@ -30,7 +30,7 @@ export const BUILDINGS: Building[] = [
   { id: "anne-maju", kind: "mamak", sign: "RESTORAN ANNE MAJU", x: 15, side: "north", w: 10, d: 8, h: 5, color: "#f4efe4", game: { slug: "anne-maju", title: "Anne Maju", emoji: "🍵" } },
   { id: "runcit", kind: "shophouse", sign: "KEDAI RUNCIT AH SENG", x: 26.5, side: "north", w: 8, d: 8, h: 6.5, color: "#f2c46b" },
   { id: "klinik", kind: "shophouse", sign: "KLINIK 24 JAM", x: 35, side: "north", w: 7, d: 8, h: 6, color: "#bfe1f2" },
-  { id: "parking", kind: "mall", sign: "MEGA MALL", x: -20, side: "north", w: 18, d: 12, h: 9, color: "#d9d4f0", soon: { title: "Cari Parking", emoji: "🚗" } },
+  { id: "parking", kind: "mall", sign: "MEGA MALL", x: -20, side: "north", w: 18, d: 12, h: 9, color: "#d9d4f0" },
   { id: "kopitiam", kind: "shophouse", sign: "KOPITIAM", x: -34, side: "north", w: 7, d: 8, h: 6, color: "#f5b7a3" },
   { id: "lrt", kind: "lrt", sign: "STESEN LRT", x: -19, side: "south", w: 16, d: 9, h: 4.6, color: "#e6e9ec", soon: { title: "Stesen LRT", emoji: "🚇" } },
   { id: "gunting", kind: "shophouse", sign: "KEDAI GUNTING", x: -34, side: "south", w: 7, d: 8, h: 6, color: "#a8d8b0" },

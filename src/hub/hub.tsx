@@ -197,8 +197,6 @@ export function Hub() {
 
 // Title screen over the live city: logo, what's inside, and one big button to start walking
 function StartScreen({ tr, touch, onStart }: { tr: (typeof HUB_STRINGS)["ms"]; touch: boolean; onStart: () => void }) {
-  const live = BUILDINGS.filter((b) => b.game);
-  const soon = BUILDINGS.filter((b) => b.soon);
   return (
     <div
       className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 overflow-y-auto bg-gradient-to-b from-ink/70 via-ink/45 to-ink/80 px-6 py-8 text-center text-cream"
@@ -209,18 +207,6 @@ function StartScreen({ tr, touch, onStart }: { tr: (typeof HUB_STRINGS)["ms"]; t
         ▶ PLAY
       </h1>
       <p className="max-w-md text-base font-bold text-cream/90 sm:text-lg">{tr.tagline}</p>
-      <div className="flex flex-wrap justify-center gap-2 text-sm font-extrabold">
-        {live.map((b) => (
-          <span key={b.id} className="rounded-xl bg-amber-300 px-3 py-1.5 text-ink shadow-[0_3px_0_#1f1a17]">
-            {b.game!.emoji} {b.game!.title} · {tr.playNow}
-          </span>
-        ))}
-        {soon.map((b) => (
-          <span key={b.id} className="rounded-xl bg-cream/15 px-3 py-1.5 backdrop-blur">
-            {b.soon!.emoji} {b.soon!.title} · {tr.soon}
-          </span>
-        ))}
-      </div>
       <button
         type="button"
         onClick={(e) => {
