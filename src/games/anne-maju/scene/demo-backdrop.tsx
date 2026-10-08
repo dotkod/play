@@ -7,7 +7,7 @@ import { randomLook } from "./look";
 import MamakScene from "./mamak-scene";
 
 // The shop keeps running behind the menus: seated regulars, Anne doing rounds, camera slowly orbiting
-export default function DemoBackdrop() {
+export default function DemoBackdrop({ poster = false }: { poster?: boolean }) {
   const [demo] = useState<GameState>(() => {
     const regular = (id: number): Customer => ({
       id,
@@ -33,7 +33,7 @@ export default function DemoBackdrop() {
 
   return (
     <div className="absolute inset-0">
-      <MamakScene s={demo} cupReady={false} serveEvent={serve} onTable={() => {}} demo />
+      <MamakScene s={demo} cupReady={false} serveEvent={poster ? null : serve} onTable={() => {}} demo poster={poster} />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2 } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { GAME } from "@/games/anne-maju/meta";
 import { site } from "@/shared/site";
 import "./globals.css";
 
@@ -9,15 +8,21 @@ const baloo = Baloo_2({ variable: "--font-baloo", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
-  title: { default: GAME.name, template: `%s · ${GAME.name}` },
-  description: GAME.tagline,
+  title: { default: "Game Malaysia 3D Percuma", template: "%s" },
+  description: "Game 3D pendek pasal hidup Malaysia. Main terus dalam browser, takde install.",
+  applicationName: site.name,
+  formatDetection: { telephone: false },
+  openGraph: { siteName: site.name, locale: site.locale, type: "website" },
+  twitter: { card: "summary_large_image" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Anne Maju" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fbf3e4",
+  themeColor: "#2f8f86",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

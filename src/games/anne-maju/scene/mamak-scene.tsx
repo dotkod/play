@@ -24,16 +24,18 @@ type Props = {
   serveEvent: { table: number; id: number } | null;
   onTable: (i: number) => void;
   demo?: boolean;
+  // Frozen hero angle for the OG poster screenshot
+  poster?: boolean;
 };
 
-export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = false }: Props) {
+export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = false, poster = false }: Props) {
   const anchors = useRef<(HTMLDivElement | null)[]>([]);
   return (
     <div className="relative h-full w-full overflow-hidden">
     <Canvas shadows dpr={[1, 2]} gl={{ antialias: true }}>
       <Projector els={anchors} />
       <color attach="background" args={["#8fd6cc"]} />
-      <CameraRig demo={demo} />
+      <CameraRig demo={demo} poster={poster} />
       <hemisphereLight args={["#fffaf0", "#9db8a8", 1.4]} />
       <directionalLight
         position={[4, 9, 5]}
@@ -84,15 +86,15 @@ function Projector({ els }: { els: RefObject<(HTMLDivElement | null)[]> }) {
 }
 
 // Portrait phones need a wider lens to fit all four tables
-function CameraRig({ demo }: { demo: boolean }) {
+function CameraRig({ demo, poster }: { demo: boolean; poster: boolean }) {
   const aspect = useThree((st) => st.size.width / st.size.height);
   const portrait = aspect < 1;
   // Menus get a slow cinematic orbit around the shop
   useFrame(({ camera, clock }) => {
     if (!demo) return;
-    const a = Math.sin(clock.elapsedTime * 0.15) * 0.6;
-    const r = portrait ? 9.5 : 8.6;
-    camera.position.set(Math.sin(a) * r, portrait ? 6.2 : 5.2, Math.cos(a) * r - 0.6);
+    const a = poster ? 0.42 : Math.sin(clock.elapsedTime * 0.15) * 0.6;
+    const r = poster ? 7.4 : portrait ? 9.5 : 8.6;
+    camera.position.set(Math.sin(a) * r, poster ? 4.4 : portrait ? 6.2 : 5.2, Math.cos(a) * r - 0.6);
     camera.lookAt(0, 0.6, -0.8);
   });
   return (
