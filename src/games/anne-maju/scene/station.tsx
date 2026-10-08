@@ -164,7 +164,7 @@ function Slot({
         <ItemModel kind={option.kind} />
       </group>
       <mesh position={[0, 0.08, 0.55]} rotation={[-0.55, 0, 0]}>
-        <planeGeometry args={[width, width * 0.32]} />
+        <planeGeometry args={[width, width / CARD_ASPECT]} />
         <meshBasicMaterial map={card} transparent toneMapped={false} />
       </mesh>
       {/* Tap target covers item and card */}
@@ -391,14 +391,14 @@ function Vessel({ cup }: { cup: Cup }) {
 }
 
 function DoneSign({ text }: { text: string }) {
-  const card = cardTexture(text, "#1f8a4c", "#ffffff");
+  const card = cardTexture(text, "#1f8a4c", "#ffffff", DONE_ASPECT);
   const ref = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     if (ref.current) ref.current.position.y = 0.45 + Math.sin(clock.elapsedTime * 3) * 0.04;
   });
   return (
     <mesh ref={ref} position={[0, 0.45, SHELF_Z]} rotation={[-0.2, 0, 0]}>
-      <planeGeometry args={[2.6, 0.5]} />
+      <planeGeometry args={[2.6, 2.6 / DONE_ASPECT]} />
       <meshBasicMaterial map={card} transparent toneMapped={false} />
     </mesh>
   );
@@ -407,21 +407,26 @@ function DoneSign({ text }: { text: string }) {
 // Cached per label: the shelf remounts every step, and uncached canvas textures piled up on the GPU
 const cards = new Map<string, THREE.CanvasTexture>();
 
-function cardTexture(text: string, bg = "#fbf3e4", fg = "#1f1a17") {
-  const key = `${text}|${bg}|${fg}`;
+// Canvas is drawn at the same aspect as the plane it's mapped onto, so text never stretches
+const CARD_ASPECT = 3.2;
+const DONE_ASPECT = 5.2;
+
+function cardTexture(text: string, bg = "#fbf3e4", fg = "#1f1a17", aspect = CARD_ASPECT) {
+  const key = `${text}|${bg}|${fg}|${aspect}`;
   const hit = cards.get(key);
   if (hit) return hit;
   const c = document.createElement("canvas");
-  c.width = 512;
   c.height = 160;
+  c.width = Math.round(c.height * aspect);
+  const w = c.width;
   const g = c.getContext("2d")!;
   g.fillStyle = "#1f1a17";
   g.beginPath();
-  g.roundRect(6, 12, 500, 142, 36);
+  g.roundRect(6, 12, w - 12, 142, 36);
   g.fill();
   g.fillStyle = bg;
   g.beginPath();
-  g.roundRect(6, 4, 500, 140, 36);
+  g.roundRect(6, 4, w - 12, 140, 36);
   g.fill();
   g.fillStyle = fg;
   g.textAlign = "center";
@@ -430,8 +435,8 @@ function cardTexture(text: string, bg = "#fbf3e4", fg = "#1f1a17") {
   do {
     g.font = `900 ${size}px system-ui, sans-serif`;
     size -= 4;
-  } while (g.measureText(text).width > 450 && size > 30);
-  g.fillText(text, 256, 78);
+  } while (g.measureText(text).width > w - 60 && size > 30);
+  g.fillText(text, w / 2, 78);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   cards.set(key, tex);
