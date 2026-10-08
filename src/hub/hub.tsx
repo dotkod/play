@@ -132,7 +132,7 @@ export function Hub() {
       {/* Brand + language */}
       <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2">
         <div className={`pointer-events-auto rounded-2xl bg-ink/85 px-3 py-1.5 text-cream shadow-[0_4px_0_#1f1a17] transition-opacity ${started ? "" : "opacity-0"}`}>
-          <p className="text-xl leading-none font-extrabold tracking-wide text-amber-300 [-webkit-text-stroke:4px_#1f1a17] [paint-order:stroke_fill]">▶ PLAY</p>
+          <p className="text-xl leading-none font-extrabold tracking-wide text-amber-300 [-webkit-text-stroke:4px_#1f1a17] [paint-order:stroke_fill]">▶ PLAY <span className="text-chili">MY</span></p>
           <p className="text-[11px] font-bold opacity-80">{tr.brand}</p>
         </div>
         <div className="pointer-events-auto flex gap-2">
@@ -204,7 +204,7 @@ function StartScreen({ tr, touch, onStart }: { tr: (typeof HUB_STRINGS)["ms"]; t
     >
       <span className="rounded-full bg-chili px-4 py-1 text-xs font-extrabold tracking-wide uppercase">🇲🇾 {tr.brand}</span>
       <h1 className="animate-pop text-[clamp(4rem,16vh,9rem)] leading-[0.85] font-extrabold text-amber-300 [-webkit-text-stroke:10px_#1f1a17] [paint-order:stroke_fill]">
-        ▶ PLAY
+        ▶ PLAY <span className="text-chili">MY</span>
       </h1>
       <p className="max-w-md text-base font-bold text-cream/90 sm:text-lg">{tr.tagline}</p>
       <button

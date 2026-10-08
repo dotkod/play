@@ -14,8 +14,8 @@ export function HubPoster() {
     <div className="relative h-[630px] w-[1200px] overflow-hidden">
       <World spawn={SPAWN} onZone={noop} poster />
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-center gap-4 bg-gradient-to-r from-ink/85 via-ink/40 to-transparent px-16">
-        <span className="w-fit rounded-full bg-chili px-5 py-1.5 text-xl font-extrabold tracking-wide text-white uppercase">🇲🇾 Bandar game 3D</span>
-        <h1 className={`text-[150px] leading-[0.85] font-extrabold text-amber-300 ${stroke}`}>▶ PLAY</h1>
+        <span className="w-fit rounded-full bg-chili px-5 py-1.5 text-xl font-extrabold tracking-wide text-white uppercase">🇲🇾 Game 3D Malaysia</span>
+        <h1 className={`text-[112px] leading-[0.85] font-extrabold text-amber-300 ${stroke}`}>▶ PLAY <span className="text-chili">MY</span></h1>
         <p className="max-w-lg text-3xl font-bold text-cream">Jalan-jalan, masuk kedai, terus main. Percuma dalam browser.</p>
         <div className="mt-1 flex gap-3">
           <span className="rounded-2xl bg-amber-300 px-5 py-2.5 text-2xl font-extrabold text-ink shadow-[0_6px_0_#1f1a17]">🍵 Anne Maju</span>

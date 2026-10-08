@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
 
-// "Add to Home Screen" opens the Play city fullscreen
+// "Add to Home Screen" opens the Play MY city fullscreen
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Play · Bandar Game 3D Malaysia",
-    short_name: "Play",
+    name: "Play MY",
+    short_name: "Play MY",
     description: "Bandar 3D ala Malaysia penuh game pendek. Jalan-jalan, masuk kedai, terus main.",
     start_url: "/",
     display: "fullscreen",

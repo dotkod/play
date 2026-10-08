@@ -4,6 +4,6 @@ const vercelProd = process.env.VERCEL_PROJECT_PRODUCTION_URL;
 
 export const site = {
   url: process.env.NEXT_PUBLIC_SITE_URL ?? (vercelProd ? `https://${vercelProd}` : "http://localhost:3210"),
-  name: "Play",
+  name: "Play MY",
   locale: "ms_MY",
 };
