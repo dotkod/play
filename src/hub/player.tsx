@@ -53,10 +53,13 @@ export function Player({
   spawn,
   onZone,
   followCamera = true,
+  active = true,
 }: {
   spawn: { x: number; z: number; rotY: number };
   onZone: (b: Building | null) => void;
   followCamera?: boolean;
+  // False while the start screen is up: no movement, camera circles the junction instead
+  active?: boolean;
 }) {
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const rot = useRef(spawn.rotY);
@@ -73,9 +76,22 @@ export function Player({
   const camPos = useMemo(() => new THREE.Vector3(), []);
   const aspect = useThree((s) => s.size.width / s.size.height);
 
-  useFrame(({ camera }, rawDt) => {
+  useFrame(({ camera, clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const p = pos.current;
+
+    if (!active) {
+      // Attract mode: slow orbit over the junction behind the start screen
+      input.target = null;
+      playerShared.x = p.x;
+      playerShared.z = p.z;
+      if (followCamera) {
+        const a = clock.elapsedTime * 0.08;
+        camera.position.set(Math.sin(a) * 26, 18, Math.cos(a) * 26);
+        camera.lookAt(4, 0, -2);
+      }
+      return;
+    }
 
     // Joystick/keys win over tap-to-walk; input is relative to where the camera is facing
     const mv = moveVector();
@@ -121,6 +137,7 @@ export function Player({
     if (bumped && input.target && Math.hypot(input.target.x - p.x, input.target.z - p.z) < 1.5) input.target = null;
     playerShared.x = p.x;
     playerShared.z = p.z;
+    playerShared.rot = rot.current;
 
     // Swing the camera round to face whichever row of shops you're walking along (with hysteresis)
     if (p.z > 3.4) yawTarget.current = Math.PI;

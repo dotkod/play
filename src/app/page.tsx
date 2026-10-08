@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Hub } from "@/hub/hub";
+import { HubClient } from "@/hub/hub-client";
 import { site } from "@/shared/site";
 
 const title = "Play · Bandar Game 3D Malaysia";
@@ -35,7 +35,7 @@ export default function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <h1 className="sr-only">{title}</h1>
       <p className="sr-only">{description}</p>
-      <Hub />
+      <HubClient />
     </>
   );
 }

@@ -17,9 +17,10 @@ type Props = {
   onZone: (b: Building | null) => void;
   // Fixed aerial shot for the OG image instead of the follow camera
   poster?: boolean;
+  active?: boolean;
 };
 
-export default function World({ spawn, onZone, poster = false }: Props) {
+export default function World({ spawn, onZone, poster = false, active = true }: Props) {
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
   const wrap = useRef<HTMLDivElement>(null);
@@ -48,7 +49,7 @@ export default function World({ spawn, onZone, poster = false }: Props) {
         <TrafficLights />
         <Traffic />
         <Pedestrians />
-        <Player spawn={spawn} onZone={onZone} followCamera={!poster} />
+        <Player spawn={spawn} onZone={onZone} followCamera={!poster} active={active} />
         {poster && <PosterCamera />}
       </Canvas>
     </div>

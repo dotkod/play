@@ -24,7 +24,7 @@ export function signalFor(axis: Axis, t: number): Signal {
 }
 
 // Where the player is, so vehicles can stop for them
-export const player = { x: 0, z: 0 };
+export const player = { x: 0, z: 0, rot: 0 };
 
 // Each pole faces traffic arriving from one side
 const POLES: { axis: Axis; x: number; z: number; rotY: number }[] = [

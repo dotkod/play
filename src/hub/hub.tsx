@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ambience, audioReady, music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
 import { bindKeyboard, input } from "./controls";
+import { Minimap } from "./minimap";
 import { HUB_STRINGS } from "./strings";
 import { type Building, BUILDINGS, doorSpot } from "./world-data";
 
@@ -18,17 +19,20 @@ const World = dynamic(() => import("./world"), {
 export const SPAWN_KEY = "dotkod-play:spawn";
 const DEFAULT_SPAWN = { x: 7.5, z: -4.4, rotY: Math.PI / 2 };
 
+// Returning from a game skips the start screen and puts you back at that building's door
 function readSpawn() {
+  const fresh = { spawn: DEFAULT_SPAWN, returning: false };
+  if (typeof window === "undefined") return fresh;
   try {
     const id = sessionStorage.getItem(SPAWN_KEY);
     sessionStorage.removeItem(SPAWN_KEY);
     const b = BUILDINGS.find((x) => x.id === id);
-    if (!b) return DEFAULT_SPAWN;
+    if (!b) return fresh;
     const d = doorSpot(b);
     // Step a little further out and face the road
-    return { x: d.x, z: d.z + d.facing * 1.2, rotY: d.facing > 0 ? 0 : Math.PI };
+    return { spawn: { x: d.x, z: d.z + d.facing * 1.2, rotY: d.facing > 0 ? 0 : Math.PI }, returning: true };
   } catch {
-    return DEFAULT_SPAWN;
+    return fresh;
   }
 }
 
@@ -36,7 +40,8 @@ export function Hub() {
   const router = useRouter();
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
-  const [spawn] = useState(() => (typeof window === "undefined" ? DEFAULT_SPAWN : readSpawn()));
+  const [{ spawn, returning }] = useState(readSpawn);
+  const [started, setStarted] = useState(returning);
   const [zone, setZone] = useState<Building | null>(null);
   const [touch, setTouch] = useState(false);
   const featured = BUILDINGS.find((b) => b.game)!;
@@ -60,6 +65,28 @@ export function Hub() {
       ambience.stop();
     };
   }, []);
+
+  const start = () => {
+    unlockAudio();
+    sfx.start();
+    music.start("city");
+    ambience.start();
+    setStarted(true);
+  };
+
+  // Enter or Space dismisses the start screen
+  useEffect(() => {
+    if (started) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        input.enter = false;
+        start();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   // A soft chime whenever you step up to a door
   useEffect(() => {
@@ -93,18 +120,18 @@ export function Hub() {
     const id = setInterval(() => {
       if (!input.enter) return;
       input.enter = false;
-      if (zone?.game) enter(zone);
+      if (started && zone?.game) enter(zone);
     }, 50);
     return () => clearInterval(id);
   });
 
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
-      <World spawn={spawn} onZone={setZone} />
+      <World spawn={spawn} onZone={setZone} active={started} />
 
       {/* Brand + language */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-        <div className="pointer-events-auto rounded-2xl bg-ink/85 px-3 py-1.5 text-cream shadow-[0_4px_0_#1f1a17]">
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2">
+        <div className={`pointer-events-auto rounded-2xl bg-ink/85 px-3 py-1.5 text-cream shadow-[0_4px_0_#1f1a17] transition-opacity ${started ? "" : "opacity-0"}`}>
           <p className="text-xl leading-none font-extrabold tracking-wide text-amber-300 [-webkit-text-stroke:4px_#1f1a17] [paint-order:stroke_fill]">▶ PLAY</p>
           <p className="text-[11px] font-bold opacity-80">{tr.brand}</p>
         </div>
@@ -120,8 +147,16 @@ export function Hub() {
         </div>
       </div>
 
+      {!started && <StartScreen tr={tr} touch={touch} onStart={start} />}
+
+      {started && (
+        <div className="absolute right-3 bottom-3">
+          <Minimap size={touch ? 112 : 150} />
+        </div>
+      )}
+
       {/* Goal hint, hidden once you're at a door */}
-      {!zone && (
+      {started && !zone && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1 px-4 text-center">
           <p className="rounded-full bg-amber-300 px-4 py-1.5 text-sm font-extrabold text-ink shadow-[0_4px_0_#1f1a17]">
             {featured.game!.emoji} {tr.goTo(featured.game!.title)}
@@ -131,7 +166,7 @@ export function Hub() {
       )}
 
       {/* Door prompt */}
-      {zone && (
+      {started && zone && (
         <div className="absolute inset-x-0 bottom-4 flex justify-center px-4">
           <div className="flex animate-pop items-center gap-3 rounded-2xl bg-cream p-2 pl-4 shadow-[0_6px_0_#1f1a17]">
             <div>
@@ -155,7 +190,49 @@ export function Hub() {
         </div>
       )}
 
-      {touch && <Joystick />}
+      {started && touch && <Joystick />}
+    </div>
+  );
+}
+
+// Title screen over the live city: logo, what's inside, and one big button to start walking
+function StartScreen({ tr, touch, onStart }: { tr: (typeof HUB_STRINGS)["ms"]; touch: boolean; onStart: () => void }) {
+  const live = BUILDINGS.filter((b) => b.game);
+  const soon = BUILDINGS.filter((b) => b.soon);
+  return (
+    <div
+      className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 overflow-y-auto bg-gradient-to-b from-ink/70 via-ink/45 to-ink/80 px-6 py-8 text-center text-cream"
+      onClick={onStart}
+    >
+      <span className="rounded-full bg-chili px-4 py-1 text-xs font-extrabold tracking-wide uppercase">🇲🇾 {tr.brand}</span>
+      <h1 className="animate-pop text-[clamp(4rem,16vh,9rem)] leading-[0.85] font-extrabold text-amber-300 [-webkit-text-stroke:10px_#1f1a17] [paint-order:stroke_fill]">
+        ▶ PLAY
+      </h1>
+      <p className="max-w-md text-base font-bold text-cream/90 sm:text-lg">{tr.tagline}</p>
+      <div className="flex flex-wrap justify-center gap-2 text-sm font-extrabold">
+        {live.map((b) => (
+          <span key={b.id} className="rounded-xl bg-amber-300 px-3 py-1.5 text-ink shadow-[0_3px_0_#1f1a17]">
+            {b.game!.emoji} {b.game!.title} · {tr.playNow}
+          </span>
+        ))}
+        {soon.map((b) => (
+          <span key={b.id} className="rounded-xl bg-cream/15 px-3 py-1.5 backdrop-blur">
+            {b.soon!.emoji} {b.soon!.title} · {tr.soon}
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onStart();
+        }}
+        className="mt-2 rounded-2xl bg-amber-300 px-10 py-4 text-2xl font-extrabold text-ink shadow-[0_6px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
+      >
+        {tr.startCta}
+      </button>
+      {!touch && <p className="text-xs font-bold text-cream/60">{tr.startKey}</p>}
+      <p className="text-xs font-bold text-cream/70">{touch ? tr.controlsTouch : tr.controlsDesktop}</p>
     </div>
   );
 }
