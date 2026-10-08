@@ -1,15 +1,18 @@
 export type Result = { earned: number; served: number };
 
+import { type Lang, t } from "./strings";
+
 const RANKS = [
-  { min: 0, title: "Budak Baru Masuk Kerja", emoji: "🥲" },
-  { min: 1500, title: "Pembancuh Amatur", emoji: "🫗" },
-  { min: 3000, title: "Anne Senior", emoji: "💪" },
-  { min: 5000, title: "Tauke Mamak", emoji: "😎" },
-  { min: 7500, title: "Legenda Tarik 24 Jam", emoji: "🏆" },
+  { min: 0, emoji: "🥲" },
+  { min: 1500, emoji: "🫗" },
+  { min: 3000, emoji: "💪" },
+  { min: 5000, emoji: "😎" },
+  { min: 7500, emoji: "🏆" },
 ];
 
-export function rankFor(earnedSen: number) {
-  return [...RANKS].reverse().find((r) => earnedSen >= r.min)!;
+export function rankFor(earnedSen: number, lang: Lang = "ms") {
+  const i = RANKS.findLastIndex((r) => earnedSen >= r.min);
+  return { ...RANKS[i], title: t(lang).ranks[i] };
 }
 
 export const rm = (sen: number) => `RM${(sen / 100).toFixed(2)}`;

@@ -1,3 +1,5 @@
+import { type Lang, t } from "./strings";
+
 export const BASES = ["teh", "kopi", "milo", "nescafe"] as const;
 export const MILKS = ["susu", "o", "c"] as const;
 export const SUGARS = ["biasa", "kurang", "kosong"] as const;
@@ -11,13 +13,6 @@ export type Temp = (typeof TEMPS)[number];
 export type Drink = { base: Base; milk: Milk; sugar: Sugar; temp: Temp };
 export type Cup = Partial<Drink>;
 
-export const LABELS = {
-  base: { teh: "Teh", kopi: "Kopi", milo: "Milo", nescafe: "Nescafe" },
-  milk: { susu: "Susu pekat", o: "O (tak susu)", c: "C (susu cair)" },
-  sugar: { biasa: "Biasa", kurang: "Kurang manis", kosong: "Kosong" },
-  temp: { panas: "Panas", ais: "Ais" },
-} as const;
-
 // Milo/Nescafe "C" is rare at mamak, condensed milk is already sweet so "kosong" never pairs with susu
 export function isValidDrink(d: Drink): boolean {
   if (d.milk === "c" && (d.base === "milo" || d.base === "nescafe")) return false;
@@ -25,8 +20,11 @@ export function isValidDrink(d: Drink): boolean {
   return true;
 }
 
-export function drinkName(d: Drink): string {
-  const base = LABELS.base[d.base];
+const BASE_NAME: Record<Base, string> = { teh: "Teh", kopi: "Kopi", milo: "Milo", nescafe: "Nescafe" };
+
+// Drink names stay in mamak Malay in both languages; only the sugar note is translated
+export function drinkName(d: Drink, lang: Lang = "ms"): string {
+  const base = BASE_NAME[d.base];
   let name: string;
   if (d.milk === "susu") {
     if (d.temp === "ais") name = `${base} Ais`;
@@ -36,8 +34,8 @@ export function drinkName(d: Drink): string {
   } else {
     name = `${base} ${d.milk.toUpperCase()}${d.temp === "ais" ? " Ais" : ""}`;
   }
-  if (d.sugar === "kurang") name += " Kurang Manis";
-  if (d.sugar === "kosong") name += " Kosong";
+  if (d.sugar === "kurang") name += ` ${t(lang).sugarKurang}`;
+  if (d.sugar === "kosong") name += ` ${t(lang).sugarKosong}`;
   return name;
 }
 
@@ -73,24 +71,19 @@ export function randomDrink(difficulty: number): Drink {
   }
 }
 
-const CALLS = ["Anne", "Boss", "Macha", "Bang", "Adik", "Thambi"];
-const ENDS = ["satu!", "satu ya!", "satu, cepat sikit!", "satu lah!", "satu, terima kasih!"];
-
-export function orderPhrase(d: Drink): string {
-  return `${pick(CALLS)}, ${drinkName(d).toLowerCase()} ${pick(ENDS)}`;
+// Groups say identical drinks once with a count: "teh tarik dua, milo ais satu"
+export function orderPhrase(drinks: Drink[], lang: Lang, seed: number): string {
+  const tr = t(lang);
+  const counts = new Map<string, number>();
+  for (const d of drinks) {
+    const name = drinkName(d, lang).toLowerCase();
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const items = [...counts].map(([name, n]) => (lang === "ms" ? `${name} ${tr.numbers[n]}` : `${tr.numbers[n]} ${name}`));
+  const call = tr.calls[seed % tr.calls.length];
+  const end = tr.ends[Math.floor(seed / 7) % tr.ends.length];
+  return `${call}, ${items.join(", ")}${end}`;
 }
-
-export const WRONG_LINES = [
-  "Aiyo, bukan ini saya order la!",
-  "Eh boss, salah ni!",
-  "Saya cakap lain la anne...",
-  "Ini air siapa punya?",
-  "Haih, tak dengar ke?",
-];
-
-export const LEAVE_LINES = ["Lama sangat, blah dulu!", "Tak apa la, pergi kedai sebelah.", "Order pun tak ambil..."];
-
-export const HAPPY_LINES = ["Terbaik boss!", "Power la anne!", "Ngam!", "Sedap, terima kasih!", "Ini baru betul!"];
 
 export function randomLine(lines: readonly string[]): string {
   return pick(lines);

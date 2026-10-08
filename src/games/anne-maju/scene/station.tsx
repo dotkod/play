@@ -2,35 +2,36 @@
 
 import { OrthographicCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { type Cup, cupColor } from "../drinks";
+import { type Lang, t } from "../strings";
 import { currentStep, type Step } from "../state";
 import { Box, Cyl, ToonMaterial, toonGradient } from "./toon";
 
 type Kind = "mug" | "glass" | "teh" | "kopi" | "milo" | "nescafe" | "pekat" | "cair" | "none" | "sugar0" | "sugar1" | "sugar2";
-type Option = { value: string; kind: Kind; label: string };
+type Option = { value: string; kind: Kind };
 
 const OPTIONS: Record<Step, Option[]> = {
   temp: [
-    { value: "panas", kind: "mug", label: "PANAS" },
-    { value: "ais", kind: "glass", label: "AIS" },
+    { value: "panas", kind: "mug" },
+    { value: "ais", kind: "glass" },
   ],
   base: [
-    { value: "teh", kind: "teh", label: "TEH" },
-    { value: "kopi", kind: "kopi", label: "KOPI" },
-    { value: "milo", kind: "milo", label: "MILO" },
-    { value: "nescafe", kind: "nescafe", label: "NESCAFE" },
+    { value: "teh", kind: "teh" },
+    { value: "kopi", kind: "kopi" },
+    { value: "milo", kind: "milo" },
+    { value: "nescafe", kind: "nescafe" },
   ],
   milk: [
-    { value: "susu", kind: "pekat", label: "SUSU" },
-    { value: "c", kind: "cair", label: "C" },
-    { value: "o", kind: "none", label: "O" },
+    { value: "susu", kind: "pekat" },
+    { value: "c", kind: "cair" },
+    { value: "o", kind: "none" },
   ],
   sugar: [
-    { value: "biasa", kind: "sugar2", label: "BIASA" },
-    { value: "kurang", kind: "sugar1", label: "KURANG" },
-    { value: "kosong", kind: "sugar0", label: "KOSONG" },
+    { value: "biasa", kind: "sugar2" },
+    { value: "kurang", kind: "sugar1" },
+    { value: "kosong", kind: "sugar0" },
   ],
 };
 
@@ -54,7 +55,8 @@ const VIEW_H = 3.0;
 
 type Fx = { id: number; kind: Kind; from: THREE.Vector3 };
 
-export default function DrinkStation({ cup, onPick }: { cup: Cup; onPick: (step: Step, value: string) => void }) {
+// Memoised: the game ticks 10x a second, but the station only needs to update when the cup changes
+export default memo(function DrinkStation({ cup, lang, onPick }: { cup: Cup; lang: Lang; onPick: (step: Step, value: string) => void }) {
   const step = currentStep(cup);
   const [fx, setFx] = useState<Fx | null>(null);
 
@@ -65,7 +67,7 @@ export default function DrinkStation({ cup, onPick }: { cup: Cup; onPick: (step:
   };
 
   return (
-    <Canvas dpr={[1, 2]}>
+    <Canvas dpr={[1, 1.5]}>
       <Rig />
       <color attach="background" args={["#2f8f86"]} />
       <hemisphereLight args={["#fffaf0", "#7d6b55", 1.5]} />
@@ -74,12 +76,12 @@ export default function DrinkStation({ cup, onPick }: { cup: Cup; onPick: (step:
       <Backdrop />
       <Vessel cup={cup} />
       {/* Remount the shelf per step so each set of items pops in fresh */}
-      <Shelf key={step ?? "done"} options={step ? OPTIONS[step] : []} onPick={pick} />
-      {!step && <DoneSign />}
+      <Shelf key={step ?? "done"} options={step ? OPTIONS[step] : []} lang={lang} onPick={pick} />
+      {!step && <DoneSign text={t(lang).ready} />}
       {fx && <PourFx key={fx.id} fx={fx} />}
     </Canvas>
   );
-}
+});
 
 function Rig() {
   const size = useThree((st) => st.size);
@@ -88,12 +90,12 @@ function Rig() {
 }
 
 function Backdrop() {
-  const tiles = useMemo(() => tileTexture(), []);
+  const tileMap = tileTexture();
   return (
     <group>
       <mesh position={[0, 1.5, -1.1]}>
         <planeGeometry args={[8, 4]} />
-        <meshBasicMaterial map={tiles} toneMapped={false} />
+        <meshBasicMaterial map={tileMap} toneMapped={false} />
       </mesh>
       {/* Wooden shelf the options sit on */}
       <Box size={[3.6, 0.08, 0.8]} position={[0, -0.04, SHELF_Z]} color="#b9773f" />
@@ -107,23 +109,37 @@ function Backdrop() {
   );
 }
 
-function Shelf({ options, onPick }: { options: Option[]; onPick: (o: Option, from: THREE.Vector3) => void }) {
+function Shelf({ options, lang, onPick }: { options: Option[]; lang: Lang; onPick: (o: Option, from: THREE.Vector3) => void }) {
   const gap = Math.min(0.95, (VIEW_W - 0.1) / Math.max(options.length, 1));
   return (
     <>
       {options.map((o, i) => {
         const x = (i - (options.length - 1) / 2) * gap;
-        return <Slot key={o.value} option={o} x={x} delay={i * 70} width={gap * 0.92} onPick={onPick} />;
+        return <Slot key={o.value} option={o} label={t(lang).labels[o.value]} x={x} delay={i * 70} width={gap * 0.92} onPick={onPick} />;
       })}
     </>
   );
 }
 
 // One pickable item on the shelf: pops in, bobs gently, label card underneath
-function Slot({ option, x, delay, width, onPick }: { option: Option; x: number; delay: number; width: number; onPick: (o: Option, from: THREE.Vector3) => void }) {
+function Slot({
+  option,
+  label,
+  x,
+  delay,
+  width,
+  onPick,
+}: {
+  option: Option;
+  label: string;
+  x: number;
+  delay: number;
+  width: number;
+  onPick: (o: Option, from: THREE.Vector3) => void;
+}) {
   const group = useRef<THREE.Group>(null);
   const born = useRef<number | null>(null);
-  const card = useMemo(() => cardTexture(option.label), [option.label]);
+  const card = cardTexture(label);
 
   useFrame(({ clock }) => {
     if (!group.current) return;
@@ -374,8 +390,8 @@ function Vessel({ cup }: { cup: Cup }) {
   );
 }
 
-function DoneSign() {
-  const card = useMemo(() => cardTexture("SIAP! TAP PELANGGAN", "#1f8a4c", "#ffffff"), []);
+function DoneSign({ text }: { text: string }) {
+  const card = cardTexture(text, "#1f8a4c", "#ffffff");
   const ref = useRef<THREE.Mesh>(null);
   useFrame(({ clock }) => {
     if (ref.current) ref.current.position.y = 0.45 + Math.sin(clock.elapsedTime * 3) * 0.04;
@@ -388,7 +404,13 @@ function DoneSign() {
   );
 }
 
+// Cached per label: the shelf remounts every step, and uncached canvas textures piled up on the GPU
+const cards = new Map<string, THREE.CanvasTexture>();
+
 function cardTexture(text: string, bg = "#fbf3e4", fg = "#1f1a17") {
+  const key = `${text}|${bg}|${fg}`;
+  const hit = cards.get(key);
+  if (hit) return hit;
   const c = document.createElement("canvas");
   c.width = 512;
   c.height = 160;
@@ -412,10 +434,14 @@ function cardTexture(text: string, bg = "#fbf3e4", fg = "#1f1a17") {
   g.fillText(text, 256, 78);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  cards.set(key, tex);
   return tex;
 }
 
+let tiles: THREE.CanvasTexture | null = null;
+
 function tileTexture() {
+  if (tiles) return tiles;
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const g = c.getContext("2d")!;
@@ -435,5 +461,6 @@ function tileTexture() {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(8, 4);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tiles = tex;
   return tex;
 }

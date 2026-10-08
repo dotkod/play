@@ -1,36 +1,49 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { shareResult, type ShareOutcome } from "@/shared/share";
 import { useBestScore } from "@/shared/use-best-score";
-import {
-  type Cup,
-  drinkName,
-  isCupComplete,
-  orderPhrase,
-  randomDrink,
-  randomLine,
-  sameDrink,
-} from "./drinks";
+import { type Cup, drinkName, isCupComplete, randomDrink, randomLine, sameDrink } from "./drinks";
+import { getLang, type Lang, setLang, t, useLang, useT } from "./i18n";
 import { LeaderboardPanel, playerId, savedName, useBoard } from "./leaderboard-panel";
 import { GAME } from "./meta";
 import { encodeResult, rankFor, rm } from "./result";
-import { randomLook } from "./scene/look";
-import { currentStep, difficulty, type GameState, initialState, lines, reducer, SHIFT_MS, type Spawn, type Step, STEPS, timeLeft } from "./state";
+import { randomParty } from "./scene/look";
+import {
+  currentStep,
+  difficulty,
+  type GameState,
+  initialState,
+  type Lines,
+  partySize,
+  reducer,
+  SHIFT_MS,
+  type Spawn,
+  type Step,
+  STEPS,
+  timeLeft,
+} from "./state";
 
 // WebGL only exists in the browser
 const MamakScene = dynamic(() => import("./scene/mamak-scene"), {
   ssr: false,
-  loading: () => <div className="grid h-full place-items-center text-sm text-ink/50">Buka kedai...</div>,
+  loading: () => <div className="grid h-full place-items-center text-sm text-ink/50">{t().loading}</div>,
 });
 const DrinkStation = dynamic(() => import("./scene/station"), { ssr: false });
 const DemoBackdrop = dynamic(() => import("./scene/demo-backdrop"), { ssr: false });
 
-export function AnneMajuGame({ challenge }: { challenge?: string }) {
+// Customer lines are picked at dispatch time in whatever language is active
+function lines(): Lines {
+  const tr = t(getLang());
+  return { happy: randomLine(tr.happy), wrong: randomLine(tr.wrong), leave: randomLine(tr.leave), annoyed: tr.annoyedAsk, refused: tr.refusedAsk };
+}
+
+export function AnneMajuGame({ challenge }: { challenge?: number }) {
   const [s, dispatch] = useReducer(reducer, initialState);
   const [serveEvent, setServeEvent] = useState<{ table: number; id: number } | null>(null);
+  const lang = useLang();
   const stateRef = useRef(s);
   useLayoutEffect(() => {
     stateRef.current = s;
@@ -41,7 +54,7 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
     const id = setInterval(() => {
       const cur = stateRef.current;
       const now = Date.now();
-      const free = cur.tables.flatMap((c, i) => (c ? [] : [i]));
+      const free = cur.tables.flatMap((p, i) => (p ? [] : [i]));
       // Sound cues derived from what this tick is about to change
       const leftBefore = Math.ceil(timeLeft(cur) / 1000);
       const leftNow = Math.ceil(Math.max(0, SHIFT_MS - (now - cur.startAt)) / 1000);
@@ -53,23 +66,27 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
         sfx.over();
         music.setTempo(112);
       }
-      if (cur.tables.some((c) => c && c.leaveAt <= now)) sfx.walkout();
+      if (cur.tables.some((p) => p && p.leaveAt <= now)) sfx.walkout();
       let spawn: Spawn | null = null;
       if (free.length && now >= cur.nextSpawnAt) {
         sfx.arrive();
-        const order = randomDrink(difficulty(cur));
+        const d = difficulty(cur);
         spawn = {
           table: free[Math.floor(Math.random() * free.length)],
-          look: randomLook(),
-          order,
-          phrase: orderPhrase(order),
-          askedAgain: false,
+          guests: randomParty(partySize(d)).map((look) => ({ look, order: randomDrink(d), served: false })),
+          seed: Math.floor(Math.random() * 1000),
         };
       }
-      dispatch({ type: "tick", now, spawn, line: randomLine(lines.LEAVE_LINES) });
+      dispatch({ type: "tick", now, spawn, lines: lines() });
     }, 100);
     return () => clearInterval(id);
   }, [s.phase]);
+
+  // Stable so the memoised 3D counter doesn't re-render on every game tick
+  const onPick = useCallback((part: Step, value: string) => {
+    pickSound(part, value);
+    dispatch({ type: "pick", part, value });
+  }, []);
 
   if (s.phase !== "playing") {
     const start = () => {
@@ -91,7 +108,8 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
       >
         <DemoBackdrop />
         {s.phase === "intro" ? <Intro challenge={challenge} onStart={start} /> : <GameOver s={s} onRestart={start} />}
-        <div className="absolute top-3 right-3">
+        <div className="absolute top-3 right-3 flex gap-2">
+          <LangToggle />
           <MuteButton />
         </div>
         <RotateHint />
@@ -100,17 +118,18 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
   }
 
   const onTable = (i: number) => {
-    const c = s.tables[i];
-    if (!c || s.now < c.seatedAt) return;
-    if (isCupComplete(s.cup)) {
-      const correct = sameDrink(s.cup, c.order);
+    const p = s.tables[i];
+    if (!p || s.now < p.seatedAt) return;
+    const cup = s.cup;
+    if (isCupComplete(cup)) {
+      const correct = p.guests.some((g) => !g.served && sameDrink(cup, g.order));
       if (correct) sfx.correct();
       else sfx.wrong();
-      dispatch({ type: "serve", table: i, line: randomLine(correct ? lines.HAPPY_LINES : lines.WRONG_LINES) });
+      dispatch({ type: "serve", table: i, lines: lines() });
       setServeEvent({ table: i, id: (serveEvent?.id ?? 0) + 1 });
-    } else if (s.now >= c.revealUntil) {
+    } else if (s.now >= p.revealUntil) {
       sfx.tap();
-      dispatch({ type: "askAgain", table: i });
+      dispatch({ type: "askAgain", table: i, lines: lines() });
     }
   };
 
@@ -118,9 +137,10 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
     <div className="flex h-dvh w-full overflow-hidden select-none">
       <div className="relative min-w-0 flex-1">
         <MamakScene s={s} cupReady={isCupComplete(s.cup)} serveEvent={serveEvent} onTable={onTable} />
-        <div className="absolute top-3 left-3 flex items-center gap-2">
+        <div className="absolute bottom-3 left-3 flex items-center gap-2">
           <Hud s={s} />
           <MuteButton />
+          <LangToggle />
         </div>
       </div>
       <div className="flex h-full w-[min(360px,44vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)]">
@@ -136,16 +156,10 @@ export function AnneMajuGame({ challenge }: { challenge?: string }) {
           }}
         />
         <div className="relative min-h-0 flex-1">
-          <DrinkStation
-            cup={s.cup}
-            onPick={(part, value) => {
-              pickSound(part, value);
-              dispatch({ type: "pick", part, value });
-            }}
-          />
+          <DrinkStation cup={s.cup} lang={lang} onPick={onPick} />
           {s.cup.base && (
             <p className="pointer-events-none absolute inset-x-0 bottom-2 truncate px-3 text-center text-base font-extrabold text-white drop-shadow-[0_2px_0_#1f1a17]">
-              {cupTitle(s.cup)}
+              {cupTitle(s.cup, lang)}
             </p>
           )}
         </div>
@@ -175,10 +189,11 @@ function pickSound(part: Step, value: string) {
 
 function MuteButton() {
   const muted = useMuted();
+  const tr = useT();
   return (
     <button
       type="button"
-      aria-label={muted ? "Buka bunyi" : "Tutup bunyi"}
+      aria-label={muted ? tr.unmute : tr.mute}
       onClick={(e) => {
         e.stopPropagation();
         unlockAudio();
@@ -191,34 +206,37 @@ function MuteButton() {
   );
 }
 
-function cupTitle(cup: Cup) {
-  return drinkName({ milk: "o", sugar: "biasa", temp: "panas", base: "teh", ...cup });
+function LangToggle() {
+  const lang = useLang();
+  return (
+    <div className="flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg" role="group" aria-label="Language">
+      {(["ms", "en"] as Lang[]).map((l) => (
+        <button
+          key={l}
+          type="button"
+          aria-pressed={lang === l}
+          onClick={(e) => {
+            e.stopPropagation();
+            setLang(l);
+          }}
+          className={`h-full rounded-lg px-2 ${lang === l ? "bg-amber-300 text-ink" : "text-cream/70"}`}
+        >
+          {l === "ms" ? "BM" : "EN"}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-const STEP_META: Record<Step, { title: string; icon: string }> = {
-  temp: { title: "Cawan", icon: "☕" },
-  base: { title: "Serbuk", icon: "🫙" },
-  milk: { title: "Susu", icon: "🥛" },
-  sugar: { title: "Gula", icon: "🍬" },
-};
+function cupTitle(cup: Cup, lang: Lang) {
+  return drinkName({ milk: "o", sugar: "biasa", temp: "panas", base: "teh", ...cup }, lang);
+}
 
-const VALUE_LABEL: Record<string, string> = {
-  panas: "Panas",
-  ais: "Ais",
-  teh: "Teh",
-  kopi: "Kopi",
-  milo: "Milo",
-  nescafe: "Nescafe",
-  susu: "Susu",
-  c: "C",
-  o: "O",
-  biasa: "Biasa",
-  kurang: "Kurang",
-  kosong: "Kosong",
-};
+const STEP_ICON: Record<Step, string> = { temp: "☕", base: "🫙", milk: "🥛", sugar: "🍬" };
 
 // Four steps, always visible: done steps show the choice and can be tapped to redo
 function StepRail({ cup, onRewind, onDiscard }: { cup: Cup; onRewind: (p: Step) => void; onDiscard: () => void }) {
+  const tr = useT();
   const active = currentStep(cup);
   return (
     <div className="flex items-center gap-1 p-1.5">
@@ -236,16 +254,16 @@ function StepRail({ cup, onRewind, onDiscard }: { cup: Cup; onRewind: (p: Step) 
             }`}
           >
             <span className="text-[10px] font-bold opacity-70">
-              {i + 1}. {STEP_META[p].title}
+              {i + 1}. {tr.steps[p]}
             </span>
-            <span className="mt-0.5 truncate text-xs font-extrabold">{value ? VALUE_LABEL[value] : STEP_META[p].icon}</span>
+            <span className="mt-0.5 truncate text-xs font-extrabold">{value ? tr.values[value] : STEP_ICON[p]}</span>
           </button>
         );
       })}
       <button
         type="button"
         onClick={onDiscard}
-        aria-label="Buang air"
+        aria-label={tr.discard}
         className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/15 text-lg active:scale-95"
       >
         🗑️
@@ -255,11 +273,12 @@ function StepRail({ cup, onRewind, onDiscard }: { cup: Cup; onRewind: (p: Step) 
 }
 
 function RotateHint() {
+  const tr = useT();
   return (
     <div className="fixed inset-0 z-50 hidden flex-col items-center justify-center gap-3 bg-ink text-center text-cream portrait:flex">
       <span className="animate-bounce text-6xl">📱↻</span>
-      <p className="text-xl font-extrabold">Pusingkan phone</p>
-      <p className="text-sm opacity-70">Game ni main landscape</p>
+      <p className="text-xl font-extrabold">{tr.rotate}</p>
+      <p className="text-sm opacity-70">{tr.rotateSub}</p>
     </div>
   );
 }
@@ -275,18 +294,20 @@ function goLandscape() {
 
 const titleStroke = "[-webkit-text-stroke:7px_#1f1a17] [paint-order:stroke_fill]";
 
-function Intro({ challenge, onStart }: { challenge?: string; onStart: () => void }) {
+function Intro({ challenge, onStart }: { challenge?: number; onStart: () => void }) {
+  const tr = useT();
+  const lang = useLang();
   const { best } = useBestScore(GAME.storageKey);
   const { board } = useBoard();
   return (
     <div className="absolute inset-0 flex items-center justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent px-6 py-4 lg:px-14">
       <div className="flex max-w-md flex-col gap-2.5 text-cream">
-        <span className="w-fit rounded-full bg-chili px-3 py-1 text-xs font-extrabold tracking-wide uppercase">🇲🇾 Game mamak · 90 saat</span>
+        <span className="w-fit rounded-full bg-chili px-3 py-1 text-xs font-extrabold tracking-wide uppercase">{tr.badge}</span>
         <h1 className={`text-[clamp(2.2rem,7vh,4.5rem)] leading-[0.95] font-extrabold text-amber-300 ${titleStroke}`}>{GAME.name}</h1>
-        <p className="text-base font-semibold text-cream/90">{GAME.tagline}</p>
-        {challenge && <p className="animate-pop rounded-2xl bg-chili px-4 py-2 font-bold">{challenge}</p>}
+        <p className="text-base font-semibold text-cream/90">{tr.tagline}</p>
+        {challenge !== undefined && <p className="animate-pop rounded-2xl bg-chili px-4 py-2 font-bold">{tr.challenge(rm(challenge), rankFor(challenge, lang).title)}</p>}
         <div className="flex gap-2 text-xs font-bold">
-          {["👂 Dengar order", "🫗 Bancuh", "🪑 Hantar"].map((step, i) => (
+          {tr.steps3.map((step, i) => (
             <span key={step} className="rounded-xl bg-cream/15 px-2.5 py-1.5 backdrop-blur">
               {i + 1}. {step}
             </span>
@@ -297,19 +318,21 @@ function Intro({ challenge, onStart }: { challenge?: string; onStart: () => void
           onClick={onStart}
           className="mt-1 rounded-2xl bg-amber-300 py-4 text-2xl font-extrabold text-ink shadow-[0_6px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
         >
-          ▶ Mula shift
+          {tr.start}
         </button>
         <details className="rounded-2xl bg-cream/15 px-3 py-2 text-sm backdrop-blur">
-          <summary className="cursor-pointer font-bold">Cara main & kamus mamak</summary>
+          <summary className="cursor-pointer font-bold">{tr.howTo}</summary>
           <ul className="mt-2 space-y-1 text-xs text-cream/90">
-            <li>☕ 4 langkah: cawan (panas/ais) → serbuk → susu → gula.</li>
-            <li>🥛 <b>O</b> = tak letak susu · <b>C</b> = susu cair.</li>
-            <li>🍬 <b>Kurang</b> = kurang manis · <b>Kosong</b> = tak letak gula.</li>
-            <li>🤔 Lupa order? Tap pelanggan, tanya balik (tip kurang).</li>
-            <li>🍵 <b>Teh tarik</b> = panas + teh + susu + biasa.</li>
+            {tr.howToItems.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
           </ul>
         </details>
-        {best > 0 && <p className="text-sm font-bold text-cream/80">🏆 Rekod kau: {rm(best)}</p>}
+        {best > 0 && (
+          <p className="text-sm font-bold text-cream/80">
+            {tr.yourBest} {rm(best)}
+          </p>
+        )}
       </div>
       <div className="hidden w-64 shrink-0 self-end sm:block lg:w-72">
         <LeaderboardPanel board={board} highlight={savedName()} compact />
@@ -319,6 +342,8 @@ function Intro({ challenge, onStart }: { challenge?: string; onStart: () => void
 }
 
 function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
+  const tr = useT();
+  const lang = useLang();
   const { best, submit } = useBestScore(GAME.storageKey);
   const [prevBest] = useState(best);
   const [shareState, setShareState] = useState<ShareOutcome | null>(null);
@@ -327,7 +352,7 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
   const [saved, setSaved] = useState<{ rank: number | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const rank = rankFor(s.earned);
+  const rank = rankFor(s.earned, lang);
   const isRecord = s.earned > prevBest;
 
   useEffect(() => {
@@ -338,14 +363,13 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
   const onShare = async () => {
     sfx.tap();
     const url = `${window.location.origin}/${GAME.slug}/k/${encodeResult({ earned: s.earned, served: s.served })}`;
-    const text = `Aku kutip ${rm(s.earned)} satu shift kat ${GAME.name} ${rank.emoji} (${rank.title}). Kau boleh lawan?`;
-    setShareState(await shareResult({ title: GAME.name, text, url }));
+    setShareState(await shareResult({ title: GAME.name, text: tr.shareText(rm(s.earned), rank.emoji, rank.title), url }));
   };
 
   const onSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = name.trim();
-    if (clean.length < 2) return setError("Nama minimum 2 huruf");
+    if (clean.length < 2) return setError(tr.nameTooShort);
     setSaving(true);
     setError(null);
     try {
@@ -358,7 +382,7 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
         body: JSON.stringify({ playerId: playerId(), name: clean, earned: s.earned, served: s.served }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Tak dapat simpan");
+      if (!res.ok) throw new Error(data.error ?? tr.saveFailed);
       setSaved({ rank: data.weekRank });
       sfx.correct();
       await refresh();
@@ -373,31 +397,31 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
     <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px]">
       <div className="flex w-full max-w-4xl animate-pop flex-row items-stretch gap-3">
         <div className="flex flex-1 flex-col items-center justify-center rounded-3xl bg-cream p-4 text-center shadow-[0_6px_0_#1f1a17]">
-          <p className="text-xs font-extrabold tracking-widest text-ink/50 uppercase">Shift habis!</p>
+          <p className="text-xs font-extrabold tracking-widest text-ink/50 uppercase">{tr.shiftOver}</p>
           <p className="text-5xl">{rank.emoji}</p>
           <p className="text-base font-extrabold">{rank.title}</p>
           <p className={`text-5xl font-extrabold text-amber-300 ${titleStroke}`}>{rm(s.earned)}</p>
-          {isRecord && <p className="mt-1 rounded-full bg-chili px-3 py-0.5 text-xs font-bold text-white">Rekod baru!</p>}
+          {isRecord && <p className="mt-1 rounded-full bg-chili px-3 py-0.5 text-xs font-bold text-white">{tr.newRecord}</p>}
           <div className="mt-3 grid w-full grid-cols-4 gap-1.5 text-center text-xs">
-            <Stat label="Hantar" value={s.served} />
-            <Stat label="Salah" value={s.wrong} />
-            <Stat label="Lari" value={s.walkouts} />
-            <Stat label="Streak" value={s.bestStreak} />
+            <Stat label={tr.stats.served} value={s.served} />
+            <Stat label={tr.stats.wrong} value={s.wrong} />
+            <Stat label={tr.stats.walkouts} value={s.walkouts} />
+            <Stat label={tr.stats.streak} value={s.bestStreak} />
           </div>
         </div>
         <div className="flex flex-1 flex-col gap-2">
           {s.earned === 0 ? (
-            <p className="rounded-2xl bg-cream/15 px-3 py-2 text-center text-sm font-bold text-cream">Hantar sekurang-kurangnya satu air untuk masuk papan juara</p>
+            <p className="rounded-2xl bg-cream/15 px-3 py-2 text-center text-sm font-bold text-cream">{tr.zeroScore}</p>
           ) : saved ? (
             <p className="rounded-2xl bg-leaf px-3 py-2 text-center text-sm font-extrabold text-white shadow-[0_4px_0_#1f1a17]">
-              {saved.rank ? `Kau nombor ${saved.rank} minggu ni!` : "Skor disimpan!"}
+              {saved.rank ? tr.savedRank(saved.rank) : tr.saved}
             </p>
           ) : (
             <form onSubmit={onSave} className="flex gap-1.5">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value.slice(0, 16))}
-                placeholder="Nama kau"
+                placeholder={tr.namePlaceholder}
                 maxLength={16}
                 className="min-w-0 flex-1 rounded-xl border-2 border-ink bg-cream px-3 py-2 font-bold text-ink outline-none focus:border-amber-400"
               />
@@ -406,7 +430,7 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
                 disabled={saving}
                 className="rounded-xl bg-amber-300 px-3 font-extrabold text-ink shadow-[0_4px_0_#1f1a17] active:translate-y-0.5 disabled:opacity-60"
               >
-                {saving ? "..." : "Simpan"}
+                {saving ? "..." : tr.save}
               </button>
             </form>
           )}
@@ -418,17 +442,17 @@ function GameOver({ s, onRestart }: { s: GameState; onRestart: () => void }) {
               onClick={onShare}
               className="flex-1 rounded-2xl bg-chili py-3 text-lg font-extrabold text-white shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
             >
-              Cabar kawan
+              {tr.challengeFriends}
             </button>
             <button
               type="button"
               onClick={onRestart}
               className="flex-1 rounded-2xl bg-amber-300 py-3 text-lg font-extrabold text-ink shadow-[0_5px_0_#1f1a17] transition active:translate-y-1 active:shadow-[0_2px_0_#1f1a17]"
             >
-              ▶ Main lagi
+              {tr.playAgain}
             </button>
           </div>
-          {shareState === "copied" && <p className="text-center text-sm font-bold text-cream">Link dah copy. Paste kat Threads!</p>}
+          {shareState === "copied" && <p className="text-center text-sm font-bold text-cream">{tr.copied}</p>}
         </div>
       </div>
     </div>

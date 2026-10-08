@@ -1,17 +1,9 @@
-import {
-  type Cup,
-  type Drink,
-  drinkPrice,
-  HAPPY_LINES,
-  isCupComplete,
-  LEAVE_LINES,
-  sameDrink,
-  WRONG_LINES,
-} from "./drinks";
+import { type Cup, type Drink, drinkPrice, isCupComplete, sameDrink } from "./drinks";
 import type { Look } from "./scene/look";
 
 export const SHIFT_MS = 90_000;
-export const TABLE_COUNT = 4;
+export const TABLE_COUNT = 6;
+export const MAX_ASKS = 2;
 // Drinks are built in four picks, always in this order
 export const STEPS = ["temp", "base", "milk", "sugar"] as const;
 export type Step = (typeof STEPS)[number];
@@ -23,19 +15,22 @@ export function currentStep(cup: Cup): Step | null {
 const WASTE_SEN = 50;
 
 // Customers walk in from the road before they can order
-export const ARRIVE_MS = 1300;
-export const LEAVE_MS = 1300;
+export const ARRIVE_MS = 1500;
+export const LEAVE_MS = 1400;
 
-export type Customer = {
+export type Guest = { look: Look; order: Drink; served: boolean };
+
+// One table's group. Everyone orders at once and leaves together once all drinks arrive.
+export type Party = {
   id: number;
-  look: Look;
-  order: Drink;
-  phrase: string;
+  guests: Guest[];
+  seed: number; // picks the phrasing of the order so it re-renders identically in either language
   arrivedAt: number;
   seatedAt: number;
   revealUntil: number;
+  patienceMs: number;
   leaveAt: number;
-  askedAgain: boolean;
+  asks: number;
 };
 
 export type Bubble = { id: number; table: number; text: string; kind: "good" | "bad"; until: number };
@@ -46,7 +41,7 @@ export type GameState = {
   phase: Phase;
   startAt: number;
   now: number;
-  tables: (Customer | null)[];
+  tables: (Party | null)[];
   cup: Cup;
   earned: number; // sen
   served: number;
@@ -60,16 +55,18 @@ export type GameState = {
 };
 
 // Payload built outside the reducer so Strict Mode double-invokes stay deterministic
-export type Spawn = Omit<Customer, "id" | "arrivedAt" | "seatedAt" | "revealUntil" | "leaveAt"> & { table: number };
+export type Spawn = { table: number; guests: Guest[]; seed: number };
+
+export type Lines = { happy: string; wrong: string; leave: string; annoyed: string; refused: string };
 
 export type Action =
   | { type: "start"; now: number }
-  | { type: "tick"; now: number; spawn: Spawn | null; line: string }
+  | { type: "tick"; now: number; spawn: Spawn | null; lines: Lines }
   | { type: "pick"; part: Step; value: string }
   | { type: "rewind"; part: Step }
   | { type: "discard" }
-  | { type: "serve"; table: number; line: string }
-  | { type: "askAgain"; table: number };
+  | { type: "serve"; table: number; lines: Lines }
+  | { type: "askAgain"; table: number; lines: Lines };
 
 export const initialState: GameState = {
   phase: "intro",
@@ -92,13 +89,25 @@ export function difficulty(s: GameState): number {
   return Math.min(1, Math.max(0, (s.now - s.startAt) / SHIFT_MS));
 }
 
-const revealMs = (d: number) => 5000 - d * 2000;
-const patienceMs = (d: number) => 24_000 - d * 8000;
-const spawnGapMs = (d: number) => 6000 - d * 3000;
+// Bigger groups get longer to read and more patience, since every drink is a separate trip
+const revealMs = (d: number, n: number) => 5000 - d * 2000 + (n - 1) * 1800;
+const patienceMs = (d: number, n: number) => 24_000 - d * 8000 + (n - 1) * 9000;
+const spawnGapMs = (d: number) => 5500 - d * 2500;
 
+// Solo early on, then couples, then groups of three
+export function partySize(d: number): number {
+  const r = Math.random();
+  if (d < 0.2) return 1;
+  if (d < 0.55) return r < 0.6 ? 1 : 2;
+  return r < 0.35 ? 1 : r < 0.75 ? 2 : 3;
+}
 
 export function timeLeft(s: GameState): number {
   return Math.max(0, SHIFT_MS - (s.now - s.startAt));
+}
+
+export function patienceLeft(p: Party, now: number) {
+  return Math.max(0, Math.min(1, (p.leaveAt - now) / p.patienceMs));
 }
 
 export function reducer(s: GameState, a: Action): GameState {
@@ -112,29 +121,32 @@ export function reducer(s: GameState, a: Action): GameState {
 
       if (timeLeft(next) === 0) return { ...next, phase: "over" };
 
-      // Customers who waited too long walk out
-      next.tables.forEach((c, i) => {
-        if (c && c.leaveAt <= a.now) {
+      // Groups who waited too long walk out
+      next.tables.forEach((p, i) => {
+        if (p && p.leaveAt <= a.now) {
           const tables = [...next.tables];
           tables[i] = null;
-          next = bubble({ ...next, tables, walkouts: next.walkouts + 1, streak: 0 }, i, a.line, "bad");
+          next = bubble({ ...next, tables, walkouts: next.walkouts + 1, streak: 0 }, i, a.lines.leave, "bad");
         }
       });
 
       if (a.spawn && a.now >= next.nextSpawnAt && !next.tables[a.spawn.table]) {
         const d = difficulty(next);
-        const { table, ...rest } = a.spawn;
+        const n = a.spawn.guests.length;
         const tables = [...next.tables];
-        tables[table] = {
-          ...rest,
+        const patience = patienceMs(d, n);
+        tables[a.spawn.table] = {
           id: next.seq + 1,
+          guests: a.spawn.guests,
+          seed: a.spawn.seed,
           arrivedAt: a.now,
           seatedAt: a.now + ARRIVE_MS,
-          revealUntil: a.now + ARRIVE_MS + revealMs(d),
-          leaveAt: a.now + ARRIVE_MS + patienceMs(d),
-          askedAgain: false,
+          revealUntil: a.now + ARRIVE_MS + revealMs(d, n),
+          patienceMs: patience,
+          leaveAt: a.now + ARRIVE_MS + patience,
+          asks: 0,
         };
-        next = { ...next, tables, seq: next.seq + 1, nextSpawnAt: a.now + spawnGapMs(d) };
+        next = { ...next, tables, seq: next.seq + 1, nextSpawnAt: a.now + spawnGapMs(d) * (0.8 + n * 0.2) };
       }
       return next;
     }
@@ -154,16 +166,20 @@ export function reducer(s: GameState, a: Action): GameState {
       return { ...s, cup: DEFAULT_CUP };
 
     case "serve": {
-      const c = s.tables[a.table];
-      if (s.phase !== "playing" || !c || s.now < c.seatedAt || !isCupComplete(s.cup)) return s;
+      const p = s.tables[a.table];
+      if (s.phase !== "playing" || !p || s.now < p.seatedAt || !isCupComplete(s.cup)) return s;
+      const cup = s.cup;
+      const target = p.guests.findIndex((g) => !g.served && sameDrink(cup, g.order));
       const tables = [...s.tables];
-      tables[a.table] = null;
 
-      if (sameDrink(s.cup, c.order)) {
-        const waitedRatio = (c.leaveAt - s.now) / (c.leaveAt - c.seatedAt);
+      if (target >= 0) {
+        const guests = p.guests.map((g, i) => (i === target ? { ...g, served: true } : g));
+        const done = guests.every((g) => g.served);
+        tables[a.table] = done ? null : { ...p, guests };
         const streak = s.streak + 1;
-        const tip = Math.round(Math.max(0, waitedRatio) * 100 * (c.askedAgain ? 0.3 : 1)) + Math.min(streak, 10) * 10;
-        const earned = drinkPrice(c.order) + tip;
+        // Tip shrinks with waiting and with every time they had to repeat the order
+        const tip = Math.round(patienceLeft(p, s.now) * 100 * Math.pow(0.5, p.asks)) + Math.min(streak, 10) * 10;
+        const earned = drinkPrice(guests[target].order) + tip;
         const next = {
           ...s,
           tables,
@@ -173,19 +189,29 @@ export function reducer(s: GameState, a: Action): GameState {
           streak,
           bestStreak: Math.max(s.bestStreak, streak),
         };
-        return bubble(next, a.table, `+RM${(earned / 100).toFixed(2)} ${a.line}`, "good");
+        return bubble(next, a.table, `+RM${(earned / 100).toFixed(2)} ${a.lines.happy}`, "good");
       }
 
+      // Wrong drink: they keep waiting, but get less patient
+      tables[a.table] = { ...p, leaveAt: Math.max(s.now + 2000, p.leaveAt - p.patienceMs * 0.15) };
       const next = { ...s, tables, cup: DEFAULT_CUP, wrong: s.wrong + 1, streak: 0, earned: Math.max(0, s.earned - WASTE_SEN) };
-      return bubble(next, a.table, a.line, "bad");
+      return bubble(next, a.table, a.lines.wrong, "bad");
     }
 
     case "askAgain": {
-      const c = s.tables[a.table];
-      if (s.phase !== "playing" || !c || s.now < c.revealUntil) return s;
+      const p = s.tables[a.table];
+      if (s.phase !== "playing" || !p || s.now < p.revealUntil) return s;
+      if (p.asks >= MAX_ASKS) return bubble(s, a.table, a.lines.refused, "bad");
       const tables = [...s.tables];
-      tables[a.table] = { ...c, askedAgain: true, revealUntil: s.now + 1500 };
-      return { ...s, tables };
+      // Each repeat costs a fifth of their patience
+      tables[a.table] = {
+        ...p,
+        asks: p.asks + 1,
+        revealUntil: s.now + 1800 + (p.guests.length - 1) * 600,
+        leaveAt: Math.max(s.now + 3000, p.leaveAt - p.patienceMs * 0.2),
+      };
+      const next = { ...s, tables };
+      return p.asks + 1 === MAX_ASKS ? bubble(next, a.table, a.lines.annoyed, "bad") : next;
     }
   }
 }
@@ -194,5 +220,3 @@ function bubble(s: GameState, table: number, text: string, kind: Bubble["kind"])
   const id = s.seq + 1;
   return { ...s, seq: id, bubbles: [...s.bubbles, { id, table, text, kind, until: s.now + 1600 }] };
 }
-
-export const lines = { HAPPY_LINES, WRONG_LINES, LEAVE_LINES };

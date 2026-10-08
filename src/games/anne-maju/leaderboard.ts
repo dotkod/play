@@ -5,7 +5,7 @@ export type Board = { week: Entry[]; all: Entry[] };
 
 // Payload checks: names stay short and printable, scores stay inside what one 90s shift can earn
 export const NAME_RE = /^[\p{L}\p{N} ._'-]{2,16}$/u;
-const MAX_SERVED = 40;
+const MAX_SERVED = 60;
 const MAX_SEN_PER_DRINK = 650;
 
 export function isPlausible(earned: number, served: number) {

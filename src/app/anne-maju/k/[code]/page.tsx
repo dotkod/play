@@ -33,6 +33,5 @@ export default function Page({ params }: Props) {
 
 async function Challenge({ params }: Pick<Props, "params">) {
   const r = decodeResult((await params).code);
-  const challenge = r ? `Kawan kau kutip ${rm(r.earned)} (${rankFor(r.earned).title}). Boleh lawan?` : undefined;
-  return <AnneMajuGame challenge={challenge} />;
+  return <AnneMajuGame challenge={r?.earned} />;
 }

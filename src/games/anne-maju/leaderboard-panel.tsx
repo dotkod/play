@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useT } from "./i18n";
 import type { Board } from "./leaderboard";
 import { rm } from "./result";
 
@@ -48,6 +49,7 @@ export function useBoard() {
 }
 
 export function LeaderboardPanel({ board, highlight, compact = false }: { board: Board | null; highlight?: string; compact?: boolean }) {
+  const tr = useT();
   const [tab, setTab] = useState<"week" | "all">("week");
   const rows = board?.[tab] ?? [];
   const limit = compact ? 5 : 10;
@@ -55,7 +57,7 @@ export function LeaderboardPanel({ board, highlight, compact = false }: { board:
   return (
     <div className="flex flex-col gap-1.5 rounded-2xl bg-ink/70 p-3 text-cream shadow-[0_5px_0_#1f1a17] backdrop-blur">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-extrabold">🏆 Papan Juara</p>
+        <p className="text-sm font-extrabold">{tr.board}</p>
         <div className="flex rounded-lg bg-cream/15 p-0.5 text-[11px] font-bold">
           {(["week", "all"] as const).map((t) => (
             <button
@@ -64,13 +66,13 @@ export function LeaderboardPanel({ board, highlight, compact = false }: { board:
               onClick={() => setTab(t)}
               className={`rounded-md px-2 py-0.5 ${tab === t ? "bg-amber-300 text-ink" : "text-cream/70"}`}
             >
-              {t === "week" ? "Minggu ni" : "Semua"}
+              {t === "week" ? tr.week : tr.all}
             </button>
           ))}
         </div>
       </div>
-      {!board && <p className="py-2 text-center text-xs text-cream/60">Loading...</p>}
-      {board && rows.length === 0 && <p className="py-2 text-center text-xs text-cream/70">Belum ada juara. Jadi yang pertama!</p>}
+      {!board && <p className="py-2 text-center text-xs text-cream/60">{tr.boardLoading}</p>}
+      {board && rows.length === 0 && <p className="py-2 text-center text-xs text-cream/70">{tr.boardEmpty}</p>}
       <ol className="flex flex-col gap-0.5">
         {rows.slice(0, limit).map((r, i) => (
           <li
