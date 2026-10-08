@@ -8,10 +8,6 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/anne-maju/k/[code]/opengraph-image": ["./public/og/anne-maju-bare.jpg"],
   },
-  // Temporary until the root gets its own homepage; 307 so browsers don't cache it
-  async redirects() {
-    return [{ source: "/", destination: "/anne-maju", permanent: false }];
-  },
   partialPrefetching: true,
   turbopack: {
     rules: {

@@ -4,12 +4,13 @@ import { PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, type RefObject, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
 import { orderPhrase } from "../drinks";
 import { useLang, useT } from "../i18n";
 import { type GameState, LEAVE_MS, MAX_ASKS, type Party, patienceLeft } from "../state";
-import { ANNE_LOOK, type Look } from "./look";
-import { Person, type Pose } from "./person";
-import { Ball, Box, Cyl, RBox, toonGradient } from "./toon";
+import { ANNE_LOOK, type Look } from "@/shared/three/look";
+import { Person, type Pose } from "@/shared/three/person";
+import { Ball, Box, Cyl, RBox, toonGradient } from "@/shared/three/toon";
 
 // Two rows of three tables, with aisles at x = ±1.55
 export const TABLES: [number, number][] = [
@@ -41,6 +42,8 @@ type Props = {
 
 export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = false, poster = false }: Props) {
   const anchors = useRef<(HTMLDivElement | null)[]>([]);
+  const wrap = useRef<HTMLDivElement>(null);
+  const frameloop = useVisibleFrameloop(wrap);
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
   // Tables are memoised, so they get a stable callback that always calls the latest handler
@@ -51,8 +54,8 @@ export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = fa
   const tapTable = useCallback((i: number) => onTableRef.current(i), []);
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <Canvas shadows dpr={dpr} gl={{ antialias: true, powerPreference: "high-performance" }}>
+    <div ref={wrap} className="relative h-full w-full overflow-hidden">
+      <Canvas frameloop={frameloop} shadows dpr={dpr} gl={{ antialias: true, powerPreference: "high-performance" }}>
         {/* Slow device: drop resolution first, then shadows */}
         <PerformanceMonitor
           onDecline={() => {

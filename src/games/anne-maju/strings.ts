@@ -1,5 +1,6 @@
 // Plain string tables, safe to import from server code (OG images, metadata)
-export type Lang = "ms" | "en";
+export type { Lang } from "@/shared/lang";
+import type { Lang } from "@/shared/lang";
 
 export function t(lang: Lang) {
   return STRINGS[lang];

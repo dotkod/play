@@ -1,5 +1,5 @@
 import { type Cup, type Drink, drinkPrice, isCupComplete, sameDrink } from "./drinks";
-import type { Look } from "./scene/look";
+import type { Look } from "@/shared/three/look";
 
 export const SHIFT_MS = 90_000;
 export const TABLE_COUNT = 6;

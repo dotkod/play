@@ -4,10 +4,11 @@ import { OrthographicCamera } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
 import { type Cup, cupColor } from "../drinks";
 import { type Lang, t } from "../strings";
 import { currentStep, type Step } from "../state";
-import { Box, Cyl, ToonMaterial, toonGradient } from "./toon";
+import { Box, Cyl, ToonMaterial, toonGradient } from "@/shared/three/toon";
 
 type Kind = "mug" | "glass" | "teh" | "kopi" | "milo" | "nescafe" | "pekat" | "cair" | "none" | "sugar0" | "sugar1" | "sugar2";
 type Option = { value: string; kind: Kind };
@@ -59,6 +60,8 @@ type Fx = { id: number; kind: Kind; from: THREE.Vector3 };
 export default memo(function DrinkStation({ cup, lang, onPick }: { cup: Cup; lang: Lang; onPick: (step: Step, value: string) => void }) {
   const step = currentStep(cup);
   const [fx, setFx] = useState<Fx | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  const frameloop = useVisibleFrameloop(wrap);
 
   const pick = (opt: Option, from: THREE.Vector3) => {
     if (!step) return;
@@ -67,19 +70,21 @@ export default memo(function DrinkStation({ cup, lang, onPick }: { cup: Cup; lan
   };
 
   return (
-    <Canvas dpr={[1, 1.5]}>
-      <Rig />
-      <color attach="background" args={["#2f8f86"]} />
-      <hemisphereLight args={["#fffaf0", "#7d6b55", 1.5]} />
-      <directionalLight position={[2, 5, 4]} intensity={1.8} />
-
-      <Backdrop />
-      <Vessel cup={cup} />
-      {/* Remount the shelf per step so each set of items pops in fresh */}
-      <Shelf key={step ?? "done"} options={step ? OPTIONS[step] : []} lang={lang} onPick={pick} />
-      {!step && <DoneSign text={t(lang).ready} />}
-      {fx && <PourFx key={fx.id} fx={fx} />}
-    </Canvas>
+    <div ref={wrap} className="h-full w-full">
+      <Canvas frameloop={frameloop} dpr={[1, 1.5]}>
+        <Rig />
+        <color attach="background" args={["#2f8f86"]} />
+        <hemisphereLight args={["#fffaf0", "#7d6b55", 1.5]} />
+        <directionalLight position={[2, 5, 4]} intensity={1.8} />
+  
+        <Backdrop />
+        <Vessel cup={cup} />
+        {/* Remount the shelf per step so each set of items pops in fresh */}
+        <Shelf key={step ?? "done"} options={step ? OPTIONS[step] : []} lang={lang} onPick={pick} />
+        {!step && <DoneSign text={t(lang).ready} />}
+        {fx && <PourFx key={fx.id} fx={fx} />}
+      </Canvas>
+    </div>
   );
 });
 

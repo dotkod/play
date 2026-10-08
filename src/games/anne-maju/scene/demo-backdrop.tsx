@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { randomDrink } from "../drinks";
 import { type GameState, initialState, type Party } from "../state";
-import { randomParty } from "./look";
+import { randomParty } from "@/shared/three/look";
 import MamakScene from "./mamak-scene";
 
 // The shop keeps running behind the menus: seated regulars, Anne doing rounds, camera slowly orbiting

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { shareResult, type ShareOutcome } from "@/shared/share";
 import { useBestScore } from "@/shared/use-best-score";
@@ -10,7 +11,7 @@ import { getLang, type Lang, setLang, t, useLang, useT } from "./i18n";
 import { LeaderboardPanel, playerId, savedName, useBoard } from "./leaderboard-panel";
 import { GAME } from "./meta";
 import { encodeResult, rankFor, rm } from "./result";
-import { randomParty } from "./scene/look";
+import { randomParty } from "@/shared/three/look";
 import {
   currentStep,
   difficulty,
@@ -108,6 +109,9 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
       >
         <DemoBackdrop />
         {s.phase === "intro" ? <Intro challenge={challenge} onStart={start} /> : <GameOver s={s} onRestart={start} />}
+        <div className="absolute top-3 left-3">
+          <BackToPlay />
+        </div>
         <div className="absolute top-3 right-3 flex gap-2">
           <LangToggle />
           <MuteButton />
@@ -203,6 +207,24 @@ function MuteButton() {
     >
       {muted ? "🔇" : "🔊"}
     </button>
+  );
+}
+
+// Back to the Play city; the hub reads this key to put you outside the restaurant door
+function BackToPlay() {
+  return (
+    <Link
+      href="/"
+      onClick={() => {
+        music.stop();
+        try {
+          sessionStorage.setItem("dotkod-play:spawn", GAME.slug);
+        } catch {}
+      }}
+      className="flex h-9 items-center gap-1 rounded-xl bg-ink/80 px-3 text-sm font-extrabold text-amber-300 shadow-lg active:scale-95"
+    >
+      ← PLAY
+    </Link>
   );
 }
 
