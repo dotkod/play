@@ -127,7 +127,7 @@ export function Hub() {
       <World spawn={spawn} onZone={setZone} active={started} />
 
       {/* Brand + language */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-start justify-between gap-2">
+      <div className="edge-top pointer-events-none absolute z-20 flex items-start justify-between gap-2">
         <div className={`pointer-events-auto rounded-2xl bg-ink/85 px-3 py-1.5 text-cream shadow-[0_4px_0_#1f1a17] transition-opacity ${started ? "" : "opacity-0"}`}>
           <p className="text-xl leading-none font-extrabold tracking-wide text-amber-300 [-webkit-text-stroke:4px_#1f1a17] [paint-order:stroke_fill]">▶ PLAY <span className="text-chili">MY</span></p>
           <p className="text-[11px] font-bold opacity-80">{tr.brand}</p>
@@ -147,7 +147,7 @@ export function Hub() {
       {!started && <StartScreen tr={tr} touch={touch} onStart={start} />}
 
       {started && (
-        <div className="absolute right-3 bottom-3">
+        <div className="edge-br absolute">
           <Minimap size={touch ? 112 : 150} />
         </div>
       )}
@@ -269,7 +269,7 @@ function Joystick() {
   return (
     <div
       ref={base}
-      className="absolute bottom-16 left-6 size-32 touch-none rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
+      className="edge-bl absolute mb-12 ml-3 size-32 touch-none rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
       onPointerDown={(e) => {
         pointer.current = e.pointerId;
         e.currentTarget.setPointerCapture(e.pointerId);

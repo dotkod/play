@@ -211,10 +211,10 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
         ) : (
           <GameOver s={s} result={result} careerSen={careerSen} onRestart={() => startShift(s.mode)} />
         )}
-        <div className="absolute top-3 left-3">
+        <div className="edge-tl absolute">
           <BackToPlay />
         </div>
-        <div className="absolute top-3 right-3 flex gap-2">
+        <div className="edge-tr absolute flex gap-2">
           <LangToggle />
           <MuteButton />
         </div>
@@ -273,7 +273,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
           pulseTable={tutorial && !step && !offTrack ? TUTORIAL_TABLE : null}
           anchorsOut={anchors}
         />
-        <div className="absolute bottom-3 left-3 flex items-center gap-2">
+        <div className="edge-bl absolute flex items-center gap-2">
           <Hud s={s} moneyRef={moneyEl} />
           {s.phase === "playing" && (
             <button
@@ -311,7 +311,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
           </div>
         )}
       </div>
-      <div className="flex h-full w-[min(360px,44vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)]">
+      <div className="safe-pr flex h-full w-[min(380px,46vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)]">
         <StepRail
           cup={s.cup}
           onRewind={(part) => {
@@ -481,6 +481,7 @@ function PauseMenu({ onResume, onRestart }: { onResume: () => void; onRestart: (
         <MuteButton />
       </div>
       <BackToPlay wide />
+      <Version className="text-ink/40" />
     </Modal>
   );
 }
@@ -597,6 +598,17 @@ function StepRail({ cup, onRewind, onDiscard }: { cup: Cup; onRewind: (p: Step) 
   );
 }
 
+// "v1.5.1 · a1b2c3d" so players (and bug reports) can say exactly which build they're on
+function Version({ className = "" }: { className?: string }) {
+  const build = process.env.NEXT_PUBLIC_BUILD;
+  return (
+    <p className={`text-[11px] font-bold tabular-nums ${className}`}>
+      v{GAME.version}
+      {build ? ` · ${build}` : ""}
+    </p>
+  );
+}
+
 function RotateHint() {
   const tr = useT();
   return (
@@ -640,8 +652,9 @@ function Intro({
   const { board } = useBoard();
   const upcoming = nextUnlock(careerSen);
   return (
-    <div className="absolute inset-0 flex items-center justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent px-6 py-4 lg:px-14">
-      <div className="flex max-w-md flex-col gap-2.5 text-cream">
+    <div className="absolute inset-0 safe-px flex items-start justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent safe-pt pb-4">
+      {/* my-auto centres when there's room but never pushes content up under the top buttons */}
+      <div className="my-auto flex max-w-md flex-col gap-2.5 text-cream">
         <span className="w-fit rounded-full bg-chili px-3 py-1 text-xs font-extrabold tracking-wide uppercase">{tr.badge}</span>
         <h1 className={`text-[clamp(2.2rem,7vh,4.5rem)] leading-[0.95] font-extrabold text-amber-300 ${titleStroke}`}>{GAME.name}</h1>
         <p className="text-base font-semibold text-cream/90">{tr.tagline}</p>
@@ -683,8 +696,9 @@ function Intro({
             {tr.yourBest} {rm(best)}
           </p>
         )}
+        <Version className="text-cream/50" />
       </div>
-      <div className="hidden w-64 shrink-0 self-end sm:block lg:w-72">
+      <div className="mt-auto hidden w-64 shrink-0 sm:block lg:w-72">
         <LeaderboardPanel board={board} highlight={savedName()} compact />
       </div>
     </div>
@@ -780,8 +794,8 @@ function GameOver({ s, result, careerSen, onRestart }: { s: GameState; result: S
   };
 
   return (
-    <div className="absolute inset-0 grid place-items-center overflow-y-auto bg-ink/60 px-4 pt-14 pb-4 backdrop-blur-[2px]">
-      <div className="flex w-full max-w-4xl animate-pop flex-row items-stretch gap-3">
+    <div className="absolute inset-0 safe-px flex overflow-y-auto bg-ink/60 safe-pt pb-4 backdrop-blur-[2px]">
+      <div className="m-auto flex w-full max-w-4xl animate-pop flex-row items-stretch gap-3">
         <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-3xl bg-cream p-4 text-center shadow-[0_6px_0_#1f1a17]">
           <p className="text-xs font-extrabold tracking-widest text-ink/50 uppercase">{s.mode === "daily" ? tr.dailyBadge : tr.shiftOver}</p>
           <p className="text-4xl">{rank.emoji}</p>

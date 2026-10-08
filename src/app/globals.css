@@ -31,3 +31,53 @@ button {
   cursor: pointer;
   touch-action: manipulation;
 }
+
+/*
+ * Edge-safe placement. Notches report safe-area insets, but curved glass usually reports 0,
+ * so every edge-anchored control keeps a minimum margin that grows in fullscreen
+ * (where the game runs edge to edge on phones).
+ */
+:root {
+  --edge: 12px;
+  --edge-pad: 24px;
+}
+html:fullscreen {
+  --edge: 30px;
+  --edge-pad: 44px;
+}
+.edge-tl {
+  top: max(var(--edge), env(safe-area-inset-top));
+  left: max(var(--edge), env(safe-area-inset-left));
+}
+.edge-tr {
+  top: max(var(--edge), env(safe-area-inset-top));
+  right: max(var(--edge), env(safe-area-inset-right));
+}
+.edge-bl {
+  bottom: max(var(--edge), env(safe-area-inset-bottom));
+  left: max(var(--edge), env(safe-area-inset-left));
+}
+.edge-br {
+  bottom: max(var(--edge), env(safe-area-inset-bottom));
+  right: max(var(--edge), env(safe-area-inset-right));
+}
+/* Side padding for full-width menus */
+.safe-px {
+  padding-left: max(var(--edge-pad), env(safe-area-inset-left));
+  padding-right: max(var(--edge-pad), env(safe-area-inset-right));
+}
+/* Right-hand panels that touch the screen edge */
+.safe-pr {
+  padding-right: max(calc(var(--edge) - 12px), env(safe-area-inset-right));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+/* A bar across the top edge */
+.edge-top {
+  top: max(var(--edge), env(safe-area-inset-top));
+  left: max(var(--edge), env(safe-area-inset-left));
+  right: max(var(--edge), env(safe-area-inset-right));
+}
+/* Content below a row of edge-anchored top buttons (36px tall + a little air) */
+.safe-pt {
+  padding-top: max(calc(var(--edge) + 46px), calc(env(safe-area-inset-top) + 46px));
+}

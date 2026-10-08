@@ -1,6 +1,8 @@
 // Single place for the game's name and copy
 export const GAME = {
   name: "Anne Maju",
+  // Bump with every player-facing change; see CHANGELOG.md
+  version: "1.5.1",
   slug: "anne-maju",
   tagline: "Satu shift jadi anne mamak. Dengar order, bancuh, hantar.",
   title: "Anne Maju: Game Mamak 90 Saat",

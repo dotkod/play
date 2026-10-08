@@ -125,8 +125,8 @@ function Projector({ els }: { els: RefObject<(HTMLDivElement | null)[]> }) {
       const el = els.current[i];
       if (!el) return;
       v.set(x, BUBBLE_Y, z + SEATS[0].z).project(camera);
-      // Keep edge tables' bubbles fully on screen (bubbles are 160px wide)
-      const px = Math.min(size.width - 84, Math.max(84, ((v.x + 1) / 2) * size.width));
+      // Keep edge tables' bubbles fully on screen (up to 192px wide) and clear of curved glass
+      const px = Math.min(size.width - 110, Math.max(110, ((v.x + 1) / 2) * size.width));
       const py = Math.max(8, ((1 - v.y) / 2) * size.height);
       el.style.transform = `translate(${px}px, ${py}px) translate(-50%, -100%)`;
     });
