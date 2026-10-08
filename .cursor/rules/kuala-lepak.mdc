@@ -1,0 +1,16 @@
+---
+description: Kuala Lepak project handbook (architecture, rules, roadmap)
+alwaysApply: true
+---
+
+This repo is **Kuala Lepak**, a non-violent GTA-style Malaysian life game (Next.js 16 +
+React Three Fiber). Before writing code, read `docs/KUALA_LEPAK.md`, especially section 4
+"Engineering rules & gotchas". Key rules:
+
+- Never use drei `<Html>`; use the projected DOM overlay pattern.
+- Cache canvas textures at module level; never create textures per mount.
+- Per-frame simulation state lives outside React (module objects read in `useFrame`).
+- Respect the strict React Compiler lint rules (no randomness/time in render, no setState in effects, no ref access in render).
+- All player-facing text in BM and EN string tables; parody names for real brands/landmarks; non-violent content.
+- Bump the game version in `meta.ts` and add a `CHANGELOG.md` entry for player-facing changes.
+- Run `pnpm exec tsc --noEmit && pnpm lint && pnpm build` before pushing.
