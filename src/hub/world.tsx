@@ -15,9 +15,11 @@ import { type Building, doorSpot } from "./world-data";
 type Props = {
   spawn: { x: number; z: number; rotY: number };
   onZone: (b: Building | null) => void;
+  // Fixed aerial shot for the OG image instead of the follow camera
+  poster?: boolean;
 };
 
-export default function World({ spawn, onZone }: Props) {
+export default function World({ spawn, onZone, poster = false }: Props) {
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
   const wrap = useRef<HTMLDivElement>(null);
@@ -46,7 +48,8 @@ export default function World({ spawn, onZone }: Props) {
         <TrafficLights />
         <Traffic />
         <Pedestrians />
-        <Player spawn={spawn} onZone={onZone} />
+        <Player spawn={spawn} onZone={onZone} followCamera={!poster} />
+        {poster && <PosterCamera />}
       </Canvas>
     </div>
   );
@@ -76,6 +79,15 @@ const Sun = memo(function Sun({ shadows }: { shadows: boolean }) {
     />
   );
 });
+
+// Wide view over the junction with Restoran Anne Maju in frame
+function PosterCamera() {
+  useFrame(({ camera }) => {
+    camera.position.set(9, 13, 13);
+    camera.lookAt(10, 1, -5);
+  });
+  return null;
+}
 
 // Invisible floor that turns taps into a walk target
 function TapToWalk() {

@@ -4,7 +4,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Look } from "@/shared/three/look";
+import { sfx } from "@/shared/audio";
 import { Person, type Pose } from "@/shared/three/person";
+import { type Circle, dynamicColliders, staticColliders } from "./colliders";
 import { input, moveVector } from "./controls";
 import { player as playerShared } from "./traffic";
 import { type Building, BOUNDS, BUILDINGS, doorSpot, footprint } from "./world-data";
@@ -20,16 +22,47 @@ const solids = BUILDINGS.map((b) => {
 });
 const blocked = (x: number, z: number) => solids.some((s) => x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ);
 
+// Push the player out of any overlapping circle; returns true if something was in the way
+function pushOut(p: THREE.Vector3, list: Circle[]) {
+  let hit = false;
+  for (const c of list) {
+    const dx = p.x - c.x;
+    const dz = p.z - c.z;
+    const min = c.r + RADIUS;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= min * min) continue;
+    const d = Math.sqrt(d2) || 0.0001;
+    const nx = p.x + (dx / d) * (min - d);
+    const nz = p.z + (dz / d) * (min - d);
+    // Never get shoved into a wall
+    if (!blocked(nx, nz)) {
+      p.x = nx;
+      p.z = nz;
+    }
+    hit = true;
+  }
+  return hit;
+}
+
 // Door zones for buildings you can walk into (or that are coming soon)
 const zones = BUILDINGS.filter((b) => b.game || b.soon).map((b) => ({ b, spot: doorSpot(b) }));
 // The guide arrow points at the first playable building until you're nearly there
 const goal = doorSpot(BUILDINGS.find((b) => b.game)!);
 
-export function Player({ spawn, onZone }: { spawn: { x: number; z: number; rotY: number }; onZone: (b: Building | null) => void }) {
+export function Player({
+  spawn,
+  onZone,
+  followCamera = true,
+}: {
+  spawn: { x: number; z: number; rotY: number };
+  onZone: (b: Building | null) => void;
+  followCamera?: boolean;
+}) {
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const rot = useRef(spawn.rotY);
   const moving = useRef(false);
   const zone = useRef<string | null>(null);
+  const stride = useRef({ dist: 0, alt: false });
   const ring = useRef<THREE.Mesh>(null);
   const guide = useRef<THREE.Group>(null);
   const camTarget = useMemo(() => new THREE.Vector3(), []);
@@ -59,14 +92,27 @@ export function Player({ spawn, onZone }: { spawn: { x: number; z: number; rotY:
       const nx = THREE.MathUtils.clamp(p.x + vx * SPEED * dt, -BOUNDS, BOUNDS);
       const nz = THREE.MathUtils.clamp(p.z + vz * SPEED * dt, -BOUNDS, BOUNDS);
       // Slide along walls: try each axis separately
+      const ox = p.x;
+      const oz = p.z;
       if (!blocked(nx, p.z)) p.x = nx;
       if (!blocked(p.x, nz)) p.z = nz;
+      // A footstep every ~1.1 m actually travelled
+      stride.current.dist += Math.hypot(p.x - ox, p.z - oz);
+      if (stride.current.dist > 1.1) {
+        stride.current.dist = 0;
+        stride.current.alt = !stride.current.alt;
+        sfx.step(stride.current.alt);
+      }
       if (input.target && blocked(nx, nz)) input.target = null;
       const want = Math.atan2(vx, vz);
       let diff = want - rot.current;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
       rot.current += diff * Math.min(1, dt * 12);
     }
+    // Solid tables, poles and trees, then anything moving (vehicles nudge you out of their way)
+    const bumped = pushOut(p, staticColliders) || pushOut(p, dynamicColliders.people);
+    pushOut(p, dynamicColliders.vehicles);
+    if (bumped && input.target && Math.hypot(input.target.x - p.x, input.target.z - p.z) < 1.5) input.target = null;
     playerShared.x = p.x;
     playerShared.z = p.z;
 
@@ -74,10 +120,12 @@ export function Player({ spawn, onZone }: { spawn: { x: number; z: number; rotY:
     // Steep angle so buildings on the near side of the street don't hide the player
     const back = aspect < 1 ? 11 : 8.5;
     const up = aspect < 1 ? 15 : 12;
-    camPos.set(p.x, up, p.z + back);
-    camera.position.lerp(camPos, 1 - Math.exp(-dt * 5));
-    camTarget.set(p.x, 1, p.z - 1.5);
-    camera.lookAt(camTarget);
+    if (followCamera) {
+      camPos.set(p.x, up, p.z + back);
+      camera.position.lerp(camPos, 1 - Math.exp(-dt * 5));
+      camTarget.set(p.x, 1, p.z - 1.5);
+      camera.lookAt(camTarget);
+    }
 
     if (ring.current) ring.current.position.set(p.x, 0.04, p.z);
     if (guide.current) {

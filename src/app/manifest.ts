@@ -1,17 +1,15 @@
 import type { MetadataRoute } from "next";
-import { GAME } from "@/games/anne-maju/meta";
 
-// "Add to Home Screen" opens straight into the game, fullscreen and landscape
+// "Add to Home Screen" opens the Play city fullscreen
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: GAME.title,
-    short_name: GAME.name,
-    description: GAME.description,
-    start_url: `/${GAME.slug}`,
+    name: "Play · Bandar Game 3D Malaysia",
+    short_name: "Play",
+    description: "Bandar 3D ala Malaysia penuh game pendek. Jalan-jalan, masuk kedai, terus main.",
+    start_url: "/",
     display: "fullscreen",
-    orientation: "landscape",
-    background_color: "#2f8f86",
-    theme_color: "#2f8f86",
+    background_color: "#9fdcd2",
+    theme_color: "#1f1a17",
     lang: "ms",
     icons: [
       { src: "/icon", sizes: "512x512", type: "image/png", purpose: "any" },

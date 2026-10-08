@@ -3,6 +3,7 @@
 import { memo, useMemo, useState } from "react";
 import { randomLook } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
+import { dynamicColliders } from "./colliders";
 import { BOUNDS, SIDEWALK_MID } from "./world-data";
 
 type Walker = { axis: "x" | "z"; side: number; start: number; speed: number; phase: number };
@@ -22,13 +23,13 @@ export const Pedestrians = memo(function Pedestrians() {
   return (
     <>
       {walkers.map((w, i) => (
-        <Walking key={i} w={w} look={w.look} />
+        <Walking key={i} index={i} w={w} look={w.look} />
       ))}
     </>
   );
 });
 
-function Walking({ w, look }: { w: Walker; look: ReturnType<typeof randomLook> }) {
+function Walking({ index, w, look }: { index: number; w: Walker; look: ReturnType<typeof randomLook> }) {
   const getPose = useMemo(() => {
     const span = BOUNDS * 2;
     return (): Pose => {
@@ -36,10 +37,11 @@ function Walking({ w, look }: { w: Walker; look: ReturnType<typeof randomLook> }
       const forward = dist < span;
       const p = forward ? -BOUNDS + dist : BOUNDS - (dist - span);
       const dir = forward ? 1 : -1;
+      dynamicColliders.people[index] = w.axis === "x" ? { x: p, z: w.side, r: 0.4 } : { x: w.side, z: p, r: 0.4 };
       return w.axis === "x"
         ? { x: p, z: w.side, rotY: dir > 0 ? Math.PI / 2 : -Math.PI / 2, walking: true, seated: false }
         : { x: w.side, z: p, rotY: dir > 0 ? 0 : Math.PI, walking: true, seated: false };
     };
-  }, [w]);
+  }, [w, index]);
   return <Person look={look} getPose={getPose} />;
 }

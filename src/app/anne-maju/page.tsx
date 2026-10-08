@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   alternates: { canonical: url },
   openGraph: { title: GAME.title, description: GAME.description, url, images: [image], siteName: GAME.name, locale: site.locale, type: "website" },
   twitter: { title: GAME.title, description: GAME.description, images: [image] },
+  appleWebApp: { title: GAME.name },
 };
 
 // Structured data so search engines know this page is a playable game

@@ -17,5 +17,6 @@ shot() {
   echo "wrote public/og/$name.jpg"
 }
 
+shot /poster play
 shot /anne-maju/poster anne-maju
 shot /anne-maju/poster/bare anne-maju-bare

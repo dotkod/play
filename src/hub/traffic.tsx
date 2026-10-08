@@ -3,9 +3,11 @@
 import { useFrame } from "@react-three/fiber";
 import { memo, useRef } from "react";
 import * as THREE from "three";
+import { ambience, sfx } from "@/shared/audio";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
+import { dynamicColliders } from "./colliders";
 import { EXTENT, ROAD_HALF, WALK_HALF } from "./world-data";
 
 // ---------- Traffic lights ----------
@@ -69,7 +71,7 @@ function TrafficPole({ axis, x, z, rotY }: { axis: Axis; x: number; z: number; r
 // ---------- Vehicles ----------
 
 type Kind = "car" | "bike";
-type Vehicle = { id: number; kind: Kind; axis: Axis; dir: 1 | -1; pos: number; speed: number; max: number; color: string };
+type Vehicle = { id: number; kind: Kind; axis: Axis; dir: 1 | -1; pos: number; speed: number; max: number; color: string; rider: number; honkedAt: number };
 
 const LANE = 1.5;
 const STOP_AT = WALK_HALF + 0.6; // stop line, measured from the junction centre
@@ -92,7 +94,7 @@ function spawnVehicles(): Vehicle[] {
   for (const [axis, dir] of lanes) {
     const count = axis === "x" ? 4 : 3;
     for (let i = 0; i < count; i++) {
-      const kind: Kind = Math.random() < 0.4 ? "bike" : "car";
+      const kind: Kind = Math.random() < 0.5 ? "bike" : "car";
       const max = kind === "bike" ? 9 + Math.random() * 3 : 7 + Math.random() * 2;
       list.push({
         id: id++,
@@ -103,6 +105,8 @@ function spawnVehicles(): Vehicle[] {
         speed: max,
         max,
         color: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)],
+        rider: Math.floor(Math.random() * RIDERS.length),
+        honkedAt: -99,
       });
     }
   }
@@ -114,6 +118,7 @@ const along = (v: Vehicle) => v.pos * v.dir;
 
 // Simulation state lives outside React: it is mutated every frame and never drives a re-render
 let fleet: Vehicle[] | null = null;
+let engineTick = 0;
 const getFleet = () => (fleet ??= spawnVehicles());
 
 export const Traffic = memo(function Traffic() {
@@ -124,6 +129,10 @@ export const Traffic = memo(function Traffic() {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
     const all = getFleet();
+    let nearest = Infinity;
+    let nearestBike = false;
+    const circles = dynamicColliders.vehicles;
+    circles.length = 0;
     for (const v of all) {
       const me = along(v);
       const length = v.kind === "car" ? 3.6 : 2;
@@ -150,7 +159,14 @@ export const Traffic = memo(function Traffic() {
       const px = v.axis === "x" ? player.x : player.z;
       const pl = v.axis === "x" ? player.z : player.x;
       const ahead = px * v.dir - me;
-      if (Math.abs(pl - lane) < 1.6 && ahead > 0 && ahead < 7) target = Math.min(target, Math.max(0, ahead - length / 2 - 1.2) * 2);
+      if (Math.abs(pl - lane) < 1.6 && ahead > 0 && ahead < 7) {
+        target = Math.min(target, Math.max(0, ahead - length / 2 - 1.2) * 2);
+        // Impatient honk when you're standing in the road, at most every few seconds per vehicle
+        if (ahead < 5 && t - v.honkedAt > 4) {
+          v.honkedAt = t;
+          sfx.horn();
+        }
+      }
 
       // Ease towards the target speed: brake harder than we accelerate
       const rate = target < v.speed ? 14 : 4;
@@ -158,19 +174,34 @@ export const Traffic = memo(function Traffic() {
       v.pos += v.dir * v.speed * dt;
       if (v.pos * v.dir > EXTENT) v.pos -= v.dir * EXTENT * 2;
 
+      // Track the closest moving vehicle for the engine sound
+      const vx = v.axis === "x" ? v.pos : lane;
+      const vz = v.axis === "x" ? lane : v.pos;
+      // Body as a chain of circles along the direction of travel
+      const offsets = v.kind === "car" ? [-1.25, 0, 1.25] : [-0.55, 0.55];
+      const r = v.kind === "car" ? 1.0 : 0.55;
+      for (const o of offsets) circles.push(v.axis === "x" ? { x: vx + o, z: vz, r } : { x: vx, z: vz + o, r });
+      const d = Math.hypot(vx - player.x, vz - player.z) - v.speed * 0.1;
+      if (d < nearest) {
+        nearest = d;
+        nearestBike = v.kind === "bike";
+      }
+
       const g = refs.current[v.id];
       if (!g) continue;
       if (v.axis === "x") g.position.set(v.pos, 0, lane);
       else g.position.set(lane, 0, v.pos);
       g.rotation.y = v.axis === "x" ? (v.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : v.dir > 0 ? 0 : Math.PI;
     }
+    // ~10 Hz is plenty for the engine sound and keeps the audio automation timeline short
+    if ((engineTick = (engineTick + 1) % 6) === 0) ambience.setEngine(Math.max(0, 1 - nearest / 14), nearestBike);
   });
 
   return (
     <>
       {vehicles.map((v) => (
         <group key={v.id} ref={(g) => void (refs.current[v.id] = g)}>
-          {v.kind === "car" ? <Car color={v.color} /> : <GrabBike />}
+          {v.kind === "car" ? <Car color={v.color} /> : <DeliveryBike rider={RIDERS[v.rider]} bike={v.color} />}
         </group>
       ))}
     </>
@@ -196,23 +227,33 @@ function Car({ color }: { color: string }) {
   );
 }
 
-const RIDER: Look = { skin: "#a96d47", shirt: "#00b14f", pants: "#1f1f24", headwear: "cap", hair: "#00b14f" };
+// Food delivery riders in the colours Malaysians recognise from the road (no logos, just the vibe)
+type Rider = { jacket: string; helmet: string; box: string; trim: string };
+const RIDERS: Rider[] = [
+  { jacket: "#00b14f", helmet: "#00b14f", box: "#00b14f", trim: "#ffffff" }, // green
+  { jacket: "#ee4d2d", helmet: "#ee4d2d", box: "#ee4d2d", trim: "#ffffff" }, // orange
+  { jacket: "#d70f64", helmet: "#d70f64", box: "#d70f64", trim: "#ffffff" }, // pink
+  { jacket: "#f16622", helmet: "#ffffff", box: "#f16622", trim: "#ffffff" }, // orange + white helmet
+];
+
 const riderPose: Pose = { x: 0, z: -0.15, rotY: 0, walking: false, seated: true };
 const getRiderPose = () => riderPose;
 
-// Grab-style food delivery rider: green jacket, green helmet, delivery box
-function GrabBike() {
+function DeliveryBike({ rider, bike }: { rider: Rider; bike: string }) {
+  const look: Look = { skin: "#a96d47", shirt: rider.jacket, pants: "#1f1f24", headwear: "cap", hair: rider.helmet };
   return (
     <group>
       <RBox size={[0.45, 0.45, 1.5]} radius={0.1} position={[0, 0.65, 0]} color="#2a2a2a" />
-      <RBox size={[0.5, 0.25, 0.6]} radius={0.08} position={[0, 0.95, 0.45]} color="#d8352a" />
+      <RBox size={[0.5, 0.25, 0.6]} radius={0.08} position={[0, 0.95, 0.45]} color={bike} />
       <Wheel position={[0, 0.32, 0.65]} />
       <Wheel position={[0, 0.32, -0.65]} />
       <Box size={[0.6, 0.06, 0.06]} position={[0, 1.25, 0.55]} color="#3a3a3a" />
       <group position={[0, 0.25, 0]} scale={0.9}>
-        <Person look={RIDER} getPose={getRiderPose} />
+        <Person look={look} getPose={getRiderPose} />
       </group>
-      <RBox size={[0.6, 0.55, 0.55]} radius={0.06} position={[0, 1.55, -0.75]} color="#00b14f" />
+      {/* Thermal delivery box with a white stripe */}
+      <RBox size={[0.6, 0.55, 0.55]} radius={0.06} position={[0, 1.55, -0.75]} color={rider.box} />
+      <Box size={[0.62, 0.08, 0.57]} position={[0, 1.6, -0.75]} color={rider.trim} outline={false} />
     </group>
   );
 }

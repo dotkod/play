@@ -6,11 +6,8 @@ import * as THREE from "three";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, ToonMaterial, toonGradient } from "@/shared/three/toon";
+import { streetSpots } from "./colliders";
 import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
-
-// Keep street furniture out of doorways
-const DOORS = BUILDINGS.filter((b) => b.game || b.soon).map(doorSpot);
-const clearOfDoors = (x: number, z: number) => DOORS.every((d) => Math.abs(d.x - x) > 3.5 || Math.sign(d.z) !== Math.sign(z));
 
 export const City = memo(function City({ onBuilding }: { onBuilding: (b: Building) => void }) {
   return (
@@ -95,18 +92,7 @@ function Roads() {
 // ---------- Lamps and trees ----------
 
 const StreetProps = memo(function StreetProps() {
-  const spots = useMemo(() => {
-    const out: { x: number; z: number; kind: "lamp" | "tree" }[] = [];
-    for (let p = -EXTENT + 4; p <= EXTENT - 4; p += 9) {
-      if (Math.abs(p) < WALK_HALF + 3) continue;
-      const kind = Math.round(p / 9) % 2 === 0 ? "lamp" : "tree";
-      for (const s of [-1, 1]) {
-        if (clearOfDoors(p, s)) out.push({ x: p, z: s * (WALK_HALF - 0.6), kind });
-        out.push({ x: s * (WALK_HALF - 0.6), z: p, kind });
-      }
-    }
-    return out;
-  }, []);
+  const spots = useMemo(() => streetSpots(), []);
   return (
     <>
       {spots.map((p, i) =>

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ambience, audioReady, music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
 import { bindKeyboard, input } from "./controls";
 import { HUB_STRINGS } from "./strings";
@@ -41,6 +42,29 @@ export function Hub() {
   const featured = BUILDINGS.find((b) => b.game)!;
 
   useEffect(() => bindKeyboard(), []);
+
+  // City soundscape: starts on the first interaction (or right away if audio was already unlocked in a game)
+  useEffect(() => {
+    const begin = () => {
+      unlockAudio();
+      music.start("city");
+      ambience.start();
+    };
+    if (audioReady()) begin();
+    window.addEventListener("pointerdown", begin, { once: true });
+    window.addEventListener("keydown", begin, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", begin);
+      window.removeEventListener("keydown", begin);
+      music.stop();
+      ambience.stop();
+    };
+  }, []);
+
+  // A soft chime whenever you step up to a door
+  useEffect(() => {
+    if (zone) sfx.chime();
+  }, [zone]);
   useEffect(() => {
     const mq = matchMedia("(pointer: coarse)");
     const sync = () => setTouch(mq.matches);
@@ -56,6 +80,8 @@ export function Hub() {
 
   const enter = (b: Building) => {
     if (!b.game) return;
+    sfx.doorbell();
+    ambience.stop();
     try {
       sessionStorage.setItem(SPAWN_KEY, b.id);
     } catch {}
@@ -82,12 +108,15 @@ export function Hub() {
           <p className="text-xl leading-none font-extrabold tracking-wide text-amber-300 [-webkit-text-stroke:4px_#1f1a17] [paint-order:stroke_fill]">▶ PLAY</p>
           <p className="text-[11px] font-bold opacity-80">{tr.brand}</p>
         </div>
-        <div className="pointer-events-auto flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg">
+        <div className="pointer-events-auto flex gap-2">
+          <MuteButton />
+        <div className="flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg">
           {(["ms", "en"] as const).map((l) => (
             <button key={l} type="button" onClick={() => setLang(l)} className={`h-full rounded-lg px-2 ${lang === l ? "bg-amber-300 text-ink" : "text-cream/70"}`}>
               {l === "ms" ? "BM" : "EN"}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -128,6 +157,24 @@ export function Hub() {
 
       {touch && <Joystick />}
     </div>
+  );
+}
+
+function MuteButton() {
+  const muted = useMuted();
+  return (
+    <button
+      type="button"
+      aria-label={muted ? "Unmute" : "Mute"}
+      onClick={(e) => {
+        e.stopPropagation();
+        unlockAudio();
+        setMuted(!muted);
+      }}
+      className="grid size-9 place-items-center rounded-xl bg-ink/80 text-lg shadow-lg active:scale-95"
+    >
+      {muted ? "🔇" : "🔊"}
+    </button>
   );
 }
 

@@ -1,5 +1,6 @@
-// Shared art for the favicon/app icon: a teh tarik glass on mamak teal
+// App icon: a chunky yellow play button on ink, matching the PLAY logo
 export function IconArt({ size }: { size: number }) {
+  const tri = size * 0.36;
   return (
     <div
       style={{
@@ -8,12 +9,20 @@ export function IconArt({ size }: { size: number }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#2f8f86",
+        background: "#1f1a17",
         borderRadius: size * 0.22,
-        fontSize: size * 0.68,
       }}
     >
-      🍵
+      <div
+        style={{
+          width: 0,
+          height: 0,
+          marginLeft: tri * 0.25,
+          borderTop: `${tri * 0.62}px solid transparent`,
+          borderBottom: `${tri * 0.62}px solid transparent`,
+          borderLeft: `${tri}px solid #fcd34d`,
+        }}
+      />
     </div>
   );
 }
