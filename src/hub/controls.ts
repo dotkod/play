@@ -6,6 +6,9 @@ export const input = {
   enter: false, // Enter/E pressed this frame
 };
 
+// Camera state other systems care about: the cutaway only applies to the low follow camera
+export const view = { cutaway: false };
+
 const MOVE_KEYS = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 
 export function bindKeyboard() {

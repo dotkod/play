@@ -7,6 +7,7 @@ import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, RBox, ToonMaterial, toonGradient } from "@/shared/three/toon";
 import { streetSpots } from "./colliders";
+import { view } from "./controls";
 import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
 
 export const City = memo(function City({ onBuilding }: { onBuilding: (b: Building) => void }) {
@@ -124,6 +125,10 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
   // Cutaway: a building between the camera and the street hides itself so it never blocks the view
   useFrame(({ camera }) => {
     if (!group.current) return;
+    if (!view.cutaway) {
+      group.current.visible = true;
+      return;
+    }
     const near = Math.abs(camera.position.x - b.x) < b.w / 2 + 5;
     const between = near && (b.side === "south" ? camera.position.z > f.minZ - 1.5 : camera.position.z < f.maxZ + 1.5);
     group.current.visible = !between;

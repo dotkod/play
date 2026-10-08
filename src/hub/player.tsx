@@ -7,7 +7,7 @@ import type { Look } from "@/shared/three/look";
 import { sfx } from "@/shared/audio";
 import { Person, type Pose } from "@/shared/three/person";
 import { type Circle, dynamicColliders, staticColliders } from "./colliders";
-import { input, moveVector } from "./controls";
+import { input, moveVector, view } from "./controls";
 import { player as playerShared } from "./traffic";
 import { type Building, BOUNDS, BUILDINGS, doorSpot, footprint } from "./world-data";
 
@@ -80,6 +80,7 @@ export function Player({
     const dt = Math.min(rawDt, 0.05);
     const p = pos.current;
 
+    view.cutaway = active && followCamera;
     if (!active) {
       // Attract mode: slow orbit over the junction behind the start screen
       input.target = null;

@@ -6,7 +6,7 @@ import { memo, useRef, useState } from "react";
 import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
 import type * as THREE from "three";
 import { City } from "./city";
-import { input } from "./controls";
+import { input, view } from "./controls";
 import { Pedestrians } from "./npcs";
 import { Player } from "./player";
 import { player, TrafficLights, Traffic } from "./traffic";
@@ -84,6 +84,8 @@ const Sun = memo(function Sun({ shadows }: { shadows: boolean }) {
 // Wide view over the junction with Restoran Anne Maju in frame
 function PosterCamera() {
   useFrame(({ camera }) => {
+    // Keep near-side buildings out of the shot
+    view.cutaway = true;
     camera.position.set(9, 13, 13);
     camera.lookAt(10, 1, -5);
   });
