@@ -14,6 +14,8 @@ export type Pose = {
   seated: boolean;
   angry?: boolean;
   carrying?: boolean;
+  // Bent down (e.g. petting a cat)
+  crouch?: boolean;
 };
 
 const HIP_STAND = 0.78;
@@ -47,12 +49,19 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
       armL.current.rotation.x = armR.current.rotation.x = -0.75;
       // Impatient customers drum the table
       if (p.angry) armR.current.rotation.x = -0.75 + Math.sin(t * 18) * 0.15;
+    } else if (p.crouch) {
+      // Squat down with one hand reaching forward
+      hips.current.position.y = 0.42;
+      legL.current.rotation.x = legR.current.rotation.x = -1.1;
+      armL.current.rotation.x = -0.3;
+      armR.current.rotation.x = -1.2 + Math.sin(t * 8) * 0.15;
     } else {
       hips.current.position.y = HIP_STAND + (p.walking ? Math.abs(Math.sin(t * 11)) * 0.04 : 0);
       legL.current.rotation.x = swing;
       legR.current.rotation.x = -swing;
       armL.current.rotation.x = p.carrying ? -1.3 : -swing * 0.8;
-      armR.current.rotation.x = p.carrying ? -1.3 : swing * 0.8;
+      // Umbrellas are held up steadily; other carried things swing with the walk
+      armR.current.rotation.x = p.carrying ? -1.3 : look.carry === "umbrella" ? -0.5 : swing * 0.8;
     }
     if (brows.current) brows.current.visible = !!p.angry;
     if (tray.current) tray.current.visible = !!p.carrying;
@@ -80,6 +89,7 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
         <group ref={armR} position={[0.33, 0.58, 0]}>
           <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
           <Box size={[0.12, 0.1, 0.13]} position={[0, -0.53, 0]} color={look.skin} />
+          {look.carry && <Carried kind={look.carry} />}
         </group>
 
         <group ref={tray} position={[0, 0.62, 0.55]} visible={false}>
@@ -107,6 +117,21 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
           )}
         </group>
       </group>
+    </group>
+  );
+}
+
+// Held in the right hand (the arm group's origin is the shoulder)
+function Carried({ kind }: { kind: NonNullable<Look["carry"]> }) {
+  if (kind === "briefcase") return <Box size={[0.1, 0.3, 0.4]} position={[0, -0.72, 0]} color="#5b3a22" />;
+  if (kind === "bag") return <Box size={[0.12, 0.34, 0.3]} position={[0, -0.74, 0]} color="#f2b33d" />;
+  return (
+    <group position={[0, -0.55, 0.05]}>
+      <Cyl top={0.02} bottom={0.02} height={1.3} position={[0, 0.55, 0]} color="#3a3a3a" outline={false} />
+      <mesh position={[0, 1.2, 0]}>
+        <coneGeometry args={[0.7, 0.35, 8]} />
+        <meshToonMaterial color="#d8352a" />
+      </mesh>
     </group>
   );
 }

@@ -7,6 +7,7 @@ import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
 import type * as THREE from "three";
 import { City } from "./city";
 import { input, view } from "./controls";
+import { Cats } from "./cats";
 import { Pedestrians } from "./npcs";
 import { Player } from "./player";
 import { player, TrafficLights, Traffic } from "./traffic";
@@ -15,12 +16,13 @@ import { type Building, doorSpot } from "./world-data";
 type Props = {
   spawn: { x: number; z: number; rotY: number };
   onZone: (b: Building | null) => void;
+  onNearCat?: (index: number | null) => void;
   // Fixed aerial shot for the OG image instead of the follow camera
   poster?: boolean;
   active?: boolean;
 };
 
-export default function World({ spawn, onZone, poster = false, active = true }: Props) {
+export default function World({ spawn, onZone, onNearCat = noop, poster = false, active = true }: Props) {
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
   const wrap = useRef<HTMLDivElement>(null);
@@ -49,12 +51,15 @@ export default function World({ spawn, onZone, poster = false, active = true }: 
         <TrafficLights />
         <Traffic />
         <Pedestrians />
+        <Cats onNear={onNearCat} />
         <Player spawn={spawn} onZone={onZone} followCamera={!poster} active={active} />
         {poster && <PosterCamera />}
       </Canvas>
     </div>
   );
 }
+
+const noop = () => {};
 
 // The shadow camera follows the player so shadows stay crisp without a huge shadow map
 const Sun = memo(function Sun({ shadows }: { shadows: boolean }) {

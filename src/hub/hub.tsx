@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ambience, audioReady, music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
+import { CATS, petCat } from "./cats";
 import { bindKeyboard, input } from "./controls";
 import { Minimap } from "./minimap";
 import { HUB_STRINGS } from "./strings";
@@ -43,6 +44,8 @@ export function Hub() {
   const [{ spawn, returning }] = useState(readSpawn);
   const [started, setStarted] = useState(returning);
   const [zone, setZone] = useState<Building | null>(null);
+  const [nearCat, setNearCat] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [touch, setTouch] = useState(false);
   const featured = BUILDINGS.find((b) => b.game)!;
 
@@ -100,6 +103,14 @@ export function Hub() {
     if (featured.game) router.prefetch(`/${featured.game.slug}`);
   }, [router, featured]);
 
+  const pet = (i: number) => {
+    unlockAudio();
+    const n = petCat(i);
+    const id = Date.now();
+    setToast({ text: tr.catLoves(CATS[i].name, n), id });
+    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2600);
+  };
+
   const enter = (b: Building) => {
     if (!b.game) return;
     sfx.doorbell();
@@ -117,14 +128,16 @@ export function Hub() {
     const id = setInterval(() => {
       if (!input.enter) return;
       input.enter = false;
-      if (started && zone?.game) enter(zone);
+      if (!started) return;
+      if (zone?.game) enter(zone);
+      else if (nearCat !== null) pet(nearCat);
     }, 50);
     return () => clearInterval(id);
   });
 
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
-      <World spawn={spawn} onZone={setZone} active={started} />
+      <World spawn={spawn} onZone={setZone} onNearCat={setNearCat} active={started} />
 
       {/* Brand + language */}
       <div className="edge-top pointer-events-none absolute z-20 flex items-start justify-between gap-2">
@@ -152,8 +165,27 @@ export function Hub() {
         </div>
       )}
 
-      {/* Goal hint, hidden once you're at a door */}
-      {started && !zone && (
+      {/* Cat nearby: offer a pet (stacked above the door prompt when both apply) */}
+      {started && nearCat !== null && (
+        <div className={`absolute inset-x-0 flex justify-center px-4 ${zone ? "bottom-24" : "bottom-4"}`}>
+          <button
+            type="button"
+            onClick={() => pet(nearCat)}
+            className="animate-pop rounded-2xl bg-cream px-5 py-2.5 text-lg font-extrabold text-ink shadow-[0_5px_0_#1f1a17] active:translate-y-0.5"
+          >
+            🐱 {tr.petCat(CATS[nearCat].name)}
+          </button>
+        </div>
+      )}
+
+      {toast && (
+        <div key={toast.id} className="pointer-events-none absolute inset-x-0 top-20 flex justify-center px-4">
+          <p className="animate-pop rounded-2xl bg-[#ff5a7a] px-4 py-2 text-sm font-extrabold text-white shadow-[0_4px_0_#1f1a17]">{toast.text}</p>
+        </div>
+      )}
+
+      {/* Goal hint, hidden once you're at a door or next to a cat */}
+      {started && !zone && nearCat === null && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 flex flex-col items-center gap-1 px-4 text-center">
           <p className="rounded-full bg-amber-300 px-4 py-1.5 text-sm font-extrabold text-ink shadow-[0_4px_0_#1f1a17]">
             {featured.game!.emoji} {tr.goTo(featured.game!.title)}

@@ -37,7 +37,15 @@ export const TRAFFIC_POLES = [
   { x: -WALK_HALF + 0.6, z: WALK_HALF + 0.2 },
 ];
 
+// Street furniture with people around it (rendered in city.tsx and npcs.tsx)
+export const BUS_STOP = { x: 24, z: 5.6 };
+export const STALL = { x: -8.5, z: -5.2 };
+
 export const staticColliders: Circle[] = [
+  // Bus stop shelter + its waiting crowd, nasi lemak cart + seller and customer
+  ...[-1.6, -0.5, 0.6, 1.6].map((dx) => ({ x: BUS_STOP.x + dx, z: BUS_STOP.z - 0.3, r: 0.7 })),
+  { x: STALL.x, z: STALL.z, r: 1.2 },
+  { x: STALL.x + 1.5, z: STALL.z + 0.3, r: 0.45 },
   // A table plus its stools and seated diners
   ...mamakTables().map((t) => ({ ...t, r: 1.25 })),
   ...streetSpots().map((s) => ({ x: s.x, z: s.z, r: s.kind === "tree" ? 0.4 : 0.22 })),
@@ -47,4 +55,5 @@ export const staticColliders: Circle[] = [
 export const dynamicColliders = {
   vehicles: [] as Circle[],
   people: [] as Circle[],
+  cats: [] as Circle[],
 };

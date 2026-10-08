@@ -16,6 +16,8 @@ const ms = {
   startKey: "atau tekan Enter",
   controlsDesktop: "🎮 WASD / anak panah · klik untuk jalan · Enter untuk masuk",
   controlsTouch: "🎮 Joystick atau tap untuk jalan",
+  petCat: (name: string) => `Usap ${name}`,
+  catLoves: (name: string, n: number) => `${name} suka kau! ❤️ · ${n} kali usap kucing`,
 };
 
 type Strings = typeof ms;
@@ -36,6 +38,8 @@ const en: Strings = {
   startKey: "or press Enter",
   controlsDesktop: "🎮 WASD / arrows · click to walk · Enter to go in",
   controlsTouch: "🎮 Joystick or tap to walk",
+  petCat: (name) => `Pet ${name}`,
+  catLoves: (name, n) => `${name} loves you! ❤️ · ${n} ${n === 1 ? "cat petted" : "cats petted"}`,
 };
 
 export const HUB_STRINGS: Record<Lang, Strings> = { ms, en };

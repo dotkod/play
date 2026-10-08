@@ -112,6 +112,8 @@ export function Player({
       }
     }
     moving.current = vx !== 0 || vz !== 0;
+    // Walking off cancels a petting crouch
+    if (moving.current) playerShared.crouchUntil = 0;
     if (moving.current) {
       const nx = THREE.MathUtils.clamp(p.x + vx * SPEED * dt, -BOUNDS, BOUNDS);
       const nz = THREE.MathUtils.clamp(p.z + vz * SPEED * dt, -BOUNDS, BOUNDS);
@@ -136,6 +138,7 @@ export function Player({
     // Solid tables, poles and trees, then anything moving (vehicles nudge you out of their way)
     const bumped = pushOut(p, staticColliders) || pushOut(p, dynamicColliders.people);
     pushOut(p, dynamicColliders.vehicles);
+    pushOut(p, dynamicColliders.cats);
     if (bumped && input.target && Math.hypot(input.target.x - p.x, input.target.z - p.z) < 1.5) input.target = null;
     playerShared.x = p.x;
     playerShared.z = p.z;
@@ -183,7 +186,17 @@ export function Player({
   // Wear whatever outfit was picked in Anne Maju
   const [look] = useState<Look>(() => ({ ...PLAYER_LOOK, ...currentOutfit().look }));
 
-  const getPose = useMemo(() => (): Pose => ({ x: pos.current.x, z: pos.current.z, rotY: rot.current, walking: moving.current, seated: false }), []);
+  const getPose = useMemo(
+    () => (): Pose => ({
+      x: pos.current.x,
+      z: pos.current.z,
+      rotY: rot.current,
+      walking: moving.current,
+      seated: false,
+      crouch: Date.now() < playerShared.crouchUntil,
+    }),
+    [],
+  );
 
   return (
     <>

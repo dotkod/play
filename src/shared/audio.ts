@@ -148,6 +148,57 @@ export const sfx = {
     tone(784, 0.7, { type: "sine", vol: 0.18 });
     tone(622, 0.9, { type: "sine", vol: 0.18, at: 0.32 });
   },
+  // Cat: rising-then-falling "mi-aow" through a vowel-ish filter; vol 0..1 for distance
+  meow: (vol = 1) => {
+    if (!ctx || !sfxBus || vol <= 0.02) return;
+    const t = ctx.currentTime;
+    const base = 520 + Math.random() * 160;
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(base, t);
+    osc.frequency.linearRampToValueAtTime(base * 1.45, t + 0.12);
+    osc.frequency.linearRampToValueAtTime(base * 0.85, t + 0.45);
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.Q.value = 3;
+    f.frequency.setValueAtTime(900, t);
+    f.frequency.linearRampToValueAtTime(1600, t + 0.15);
+    f.frequency.linearRampToValueAtTime(800, t + 0.45);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22 * vol, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    osc.connect(f).connect(g).connect(sfxBus);
+    osc.start(t);
+    osc.stop(t + 0.55);
+  },
+  // Purr: low rumble pulsing ~25 times a second
+  purr: (seconds = 1.6) => {
+    if (!ctx || !sfxBus || !noise) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = noise;
+    src.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 180;
+    const g = ctx.createGain();
+    g.gain.value = 0;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 25;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.25;
+    lfo.connect(depth).connect(g.gain);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(1, t + 0.2);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+    src.connect(lp).connect(g).connect(env).connect(sfxBus);
+    src.start(t);
+    lfo.start(t);
+    src.stop(t + seconds + 0.05);
+    lfo.stop(t + seconds + 0.05);
+  },
   horn: () => {
     tone(420, 0.22, { type: "square", vol: 0.07 });
     tone(525, 0.22, { type: "square", vol: 0.06 });

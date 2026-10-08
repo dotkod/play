@@ -12,7 +12,10 @@ export type Look = {
   dress?: boolean; // baju kurung style long top
   glasses?: boolean; // sunglasses (outfit)
   apron?: string; // apron colour (outfit)
+  carry?: Carry; // something in the right hand
 };
+
+export type Carry = "briefcase" | "bag" | "umbrella";
 
 const SKINS = ["#f1cba8", "#e2ad84", "#c98d60", "#a96d47", "#87543a"];
 const SHIRTS = ["#e8553f", "#f2b33d", "#3f8fd2", "#4cae6e", "#9a63c9", "#f07fa8", "#2e4a7a", "#e7e2d6", "#ff8a3d"];
@@ -47,6 +50,34 @@ export function randomLook(kind: Kind = pick(["man", "man", "woman", "woman"] as
   const headwear: Headwear = r < 0.5 ? "short" : r < 0.68 ? "songkok" : r < 0.85 ? "cap" : "uncle";
   const hair = headwear === "cap" ? pick(CAPS) : headwear === "uncle" ? "#e9e6df" : pick(HAIR);
   return { skin, shirt: pick(SHIRTS), pants: pick(PANTS), headwear, hair };
+}
+
+// City pedestrians: a wider cast than the mamak diners (kept separate so game spawns stay unchanged)
+export type Townsfolk = "office" | "student" | "auntie" | "jogger" | "elder" | "umbrella" | "kid";
+
+export function townsfolk(kind: Townsfolk): Look {
+  const skin = pick(SKINS);
+  switch (kind) {
+    case "office":
+      return { skin, shirt: pick(["#f4f6f8", "#cfe0f2", "#e7e2d6"]), pants: "#2a2a33", headwear: rand() < 0.3 ? "long" : "short", hair: pick(HAIR), carry: "briefcase" };
+    case "student": {
+      // Sekolah: white shirt, dark trousers; girls in blue baju kurung with a white tudung
+      const girl = rand() < 0.5;
+      return girl
+        ? { skin, shirt: "#3f6fb5", pants: "#3f6fb5", headwear: "tudung", hair: "#ffffff", dress: true, kid: true }
+        : { skin, shirt: "#ffffff", pants: pick(["#1f2a44", "#23382c"]), headwear: "short", hair: pick(HAIR), kid: true };
+    }
+    case "auntie":
+      return { skin, shirt: pick(KURUNG), pants: pick(KURUNG), headwear: rand() < 0.6 ? "tudung" : "bun", hair: pick(TUDUNG), dress: true, carry: "bag" };
+    case "jogger":
+      return { skin, shirt: pick(["#ff8a3d", "#3f8fd2", "#e8553f", "#1f1f24"]), pants: "#1f1f24", headwear: "cap", hair: pick(CAPS) };
+    case "elder":
+      return { skin, shirt: pick(["#e7e2d6", "#9fd1e8", "#c7b2e6"]), pants: "#5b4a3a", headwear: "uncle", hair: "#e9e6df" };
+    case "umbrella":
+      return { ...randomLook(), carry: "umbrella" };
+    case "kid":
+      return randomLook("kid");
+  }
 }
 
 // A party's members: solo diner, couple, friends, or a parent with a kid

@@ -6,7 +6,7 @@ import * as THREE from "three";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, RBox, ToonMaterial, toonGradient } from "@/shared/three/toon";
-import { streetSpots } from "./colliders";
+import { BUS_STOP, STALL, streetSpots } from "./colliders";
 import { view } from "./controls";
 import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
 
@@ -16,6 +16,8 @@ export const City = memo(function City({ onBuilding }: { onBuilding: (b: Buildin
       <Ground />
       <Roads />
       <StreetProps />
+      <BusStop />
+      <NasiLemakStall />
       {BUILDINGS.map((b) => (
         <BuildingMesh key={b.id} b={b} onTap={() => onBuilding(b)} />
       ))}
@@ -112,6 +114,53 @@ const StreetProps = memo(function StreetProps() {
         ),
       )}
     </>
+  );
+});
+
+// ---------- Street furniture ----------
+
+// Bus shelter: roof, back panel, bench and a "BAS" sign post
+const BusStop = memo(function BusStop() {
+  const { x, z } = BUS_STOP;
+  return (
+    <group position={[x, 0, z]}>
+      <Box size={[4.2, 0.12, 1.6]} position={[0, 2.5, 0]} color="#2f6fd6" />
+      <Box size={[4.2, 2.3, 0.08]} position={[0, 1.3, 0.75]} color="#bfe6ef" />
+      {[-2, 2].map((dx) => (
+        <Box key={dx} size={[0.1, 2.5, 0.1]} position={[dx, 1.25, -0.6]} color="#6b7178" outline={false} />
+      ))}
+      <Box size={[3, 0.1, 0.5]} position={[0.3, 0.5, 0.4]} color="#b9773f" />
+      <Box size={[3, 0.45, 0.08]} position={[0.3, 0.3, 0.62]} color="#6b7178" outline={false} />
+      <group position={[-2.6, 0, -0.5]}>
+        <Cyl top={0.05} bottom={0.05} height={2.6} position={[0, 1.3, 0]} color="#6b7178" outline={false} />
+        <Box size={[0.7, 0.5, 0.06]} position={[0, 2.5, 0]} color="#1f5fa8" />
+        <Box size={[0.4, 0.14, 0.07]} position={[0, 2.5, 0]} color="#ffffff" outline={false} />
+      </group>
+    </group>
+  );
+});
+
+// Nasi lemak cart with a big umbrella and banana-leaf packets
+const NasiLemakStall = memo(function NasiLemakStall() {
+  const { x, z } = STALL;
+  return (
+    <group position={[x, 0, z]}>
+      <Box size={[1.8, 0.9, 0.9]} position={[0, 0.55, 0]} color="#c8372b" />
+      <Box size={[1.9, 0.08, 1.0]} position={[0, 1.02, 0]} color="#e3e1dc" />
+      {[-0.6, -0.2, 0.2, 0.6].map((dx) => (
+        <Box key={dx} size={[0.26, 0.12, 0.22]} position={[dx, 1.12, 0.15]} rotation={[0, dx, 0]} color="#3f9a4a" />
+      ))}
+      <Cyl top={0.15} bottom={0.15} height={0.25} position={[-0.55, 1.2, -0.25]} color="#f4f1ea" />
+      {[-0.7, 0.7].map((dx) => (
+        <Cyl key={dx} top={0.18} bottom={0.18} height={0.1} position={[dx, 0.12, 0.45]} rotation={[0, 0, Math.PI / 2]} color="#1a1a1a" outline={false} />
+      ))}
+      <Cyl top={0.03} bottom={0.03} height={2.6} position={[0.9, 1.3, -0.3]} color="#6b7178" outline={false} />
+      <mesh position={[0.9, 2.65, -0.3]}>
+        <coneGeometry args={[1.5, 0.6, 10]} />
+        <meshToonMaterial color="#f2b33d" gradientMap={toonGradient()} />
+      </mesh>
+      <Box size={[1.4, 0.35, 0.05]} position={[0, 1.5, 0.46]} color="#fbf3e4" outline={false} />
+    </group>
   );
 });
 

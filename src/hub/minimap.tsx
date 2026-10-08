@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { catStates } from "./cats";
 import { dynamicColliders } from "./colliders";
 import { input } from "./controls";
 import { player } from "./traffic";
@@ -79,6 +80,13 @@ export function Minimap({ size }: { size: number }) {
       // Traffic as small dots
       g.fillStyle = "#ffffff";
       for (const v of dynamicColliders.vehicles) g.fillRect(X(v.x) - ox - 1.5 * dpr, Z(v.z) - oz - 1.5 * dpr, 3 * dpr, 3 * dpr);
+      // Cats as little orange dots
+      g.fillStyle = "#f28c28";
+      for (const cat of catStates()) {
+        g.beginPath();
+        g.arc(X(cat.x) - ox, Z(cat.z) - oz, 2.6 * dpr, 0, Math.PI * 2);
+        g.fill();
+      }
       // Player arrow in the middle, pointing the way they're facing
       g.save();
       g.translate(c.width / 2, c.height / 2);
