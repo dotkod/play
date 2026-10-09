@@ -7,10 +7,22 @@ import { etaLabel, nextArrivals } from "@/content/transit/bus-routes";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, RBox, ToonMaterial, toonGradient } from "@/shared/three/toon";
-import { ROAD_STRIPS, SPINE_EDGES, SPINE_NODES, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
+import { hashString } from "@/shared/rng";
+import {
+  ROAD_STRIP_JOIN,
+  ROAD_STRIPS,
+  SPINE_EDGES,
+  SPINE_NODES,
+  stripLength,
+  WALK_PATH_HALF,
+  WALK_PATHS,
+  WALK_STRIP_JOIN,
+} from "@/world/walk-spine";
+import { player } from "@/world/player-bridge";
+import { WALK_PLAZAS } from "@/world/walkability";
 import { BUS_STOP, STALL, streetSpots } from "./colliders";
 import { view } from "./controls";
-import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
+import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, mamakTableSpots, ROAD_HALF, WALK_HALF } from "./world-data";
 
 export const City = memo(function City({ onBuilding }: { onBuilding: (b: Building) => void }) {
   return (
@@ -29,12 +41,56 @@ export const City = memo(function City({ onBuilding }: { onBuilding: (b: Buildin
 
 // ---------- Ground, roads, sidewalks ----------
 
+let grassTex: THREE.CanvasTexture | null = null;
+
+/** Deterministic grassy field texture (patches + blade speckles). Cached once. */
+function grassTexture() {
+  if (grassTex) return grassTex;
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#78b868";
+  g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 120; i++) {
+    const r = (hashString(`gp:${i}`) % 10000) / 10000;
+    const r2 = (hashString(`gq:${i}`) % 10000) / 10000;
+    const r3 = (hashString(`gr:${i}`) % 10000) / 10000;
+    g.fillStyle = r > 0.55 ? "#5f9a52" : r > 0.25 ? "#8fd07a" : "#6aa85c";
+    g.globalAlpha = 0.35 + r2 * 0.4;
+    g.beginPath();
+    g.ellipse(r * 256, r2 * 256, 6 + r3 * 22, 4 + r * 16, r2 * Math.PI, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.globalAlpha = 0.55;
+  g.lineWidth = 1;
+  for (let i = 0; i < 900; i++) {
+    const r = (hashString(`gb:${i}`) % 10000) / 10000;
+    const r2 = (hashString(`gc:${i}`) % 10000) / 10000;
+    const x = r * 256;
+    const y = r2 * 256;
+    g.strokeStyle = r > 0.5 ? "#4e8a42" : "#a8e698";
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (r2 - 0.5) * 2.5, y - 2 - r * 3);
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+  grassTex = new THREE.CanvasTexture(c);
+  grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+  grassTex.repeat.set(48, 48);
+  grassTex.colorSpace = THREE.SRGBColorSpace;
+  grassTex.anisotropy = 4;
+  return grassTex;
+}
+
 function Ground() {
+  const map = grassTexture();
   return (
     <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]} receiveShadow>
         <planeGeometry args={[320, 320]} />
-        <meshToonMaterial color="#86c27a" gradientMap={toonGradient()} />
+        <meshToonMaterial color="#86c27a" map={map} gradientMap={toonGradient()} />
       </mesh>
       {/* Sungai Lepak + Masjid Lepak (Phase 3 Pusat expand stub) */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-31, 0.02, 32]} receiveShadow>
@@ -88,7 +144,7 @@ function Strip({
   );
 }
 
-/** Pedestrian alleys (narrow, under sidewalks). */
+/** Pedestrian alleys + plazas (narrow, under sidewalks). */
 function CityWalkPaths() {
   return (
     <>
@@ -102,11 +158,14 @@ function CityWalkPaths() {
         const cz = (s.z0 + s.z1) / 2;
         return <Strip key={`p${i}`} w={WALK_PATH_HALF * 2} d={d} x={s.x} z={cz} y={0.003} color={PATH} />;
       })}
+      {WALK_PLAZAS.map((p, i) => (
+        <Strip key={`plaza${i}`} w={p.w} d={p.d} x={p.x} z={p.z} y={0.0025} color={PATH} />
+      ))}
     </>
   );
 }
 
-/** Soft pads at L / T junctions so 3D corners aren’t raw rectangle mitres. */
+/** L / T junction centres — square pads fill the corner without circular blobs into the grass. */
 function junctionPads(): { x: number; z: number }[] {
   const adj: Record<string, string[]> = {};
   for (const id of Object.keys(SPINE_NODES)) adj[id] = [];
@@ -130,44 +189,47 @@ function junctionPads(): { x: number; z: number }[] {
   return out;
 }
 
-/** Full-city asphalt + sidewalks from ROAD_STRIPS. Walks under roads; Z-axis asphalt slightly above X (clean junctions). */
+/** Short driveway stubs get a narrow apron, not a full 12m sidewalk into the grass. */
+function walkHalfForStrip(s: (typeof ROAD_STRIPS)[number]) {
+  return stripLength(s) < 16 ? ROAD_HALF + 1.4 : WALK_HALF;
+}
+
+/** Full-city asphalt + sidewalks from ROAD_STRIPS. Exact sidewalks + square pads; asphalt slight join. */
 function CityRoadStrips() {
   const walks: ReactNode[] = [];
   const roads: ReactNode[] = [];
   ROAD_STRIPS.forEach((s, i) => {
+    const wh = walkHalfForStrip(s);
     if (s.axis === "x") {
-      const x0 = Math.min(s.x0, s.x1);
-      const x1 = Math.max(s.x0, s.x1);
-      const w = x1 - x0;
-      const cx = (x0 + x1) / 2;
-      walks.push(<Strip key={`w${i}`} w={w} d={WALK_HALF * 2} x={cx} z={s.z} y={0.004} color={WALK} />);
-      roads.push(<Strip key={`r${i}`} w={w} d={ROAD_HALF * 2} x={cx} z={s.z} y={0.02} color={ROAD} offset={-1} />);
+      const wx0 = Math.min(s.x0, s.x1) - WALK_STRIP_JOIN;
+      const wx1 = Math.max(s.x0, s.x1) + WALK_STRIP_JOIN;
+      const rx0 = Math.min(s.x0, s.x1) - ROAD_STRIP_JOIN;
+      const rx1 = Math.max(s.x0, s.x1) + ROAD_STRIP_JOIN;
+      walks.push(<Strip key={`w${i}`} w={wx1 - wx0} d={wh * 2} x={(wx0 + wx1) / 2} z={s.z} y={0.004} color={WALK} />);
+      roads.push(
+        <Strip key={`r${i}`} w={rx1 - rx0} d={ROAD_HALF * 2} x={(rx0 + rx1) / 2} z={s.z} y={0.02} color={ROAD} offset={-1} />,
+      );
       return;
     }
-    const z0 = Math.min(s.z0, s.z1);
-    const z1 = Math.max(s.z0, s.z1);
-    const d = z1 - z0;
-    const cz = (z0 + z1) / 2;
-    walks.push(<Strip key={`w${i}`} w={WALK_HALF * 2} d={d} x={s.x} z={cz} y={0.004} color={WALK} />);
-    roads.push(<Strip key={`r${i}`} w={ROAD_HALF * 2} d={d} x={s.x} z={cz} y={0.028} color={ROAD} offset={-2} />);
+    const wz0 = Math.min(s.z0, s.z1) - WALK_STRIP_JOIN;
+    const wz1 = Math.max(s.z0, s.z1) + WALK_STRIP_JOIN;
+    const rz0 = Math.min(s.z0, s.z1) - ROAD_STRIP_JOIN;
+    const rz1 = Math.max(s.z0, s.z1) + ROAD_STRIP_JOIN;
+    walks.push(<Strip key={`w${i}`} w={wh * 2} d={wz1 - wz0} x={s.x} z={(wz0 + wz1) / 2} y={0.004} color={WALK} />);
+    roads.push(
+      <Strip key={`r${i}`} w={ROAD_HALF * 2} d={rz1 - rz0} x={s.x} z={(rz0 + rz1) / 2} y={0.028} color={ROAD} offset={-2} />,
+    );
   });
+  // Asphalt-only square pads at L/T nodes (fills mitre seams). No round/walk pads —
+  // those spilled into grass and made verges look jagged.
   const pads = junctionPads();
   return (
     <>
       <CityWalkPaths />
       {walks}
-      {pads.map((p, i) => (
-        <mesh key={`jw${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.006, p.z]} receiveShadow>
-          <circleGeometry args={[WALK_HALF, 28]} />
-          <meshToonMaterial color={WALK} gradientMap={toonGradient()} />
-        </mesh>
-      ))}
       {roads}
       {pads.map((p, i) => (
-        <mesh key={`jr${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.032, p.z]} receiveShadow>
-          <circleGeometry args={[ROAD_HALF, 28]} />
-          <meshToonMaterial color={ROAD} gradientMap={toonGradient()} />
-        </mesh>
+        <Strip key={`jr${i}`} w={ROAD_HALF * 2 + 0.4} d={ROAD_HALF * 2 + 0.4} x={p.x} z={p.z} y={0.03} color={ROAD} offset={-2} />
       ))}
     </>
   );
@@ -352,7 +414,8 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
   const facade = facadeTexture(b);
   const frontZ = f.front + f.facing * 0.01;
   const group = useRef<THREE.Group>(null);
-  // Cutaway: a building between the camera and the street hides itself so it never blocks the view
+  // Cutaway only when the camera is *behind* the block and you’re still on the street —
+  // not when the follow-cam sits past the facade while you walk up to the door.
   useFrame(({ camera }) => {
     if (!group.current) return;
     if (!view.cutaway) {
@@ -360,8 +423,14 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
       view.cutawayIds.delete(b.id);
       return;
     }
-    const near = Math.abs(camera.position.x - b.x) < b.w / 2 + 5;
-    const between = near && (b.side === "south" ? camera.position.z > f.minZ - 1.5 : camera.position.z < f.maxZ + 1.5);
+    const near = Math.abs(camera.position.x - b.x) < b.w / 2 + 4;
+    const cam = camera.position;
+    // Camera fully behind the building (back face), player still on the road/front side
+    const behind =
+      b.side === "south"
+        ? cam.z > f.maxZ + 0.4 && player.z < f.minZ + 1.2
+        : cam.z < f.minZ - 0.4 && player.z > f.maxZ - 1.2;
+    const between = near && behind;
     group.current.visible = !between;
     if (between) view.cutawayIds.add(b.id);
     else view.cutawayIds.delete(b.id);
@@ -384,44 +453,98 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
       <Box size={[b.w + 0.3, 0.4, b.d + 0.3]} position={[f.cx, b.h + 0.2, f.cz]} color={shade(b.color)} />
       {/* Five-foot way awning */}
       <Box size={[b.w, 0.18, 1.6]} position={[b.x, b.kind === "mall" ? 4.2 : 3.1, f.front + f.facing * 0.8]} color={b.kind === "mamak" ? "#2f8f86" : shade(b.color)} />
-      {b.kind === "mamak" && <MamakFront b={b} />}
+      {b.kind === "mamak" && <MamakCorner b={b} />}
       {b.kind === "lrt" && <LrtPlatform b={b} />}
       {(b.game || b.soon || b.lrt || b.interior) && <FloatingLabel b={b} />}
     </group>
   );
 }
 
-// Outdoor tables, diners and a teh tarik counter in front of Restoran Anne Maju
-function MamakFront({ b }: { b: Building }) {
+/** Corner mamak: west facade + wrap awning, outdoor tables, diners, menu board, crates. */
+function MamakCorner({ b }: { b: Building }) {
   const f = footprint(b);
-  const z = f.front + f.facing * 1.1;
-  const diners: { look: Look; x: number }[] = useMemo(
+  const awningY = 3.1;
+  const sideX = f.minX - 0.01;
+  const sideTex = mamakSideTexture(b);
+  const tables = useMemo(() => mamakTableSpots(b), [b]);
+  const diners = useMemo(
     () => [
-      { look: { skin: "#c98d60", shirt: "#3f8fd2", pants: "#2a2a33", headwear: "songkok", hair: "#141414" }, x: b.x - 3.2 },
-      { look: { skin: "#e2ad84", shirt: "#f3b6c9", pants: "#f3b6c9", headwear: "tudung", hair: "#9fd1e8", dress: true }, x: b.x + 3.2 },
+      {
+        look: { skin: "#c98d60", shirt: "#3f8fd2", pants: "#2a2a33", headwear: "songkok" as const, hair: "#141414" },
+        x: tables[0].x - 0.72,
+        z: tables[0].z,
+        rotY: Math.PI / 2,
+      },
+      {
+        look: { skin: "#e2ad84", shirt: "#f3b6c9", pants: "#f3b6c9", headwear: "tudung" as const, hair: "#9fd1e8", dress: true },
+        x: tables[1].x + 0.72,
+        z: tables[1].z,
+        rotY: -Math.PI / 2,
+      },
+      {
+        look: { skin: "#b8794a", shirt: "#f2f2ee", pants: "#2a2a33", headwear: "short" as const, hair: "#1a1a1a" },
+        x: tables[3].x + 0.55,
+        z: tables[3].z,
+        rotY: 0,
+      },
     ],
-    [b.x],
+    [tables],
   );
   return (
     <group>
-      {[b.x - 3.2, b.x + 3.2].map((x) => (
-        <group key={x} position={[x, 0, z]}>
-          <Cyl top={0.55} bottom={0.55} height={0.05} position={[0, 0.76, 0]} color="#d3d7db" segments={24} />
-          <Cyl top={0.05} bottom={0.05} height={0.72} position={[0, 0.38, 0]} color="#9ea4aa" />
-          <Cyl top={0.18} bottom={0.22} height={0.46} position={[0.75, 0.23, 0]} color="#d8352a" />
-          <Cyl top={0.18} bottom={0.22} height={0.46} position={[-0.75, 0.23, 0]} color="#2f6fd6" />
-          <Cyl top={0.07} bottom={0.055} height={0.16} position={[0.1, 0.87, 0.1]} color="#c9965f" />
-        </group>
+      {/* West face toward the cross road — open shopfront strip */}
+      <mesh position={[sideX, b.h / 2, f.cz]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[b.d, b.h]} />
+        <meshToonMaterial map={sideTex} gradientMap={toonGradient()} />
+      </mesh>
+      {/* Awning wraps the corner onto the west five-foot way */}
+      <Box size={[1.5, 0.18, b.d]} position={[f.minX - 0.75, awningY, f.cz]} color="#2f8f86" />
+      <Box size={[1.1, 0.18, 1.1]} position={[f.minX - 0.55, awningY, f.front + f.facing * 0.55]} color="#2a7f78" />
+      {/* Standing menu board at the SW corner */}
+      <group position={[f.minX + 0.35, 0, f.front + f.facing * 1.55]}>
+        <Box size={[0.06, 1.35, 0.7]} position={[0, 0.85, 0]} color="#1f1a17" />
+        <Box size={[0.04, 0.9, 0.55]} position={[0.04, 0.95, 0]} color="#c62f25" />
+        <Box size={[0.02, 0.12, 0.42]} position={[0.06, 1.15, 0]} color="#f6d13a" />
+        <Box size={[0.02, 0.08, 0.42]} position={[0.06, 0.95, 0]} color="#f6d13a" />
+        <Box size={[0.02, 0.08, 0.42]} position={[0.06, 0.78, 0]} color="#f6d13a" />
+      </group>
+      {/* Crates / stool stack by the door */}
+      <group position={[b.x + 1.4, 0, f.front + f.facing * 0.55]}>
+        <Box size={[0.55, 0.35, 0.45]} position={[0, 0.18, 0]} color="#8b5a2b" />
+        <Box size={[0.5, 0.32, 0.4]} position={[0.05, 0.52, 0.02]} color="#a06a35" />
+        <Cyl top={0.16} bottom={0.18} height={0.42} position={[-0.55, 0.21, 0.15]} color="#d8352a" />
+      </group>
+      {tables.map((t, i) => (
+        <MamakTable key={i} x={t.x} z={t.z} emptySeats={i === 2 || i === 4} />
       ))}
-      {diners.map((d) => (
-        <SeatedDiner key={d.x} look={d.look} x={d.x - 0.75} z={z} />
+      {diners.map((d, i) => (
+        <SeatedDiner key={i} look={d.look} x={d.x} z={d.z} rotY={d.rotY} />
       ))}
     </group>
   );
 }
 
-function SeatedDiner({ look, x, z }: { look: Look; x: number; z: number }) {
-  const pose = useMemo<Pose>(() => ({ x, z, rotY: Math.PI / 2, walking: false, seated: true }), [x, z]);
+function MamakTable({ x, z, emptySeats }: { x: number; z: number; emptySeats?: boolean }) {
+  return (
+    <group position={[x, 0, z]}>
+      <Cyl top={0.55} bottom={0.55} height={0.05} position={[0, 0.76, 0]} color="#d3d7db" segments={24} />
+      <Cyl top={0.05} bottom={0.05} height={0.72} position={[0, 0.38, 0]} color="#9ea4aa" />
+      <Cyl top={0.18} bottom={0.22} height={0.46} position={[0.75, 0.23, 0]} color="#d8352a" />
+      <Cyl top={0.18} bottom={0.22} height={0.46} position={[-0.75, 0.23, 0]} color="#2f6fd6" />
+      {emptySeats && (
+        <>
+          <Cyl top={0.18} bottom={0.22} height={0.46} position={[0, 0.23, 0.75]} color="#f2b33d" />
+          <Cyl top={0.18} bottom={0.22} height={0.46} position={[0, 0.23, -0.75]} color="#2f8f86" />
+        </>
+      )}
+      <Cyl top={0.07} bottom={0.055} height={0.16} position={[0.1, 0.87, 0.1]} color="#c9965f" />
+      <Cyl top={0.055} bottom={0.04} height={0.12} position={[-0.15, 0.85, -0.05]} color="#6b3d1f" />
+    </group>
+  );
+}
+
+function SeatedDiner({ look, x, z, rotY }: { look: Look; x: number; z: number; rotY: number }) {
+  const pose = useMemo<Pose>(() => ({ x, z, rotY, walking: false, seated: true }), [x, z, rotY]);
   const getPose = useMemo(() => () => pose, [pose]);
   return <Person look={look} getPose={getPose} />;
 }
@@ -529,6 +652,48 @@ function cached(key: string, draw: (g: CanvasRenderingContext2D, c: HTMLCanvasEl
   tex.anisotropy = 4;
   textures.set(key, tex);
   return tex;
+}
+
+/** West elevation for corner mamak — open side facing the cross road. */
+function mamakSideTexture(b: Building) {
+  const ppm = 48;
+  return cached(
+    `mamak-side:${b.id}`,
+    (g, c) => {
+      const W = c.width;
+      const H = c.height;
+      g.fillStyle = b.color;
+      g.fillRect(0, 0, W, H);
+      const ground = 3.1 * ppm;
+      const shop = H - ground;
+      // Upper windows along depth
+      const cols = Math.max(2, Math.floor(b.d / 1.8));
+      for (let i = 0; i < cols; i++) {
+        const x = ((i + 0.5) / cols) * W - 0.4 * ppm;
+        g.fillStyle = "#3e5566";
+        g.fillRect(x, 0.45 * ppm, 0.8 * ppm, 0.95 * ppm);
+        g.fillStyle = "rgba(255,255,255,0.3)";
+        g.fillRect(x + 3, 0.5 * ppm, 0.25 * ppm, 0.85 * ppm);
+      }
+      // Small side sign
+      g.fillStyle = "#c62f25";
+      g.fillRect(0.35 * ppm, shop - 1.1 * ppm, W - 0.7 * ppm, 0.85 * ppm);
+      g.fillStyle = "#f6d13a";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.font = `900 ${0.45 * ppm}px system-ui, sans-serif`;
+      g.fillText("24 JAM", W / 2, shop - 0.67 * ppm);
+      // Open ground floor
+      g.fillStyle = "#3b2a20";
+      g.fillRect(0.35 * ppm, shop + 0.12 * ppm, W - 0.7 * ppm, ground - 0.12 * ppm);
+      g.fillStyle = "#2f8f86";
+      g.fillRect(0.9 * ppm, H - 1.0 * ppm, W - 1.8 * ppm, 1.0 * ppm);
+      g.fillStyle = "#cfd4d8";
+      g.fillRect(0.9 * ppm, H - 1.05 * ppm, W - 1.8 * ppm, 0.1 * ppm);
+    },
+    Math.round(b.d * ppm),
+    Math.round(b.h * ppm),
+  );
 }
 
 function facadeTexture(b: Building) {

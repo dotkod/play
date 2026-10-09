@@ -34,7 +34,7 @@ const DROPS: Record<
   "menara-lepak": { x: MENARA_BUS_STOP.x, z: MENARA_BUS_STOP.z - 1.2, rotY: Math.PI, place: "menara-lepak-bus", district: "menara-lepak" },
   tlx: { x: TLX_BUS_STOP.x, z: TLX_BUS_STOP.z + 1.2, rotY: Math.PI, place: "tlx-bus", district: "tlx" },
   "bukit-bintik": { x: BINTIK_BUS_STOP.x, z: BINTIK_BUS_STOP.z - 1.2, rotY: Math.PI, place: "bukit-bintik-bus", district: "bukit-bintik" },
-  "bukit-jalan": { x: JALAN_BUS_STOP.x, z: JALAN_BUS_STOP.z - 1.2, rotY: Math.PI, place: "bukit-jalan-bus", district: "bukit-jalan" },
+  "bukit-jalan": { x: JALAN_BUS_STOP.x, z: JALAN_BUS_STOP.z + 1.2, rotY: Math.PI / 2, place: "bukit-jalan-bus", district: "bukit-jalan" },
   "kampung-lepak": { x: KAMPUNG_BUS_STOP.x, z: KAMPUNG_BUS_STOP.z - 1.2, rotY: Math.PI, place: "kampung-lepak-bus", district: "kampung-lepak" },
   "pasar-besar": { x: PASAR_BUS_STOP.x, z: PASAR_BUS_STOP.z - 1.2, rotY: Math.PI, place: "pasar-besar-bus", district: "pasar-besar" },
   "petaling-lane": { x: PETALING_BUS_STOP.x, z: PETALING_BUS_STOP.z + 1.2, rotY: 0, place: "petaling-lane-bus", district: "petaling-lane" },

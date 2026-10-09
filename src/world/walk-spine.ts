@@ -12,12 +12,15 @@ export const SPINE_NODES: Record<string, SpineNode> = {
   "x-neg": { id: "x-neg", x: -42, z: 0 },
   "z-pos": { id: "z-pos", x: 0, z: 42 },
   "z-neg": { id: "z-neg", x: 0, z: -42 },
-  taman: { id: "taman", x: 110, z: 0 },
+  /** East end of Taman Ceria terrace strip (was 110 — cut the road short of home). */
+  taman: { id: "taman", x: 140, z: 0 },
   menara: { id: "menara", x: -90, z: 0 },
   klcc: { id: "klcc", x: 0, z: -90 },
   pasar: { id: "pasar", x: 0, z: 58 },
-  stadium: { id: "stadium", x: 12, z: 76 },
+  // Clean L: arterial → east spur → south into stadium (bowl off the carriageway)
   "stadium-j": { id: "stadium-j", x: 0, z: 76 },
+  "stadium-k": { id: "stadium-k", x: 22, z: 76 },
+  stadium: { id: "stadium", x: 22, z: 90 },
   // Bukit Bintik — L off east arterial
   "bintik-j": { id: "bintik-j", x: 48, z: 0 },
   bintik: { id: "bintik", x: 48, z: 22 },
@@ -25,9 +28,11 @@ export const SPINE_NODES: Record<string, SpineNode> = {
   "kampung-j": { id: "kampung-j", x: -42, z: 38 },
   "kampung-k": { id: "kampung-k", x: -62, z: 38 },
   kampung: { id: "kampung", x: -65, z: 50 },
-  // Petaling Lane — spur east of north arterial
+  // Petaling Lane — E spur off north arterial, then N–S street through the market
   "petaling-j": { id: "petaling-j", x: 0, z: -28 },
   petaling: { id: "petaling", x: 28, z: -28 },
+  "petaling-n": { id: "petaling-n", x: 28, z: -16 },
+  "petaling-s": { id: "petaling-s", x: 28, z: -52 },
   // Sentral — L northwest
   "sentral-j": { id: "sentral-j", x: 0, z: -48 },
   "sentral-k": { id: "sentral-k", x: -40, z: -48 },
@@ -35,6 +40,11 @@ export const SPINE_NODES: Record<string, SpineNode> = {
   // TLX — east spur at bus-stop latitude (park sits north of the road)
   "tlx-j": { id: "tlx-j", x: 0, z: -68 },
   tlx: { id: "tlx", x: 78, z: -68 },
+  // Parking driveway mouths (connected stubs — cars can peel in)
+  "park-mega": { id: "park-mega", x: -48, z: -11 },
+  "park-mega-j": { id: "park-mega-j", x: -48, z: 0 },
+  "park-petaling": { id: "park-petaling", x: 42, z: -12 },
+  "park-petaling-j": { id: "park-petaling-j", x: 42, z: -28 },
 };
 
 /** Undirected corridors (centreline). All edges are axis-aligned. */
@@ -49,7 +59,8 @@ export const SPINE_EDGES: SpineEdge[] = [
   { a: "tlx-j", b: "klcc" },
   { a: "z-pos", b: "pasar" },
   { a: "pasar", b: "stadium-j" },
-  { a: "stadium-j", b: "stadium" },
+  { a: "stadium-j", b: "stadium-k" },
+  { a: "stadium-k", b: "stadium" },
   { a: "x-pos", b: "bintik-j" },
   { a: "bintik-j", b: "bintik" },
   { a: "x-neg", b: "kampung-j" },
@@ -57,10 +68,16 @@ export const SPINE_EDGES: SpineEdge[] = [
   { a: "kampung-k", b: "kampung" },
   { a: "z-neg", b: "petaling-j" },
   { a: "petaling-j", b: "petaling" },
+  { a: "petaling", b: "petaling-n" },
+  { a: "petaling", b: "petaling-s" },
   { a: "z-neg", b: "sentral-j" },
   { a: "sentral-j", b: "sentral-k" },
   { a: "sentral-k", b: "sentral" },
   { a: "tlx-j", b: "tlx" },
+  // Parking driveways (mega / petaling only — south stubs used to smash the Pasar L-junction)
+  { a: "park-mega-j", b: "park-mega" },
+  { a: "petaling", b: "park-petaling-j" },
+  { a: "park-petaling-j", b: "park-petaling" },
 ];
 
 /** Road / walk-path corridor: along axis, from–to, fixed other coord. */
@@ -126,22 +143,32 @@ function buildRoadStrips(): RoadStrip[] {
 
 export const ROAD_STRIPS: RoadStrip[] = buildRoadStrips();
 
+/** Asphalt overshoot at strip ends (fills T-junction seams). Keep small — big joins jagged the verge. */
+export const ROAD_STRIP_JOIN = 0.9;
+/** Sidewalks stay exact length; square junction pads fill corners instead. */
+export const WALK_STRIP_JOIN = 0;
+
+export function stripLength(s: RoadStrip) {
+  return s.axis === "x" ? Math.abs(s.x1 - s.x0) : Math.abs(s.z1 - s.z0);
+}
+
 /**
  * Narrow pedestrian alleys (not for cars). Painted on map + 3D; wayfinder can snap nearby.
  * Half-width ~1.1m — five-foot-way / laneway feel.
+ * Keep paths inside the roadside verge — stubs past ROAD_STRIPS create jagged grass edges.
  */
 export const WALK_PATH_HALF = 1.15;
 export const WALK_PATHS: RoadStrip[] = [
   // Pusat — shop frontage to carriageway edge (north row)
-  { axis: "z", x: 15, z0: -6.2, z1: -3.2 }, // Anne Maju
-  { axis: "z", x: 26, z0: -6.2, z1: -3.2 }, // kedai emas area
-  { axis: "z", x: 5, z0: -6.2, z1: -3.2 }, // warung / kopitiam stretch
+  { axis: "z", x: 9.8, z0: -6.2, z1: -3.2 }, // Anne Maju corner door
+  { axis: "z", x: 26, z0: -6.2, z1: -3.2 }, // runcit
+  { axis: "z", x: -7.5, z0: -6.2, z1: -3.2 }, // warung
   // South row
   { axis: "z", x: -19, z0: 3.2, z1: 6.2 }, // LRT plaza
   { axis: "z", x: -8, z0: 3.2, z1: 6.2 }, // gunting / bank
   { axis: "z", x: 8, z0: 3.2, z1: 6.2 }, // farmasi stretch
   // Side laneways between shophouse blocks (parallel to cross road)
-  { axis: "x", z: -9.5, x0: 10, x1: 20 }, // behind Anne block
+  { axis: "x", z: -9.5, x0: 5, x1: 16 }, // behind Anne corner
   { axis: "x", z: 9.5, x0: -24, x1: -12 }, // behind LRT block
   // Bus stop spur
   { axis: "z", x: -31, z0: 4, z1: 12 },
@@ -152,6 +179,16 @@ export const WALK_PATHS: RoadStrip[] = [
   // KLCC park cross paths (pedestrian)
   { axis: "z", x: 0, z0: -102, z1: -88 },
   { axis: "x", z: -92, x0: -10, x1: 10 },
+  // Petaling Lane — five-foot ways + crossings, clipped to the N–S street span (z -52…-16)
+  { axis: "z", x: 23.8, z0: -52, z1: -16 },
+  { axis: "z", x: 32.2, z0: -52, z1: -16 },
+  { axis: "x", z: -16.2, x0: 22, x1: 34 }, // approach plaza / bus
+  { axis: "x", z: -28, x0: 22, x1: 34 }, // spur ↔ street link
+  { axis: "x", z: -39, x0: 22.5, x1: 33.5 }, // mid market crossing
+  { axis: "x", z: -44.5, x0: 22.5, x1: 33.5 },
+  { axis: "x", z: -50.5, x0: 22.5, x1: 33.5 },
+  // Taman Ceria — five-foot way along the terrace fronts (north verge)
+  { axis: "x", z: -5.25, x0: 90, x1: 128 },
 ];
 
 export type Vec2 = { x: number; z: number };

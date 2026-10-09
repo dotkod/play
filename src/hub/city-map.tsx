@@ -3,7 +3,10 @@
 import { useEffect, useRef, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { getWalkRoute, setWalkRoute } from "@/core/walk-path";
 import { getUserWaypoint, getWaypoint, onWaypoint, setUserWaypoint } from "@/core/waypoint";
+import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/bounds";
 import { pathAlongRoads } from "@/world/walk-spine";
+import { snapToWalkable } from "@/world/walkability";
+import { useLang } from "@/shared/lang";
 import { catStates } from "./cats";
 import { input } from "./controls";
 import {
@@ -14,8 +17,6 @@ import {
   paintCityBase,
   worldFromCanvas,
 } from "./map-draw";
-import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/bounds";
-import { useLang } from "@/shared/lang";
 import { player } from "./traffic";
 import { HUB_STRINGS } from "./strings";
 
@@ -181,7 +182,9 @@ export function CityMap({ open, onClose }: { open: boolean; onClose: () => void 
     const c = canvas.current;
     if (!c) return;
     const { ox, oz, k } = view.current;
-    const world = worldFromCanvas(e.clientX, e.clientY, c.getBoundingClientRect(), c, ox, oz, k);
+    const raw = worldFromCanvas(e.clientX, e.clientY, c.getBoundingClientRect(), c, ox, oz, k);
+    const world = snapToWalkable(raw.x, raw.z);
+    if (!world) return;
     setUserWaypoint({ x: world.x, z: world.z, label: tr.mapPin });
     setWalkRoute({ x: player.x, z: player.z }, world);
     input.target = { x: world.x, z: world.z };

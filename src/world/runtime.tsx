@@ -10,7 +10,10 @@ import { input, view } from "@/hub/controls";
 import { NamedNpcs } from "@/hub/named-npcs";
 import { Pedestrians } from "@/hub/npcs";
 import { Player } from "@/hub/player";
+import { Billboards } from "@/hub/billboards";
+import { RainFX } from "@/hub/rain-fx";
 import { Traffic, TrafficLights } from "@/hub/traffic";
+import { atmosphere, lightModFor } from "@/world/atmosphere";
 import type { Building } from "@/world/districts/pusat-lepak/layout";
 import { BintikScene } from "./districts/bukit-bintik/scene";
 import { JalanScene } from "./districts/bukit-jalan/scene";
@@ -28,7 +31,9 @@ import { clock, presetForFrac, syncClockFromDevice } from "./lighting";
 import { PerfOverlay, PerfProbe } from "./perf-overlay";
 import { setWalkRoute } from "@/core/walk-path";
 import { player } from "./player-bridge";
+import { ParkingLots } from "./parking-lot-mesh";
 import { ScatterTrees } from "./scatter-trees";
+import { snapToWalkable } from "./walkability";
 
 type Props = {
   spawn: { x: number; z: number; rotY: number };
@@ -101,6 +106,9 @@ export function WorldRuntime({ spawn, onZone, onNearCat = noop, poster = false, 
         <TapToWalk />
         <TrafficLights />
         <Traffic />
+        <Billboards />
+        <RainFX />
+        <ParkingLots />
         <Pedestrians />
         <NamedNpcs />
         <Cats onNear={onNearCat} />
@@ -133,22 +141,24 @@ const LightingRig = memo(function LightingRig({ shadows }: { shadows: boolean })
 
   useFrame(({ scene }) => {
     const p = presetForFrac();
-    if (p.id !== last.current) {
-      last.current = p.id;
-      if (scene.background instanceof THREE.Color) scene.background.set(p.bg);
-      else scene.background = new THREE.Color(p.bg);
+    const mod = lightModFor(p);
+    const key = `${p.id}:${atmosphere.weather}:${atmosphere.haze}:${atmosphere.aqi ?? "-"}`;
+    if (key !== last.current) {
+      last.current = key;
+      if (scene.background instanceof THREE.Color) scene.background.set(mod.bg);
+      else scene.background = new THREE.Color(mod.bg);
       if (fog.current) {
-        fog.current.color.set(p.fog);
-        fog.current.near = p.fogNear;
-        fog.current.far = p.fogFar;
+        fog.current.color.set(mod.fog);
+        fog.current.near = mod.fogNear;
+        fog.current.far = mod.fogFar;
       }
       if (hemi.current) {
         hemi.current.color.set(p.hemiSky);
         hemi.current.groundColor.set(p.hemiGround);
-        hemi.current.intensity = p.hemiIntensity;
+        hemi.current.intensity = mod.hemiIntensity;
       }
       if (sun.current) {
-        sun.current.intensity = p.sunIntensity;
+        sun.current.intensity = mod.sunIntensity;
         sun.current.color.set(p.sunColor);
       }
     }
@@ -248,7 +258,9 @@ function TapToWalk() {
       position={[10, 0.05, -10]}
       onClick={(e) => {
         e.stopPropagation();
-        const to = { x: e.point.x, z: e.point.z };
+        const raw = { x: e.point.x, z: e.point.z };
+        const to = snapToWalkable(raw.x, raw.z);
+        if (!to) return;
         setWalkRoute({ x: player.x, z: player.z }, to);
         input.target = to;
       }}

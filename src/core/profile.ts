@@ -258,6 +258,13 @@ export function savePosition(district: string, x: number, z: number) {
   });
 }
 
+/** First enter of Kak Yati's terrace claims home; later rentables overwrite when we add them. */
+export function setHome(id: string) {
+  mutate((p) => {
+    if (!p.home) p.home = id;
+  });
+}
+
 export function addItem(id: string, count = 1) {
   mutate((p) => {
     p.inventory[id] = (p.inventory[id] ?? 0) + count;

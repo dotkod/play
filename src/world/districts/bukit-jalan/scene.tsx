@@ -9,12 +9,7 @@ import { JALAN_BUS_STOP, STADIUM } from "./meta";
 export const JalanScene = memo(function JalanScene() {
   return (
     <group>
-      {/* Arterial asphalt from City ROAD_STRIPS */}
-      {/* Car park */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[28, 0.02, 70]} receiveShadow>
-        <planeGeometry args={[18, 22]} />
-        <meshLambertMaterial color="#5a6068" />
-      </mesh>
+      {/* Arterial asphalt from City ROAD_STRIPS; car park is city-wide ParkingLots */}
       <group position={[STADIUM.x, 0, STADIUM.z]}>
         <Cyl top={18} bottom={20} height={4} position={[0, 2, 0]} color="#e8eef4" />
         <Cyl top={14} bottom={16} height={6} position={[0, 7, 0]} color="#f4f6f8" />

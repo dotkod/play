@@ -445,7 +445,7 @@ export const music = {
   // Switching mamak↔city restarts; city playlist rotates in-session and avoids last song on login.
   start(next: Track = "mamak") {
     unlockAudio();
-    if (!ctx) return;
+    if (!ctx || !musicBus) return;
     if (timer && track === next) return;
     music.stop();
     track = next;
@@ -455,6 +455,8 @@ export const music = {
     } else {
       bpm = MAMAK.bpm;
     }
+    // Restore bus after stop() mute — kills overlapping tails from a prior session
+    musicBus.gain.setValueAtTime(0.32, ctx.currentTime);
     nextTime = ctx.currentTime + 0.05;
     timer = setInterval(() => {
       if (!ctx || !musicBus) return;
@@ -473,6 +475,8 @@ export const music = {
   stop() {
     if (timer) clearInterval(timer);
     timer = null;
+    // Mute immediately so already-scheduled notes don’t stack with the next start
+    if (musicBus && ctx) musicBus.gain.setValueAtTime(0, ctx.currentTime);
   },
   setTempo(next: number) {
     bpm = next;

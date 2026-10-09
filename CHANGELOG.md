@@ -5,6 +5,95 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.59
+- Taman Ceria is a real terrace row now — road to x=140, houses on the sidewalk with roofs/doors, home door reachable
+
+### 0.10.58
+- Rumah Kak Yati in Taman Ceria is enterable — go inside, nap on the bed (rest only; real clock stays)
+
+### 0.10.57
+- Billboards moved onto open grass (not next to shophouses) — clear of buildings + parking
+
+### 0.10.56
+- Billboards cleared of Petaling shophouses (was inside a shop); spots footprint-checked in dev
+
+### 0.10.55
+- Billboards sit on the sidewalk now — no more boards punching through shophouses
+
+### 0.10.54
+- Roadside billboards replace the sky plane — ads you can actually see while walking (joke + sponsor slot)
+
+### 0.10.53
+- Live KL weather + jerebu (Open-Meteo + WAQI) — fog, rain, AQI chip on the HUD
+
+### 0.10.52
+- (replaced) Sky banner biplane — swapped for billboards in 0.10.54
+
+### 0.10.51
+- Roads/sidewalks cleaned city-wide — no more jagged verges, round junction blobs, or path stubs past the asphalt
+
+### 0.10.50
+- No @username floating above your head
+- City traffic flows cleaner — less reverse/jam/overlap; fewer cars; turns preferred over U-turns
+
+### 0.10.49
+- Restoran Anne Maju is a real NE corner mamak (Kedai Emas gone) — wrap awning, outdoor tables & chairs, menu board
+
+### 0.10.48
+- Traffic unsticks after a few seconds — crossing cars no longer deadlock forever at junctions
+
+### 0.10.47
+- Pasar Besar / Bukit Jalan map cleaned: stadium off the road, no driveway stubs smashing the L, labels and icons clear of asphalt
+
+### 0.10.46
+- Phone shell locks a real 390∶844 frame (no more skinny/squeezed icons on desktop)
+
+### 0.10.45
+- Pasar Besar / Bukit Jalan: market halls and stadium are solid; halls no longer sit on the road; map blocks clear of bus stops
+
+### 0.10.44
+- Phone shell keeps a real iPhone ratio on desktop again (and still fits landscape mobile)
+
+### 0.10.43
+- Petaling junction uses city asphalt only (no stacked plazas/zebra); parking lot sits clear of the spur; lot cars stay inside the lot
+
+### 0.10.42
+- Petaling Lane cleaned up — no mid-road poles, awnings don’t fight each other, lanterns hang from the verge
+
+### 0.10.41
+- Cars stay on real roads — no more cutting through parking lots / P-sign poles
+
+### 0.10.40
+- Street trees no longer grow through shop walls (cross-road props skip building footprints)
+
+### 0.10.39
+- Petaling Lane shophouses no longer sit on the approach road — walk straight in from Pusat
+
+### 0.10.38
+- Parking lots sit on real driveways off the road network (map shows P), and cars drive in/out to park
+
+### 0.10.37
+- Walk only on roads, roadside, footpaths, parking and plazas — grass is off-limits
+- Petaling Lane has proper five-foot ways and crossings; city grass looks more grassy
+
+### 0.10.36
+- No more trees planted on district roads; road junctions overlap so seams don’t show grass gaps
+
+### 0.10.35
+- Walking up to a shop no longer makes the building vanish (cutaway only when the camera is truly behind the block)
+
+### 0.10.34
+- Petaling Lane has a real road in (T-junction + N–S street) so you can walk and drive there; dead-end traffic jams cleared
+- Parking lots with bay lines and parked cars: Mega Mall, Petaling, Pasar Besar, Stadium
+
+### 0.10.33
+- Petaling Lane is real Chinatown shophouses (signs, awnings, lanterns) with solid collision — no more walk-through beige boxes
+
+### 0.10.32
+- Logout stops city BGM (no more overlapping tracks on the next login)
+- Buildings stay solid — walk to the door and enter the interior scene; no walking through walls
+- Phone shell keeps a real portrait ratio on mobile (smaller, not stretched)
+
 ### 0.10.31
 - Welcome-back toast shows again after login (was racing the auth hello stash)
 

@@ -92,6 +92,8 @@ type Vehicle = {
   color: string;
   rider: number;
   honkedAt: number;
+  /** Seconds near-zero speed while wanting to move — jam recovery. */
+  stuck: number;
 };
 
 const SPECS: Record<Kind, { len: number; width: number; speed: [number, number]; weight: number }> = {
@@ -108,8 +110,8 @@ const lengthOf = (v: Vehicle) => SPECS[v.kind].len;
 
 const STOP_AT = WALK_HALF + 0.6;
 const FOLLOW_GAP = 3.2;
-/** World-space bumper radius — stops cars stacking across lanes at junctions. */
-const WORLD_SEP = 4.2;
+/** Soft follow radius for same-direction parallel strips (not opposite traffic). */
+const WORLD_SEP = 3.6;
 const CAR_COLORS = ["#d8352a", "#2f6fd6", "#f2f2ee", "#1f1f24", "#f2b33d", "#9aa3ab", "#2f8f86", "#7a4a2e", "#c7b2e6"];
 
 const LANE_BY_ID = Object.fromEntries(VEHICLE_LANES.map((l) => [l.id, l])) as Record<string, VehicleLane>;
@@ -149,11 +151,73 @@ function spawnVehicles(): Vehicle[] {
         color: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)],
         rider: Math.floor(Math.random() * RIDERS.length),
         honkedAt: -99,
+        stuck: 0,
       });
       cursor += len / 2 + FOLLOW_GAP + 2;
     }
   }
   return list;
+}
+
+function clearOfFleet(x: number, z: number, self: Vehicle, all: Vehicle[], pad = 3.5): boolean {
+  if (inBuilding(x, z)) return false;
+  for (const o of all) {
+    if (o === self) continue;
+    const ol = LANE_BY_ID[o.laneId];
+    if (!ol) continue;
+    const p = pointOnLane(ol, o.s);
+    const need = (lengthOf(self) + lengthOf(o)) * 0.35 + pad;
+    if (Math.hypot(p.x - x, p.z - z) < need) return false;
+  }
+  return true;
+}
+
+/** Break a forever-jam — only forward / hop / respawn. Never reverse along the lane. */
+function unstickVehicle(v: Vehicle, all: Vehicle[]) {
+  const lane = LANE_BY_ID[v.laneId];
+  if (!lane) return;
+
+  for (const bump of [8, 16, 28]) {
+    const s = Math.min(lane.length - 2, v.s + bump);
+    if (s <= v.s + 0.5) break;
+    const p = pointOnLane(lane, s);
+    if (clearOfFleet(p.x, p.z, v, all, 2.8)) {
+      v.s = s;
+      v.speed = Math.max(v.speed, v.max * 0.5);
+      return;
+    }
+  }
+
+  const hop = pickNextLane(lane);
+  const next = LANE_BY_ID[hop.laneId];
+  if (next && next.id !== lane.id) {
+    for (const entry of [hop.entryS + 6, hop.entryS + 14, next.length * 0.4, next.length * 0.65]) {
+      const s = Math.min(next.length - 3, Math.max(4, entry));
+      const p = pointOnLane(next, s);
+      if (clearOfFleet(p.x, p.z, v, all, 2.8)) {
+        v.laneId = next.id;
+        v.s = s;
+        v.speed = v.max * 0.5;
+        return;
+      }
+    }
+  }
+
+  const candidates = VEHICLE_LANES.filter((l) => l.length >= 40 && l.id !== lane.id);
+  for (let tries = 0; tries < 16; tries++) {
+    const L = candidates[Math.floor(Math.random() * candidates.length)];
+    if (!L) break;
+    const s = 6 + Math.random() * Math.max(1, L.length - 14);
+    const p = pointOnLane(L, s);
+    if (clearOfFleet(p.x, p.z, v, all, 4)) {
+      v.laneId = L.id;
+      v.s = s;
+      v.speed = v.max * 0.55;
+      return;
+    }
+  }
+  // Still jammed — nudge speed so we don't look frozen; stay put until a gap opens
+  v.speed = v.max * 0.2;
 }
 
 /** Nose distance to Pusat stop line when heading into the junction on a main strip. */
@@ -173,10 +237,18 @@ function distToStopLine(lane: VehicleLane, x: number, z: number, bodyLen: number
   return nose - STOP_AT;
 }
 
-// Simulation state lives outside React
+// Simulation state lives outside React — bump FLEET_GEN when spawn rules change so HMR reseeds
+const FLEET_GEN = 3;
 let fleet: Vehicle[] | null = null;
+let fleetGen = -1;
 let engineTick = 0;
-const getFleet = () => (fleet ??= spawnVehicles());
+const getFleet = () => {
+  if (!fleet || fleetGen !== FLEET_GEN) {
+    fleet = spawnVehicles();
+    fleetGen = FLEET_GEN;
+  }
+  return fleet;
+};
 
 export const Traffic = memo(function Traffic() {
   const vehicles = getFleet();
@@ -216,22 +288,36 @@ export const Traffic = memo(function Traffic() {
         if (gap < need + 8) target = Math.min(target, Math.max(0, gap - need) * 2.2);
       }
 
-      // World-space slowdown for nearby vehicles (junctions / parallel strips)
+      // World-space: ignore opposite traffic + far crossings. Only soft-follow same-direction
+      // neighbours; near-miss crossing → brake (never shove backward — that looked like reverse).
       for (const o of all) {
         if (o === v) continue;
         const otherLane = LANE_BY_ID[o.laneId];
         if (!otherLane) continue;
+        // Opposite direction on the same strip — they pass, don't brake for each other
+        if (otherLane.strip === lane.strip && otherLane.dir !== lane.dir) continue;
         const there = pointOnLane(otherLane, o.s);
         const dx = there.x - here.x;
         const dz = there.z - here.z;
         const dist = Math.hypot(dx, dz);
-        if (dist > WORLD_SEP + 6) continue;
+        if (dist > WORLD_SEP + 5) continue;
         const fx = Math.sin(here.rotY);
         const fz = Math.cos(here.rotY);
         const ahead = dx * fx + dz * fz;
         if (ahead < 0.4) continue;
-        const need = (lengthOf(v) + lengthOf(o)) / 2 + 1.6;
-        if (dist < need + 5) target = Math.min(target, Math.max(0, dist - need) * 2.4);
+        const lat = Math.abs(-dx * fz + dz * fx);
+        const crossing = lane.axis !== otherLane.axis;
+        if (crossing) {
+          // Only when almost interlocking — Pusat lights already gate the main cross
+          const collide = (lengthOf(v) + lengthOf(o)) * 0.28 + 0.9;
+          if (dist > collide || lat > 2.0) continue;
+          if (v.id > o.id) target = Math.min(target, Math.max(0, dist - collide * 0.6) * 1.8);
+          continue;
+        }
+        // Parallel same-direction: soft follow if sharing the corridor
+        if (lat > 2.4) continue;
+        const need = (lengthOf(v) + lengthOf(o)) / 2 + 1.4;
+        if (dist < need + 4) target = Math.min(target, Math.max(0, dist - need) * 2.2);
       }
 
       // Brake for player ahead in this lane
@@ -276,18 +362,41 @@ export const Traffic = memo(function Traffic() {
         nextS = v.s;
       }
 
-      // End of strip → turn onto a linked lane (junction hop) or U-turn
+      // Jam watchdog — crawl too long → hop forward / respawn (never reverse)
+      if (!(v.stuck >= 0)) v.stuck = 0;
+      if (v.speed < 0.4 && target < 2) v.stuck += dt;
+      else v.stuck = Math.max(0, v.stuck - dt * 2.5);
+      if (v.stuck > 4.5) {
+        unstickVehicle(v, all);
+        v.stuck = 0;
+        continue;
+      }
+
+      // End of strip → hop when the entry is clear; otherwise wait (no pile-up teleport)
       if (nextS >= lane.length - 1) {
         const hop = pickNextLane(lane);
-        v.laneId = hop.laneId;
-        v.s = hop.entryS + Math.random() * 1.5;
-        v.speed *= 0.45;
+        const dest = LANE_BY_ID[hop.laneId];
+        const entry = hop.entryS + Math.random() * 2;
+        if (dest) {
+          const p = pointOnLane(dest, entry);
+          if (clearOfFleet(p.x, p.z, v, all, 2.2)) {
+            v.laneId = hop.laneId;
+            v.s = entry;
+            v.speed = Math.max(v.speed * 0.55, 2.5);
+          } else {
+            v.s = lane.length - 1.02;
+            v.speed = 0;
+          }
+        } else {
+          v.s = lane.length - 1.02;
+          v.speed = 0;
+        }
       } else {
         v.s = nextS;
       }
     }
 
-    // Hard bumper separation on each lane
+    // Same-lane bumper: slow + gentle gap only when overlapping (no big reverse jumps)
     for (const v of all) {
       let leader: Vehicle | null = null;
       let leaderGap = Infinity;
@@ -300,41 +409,14 @@ export const Traffic = memo(function Traffic() {
           leader = o;
         }
       }
-      if (leader) {
-        const need = needGap(v, leader);
-        if (leaderGap < need) {
-          v.s = leader.s - need;
-          v.speed = Math.min(v.speed, Math.min(leader.speed, 1));
-        }
-      }
-    }
-
-    // World-space push so cars don't occupy the same spot across lanes
-    for (let pass = 0; pass < 2; pass++) {
-      for (let i = 0; i < all.length; i++) {
-        const a = all[i];
-        const la = LANE_BY_ID[a.laneId];
-        if (!la) continue;
-        const pa = pointOnLane(la, a.s);
-        for (let j = i + 1; j < all.length; j++) {
-          const b = all[j];
-          const lb = LANE_BY_ID[b.laneId];
-          if (!lb) continue;
-          const pb = pointOnLane(lb, b.s);
-          const dx = pb.x - pa.x;
-          const dz = pb.z - pa.z;
-          const dist = Math.hypot(dx, dz);
-          const need = (lengthOf(a) + lengthOf(b)) * 0.35 + 1.4;
-          if (dist >= need || dist < 1e-4) continue;
-          // Push the slower / trailing vehicle back along its lane
-          const push = (need - dist) * 0.55;
-          if (a.speed <= b.speed) {
-            a.s = Math.max(0.5, a.s - push);
-            a.speed = Math.min(a.speed, 1.2);
-          } else {
-            b.s = Math.max(0.5, b.s - push);
-            b.speed = Math.min(b.speed, 1.2);
-          }
+      if (!leader) continue;
+      const need = needGap(v, leader);
+      if (leaderGap < need) {
+        v.speed = Math.min(v.speed, Math.max(0, leader.speed * 0.8));
+        // Only nudge when deeply nested — big s-= jumps read as reverse driving
+        if (leaderGap < need * 0.35) {
+          v.s = leader.s - need * 0.4;
+          v.speed = Math.min(v.speed, 0.8);
         }
       }
     }

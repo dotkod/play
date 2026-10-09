@@ -8,7 +8,7 @@ import { AuthGate, AuthSplash } from "./auth-gate";
 import { CityTutorial, CITY_TUTORIAL_FLAG } from "./city-tutorial";
 import { emit } from "@/core/events";
 import { type JobResult, JOB_RESULT_KEY, settleJobResults } from "@/core/job-handoff";
-import { addItem, getProfile, removeItem, savePosition, setFlag, spendMoney } from "@/core/profile";
+import { addItem, getProfile, removeItem, savePosition, setFlag, setHome, spendMoney } from "@/core/profile";
 import {
   BUS_FARE_SEN,
   BUS_ROUTES,
@@ -18,13 +18,14 @@ import {
 } from "@/content/transit/bus-routes";
 import { anyRailNear, type RailLine, type RailStation } from "@/content/transit";
 import { TAXI_FARE_SEN, TAXI_UNLOCK_FLAG, type TaxiDest } from "@/content/transit/taxi";
-import { TAMAN_SOFA } from "@/world/districts/taman-ceria/meta";
+import { TAMAN_HOME_DOOR, TAMAN_SOFA } from "@/world/districts/taman-ceria/meta";
 import { BusBoard } from "./bus-board";
 import { BusRideOverlay, busDestLabel, type BusDest } from "./bus-ride";
 import { CityMap } from "./city-map";
 import { startTaskEngine } from "@/core/tasks/engine";
 import { npcById, type NamedNpc } from "@/content/npcs";
 import { OUTER_BUS_PLACES, placeById } from "@/content/places";
+import { HomeInterior, isHomeBuilding } from "./home";
 import { InteriorOverlay } from "./interior";
 import { RailBoard } from "./rail-board";
 import { RailRideOverlay } from "./rail-ride";
@@ -205,10 +206,9 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         setTutorialOpen(true);
         return;
       }
-      // Returning login: skip start screen so you can walk immediately
+      // Returning login: skip start screen so you can walk immediately.
+      // BGM is owned solely by the started/jobOpen effect — don’t start it here.
       unlockAudio();
-      music.start("city");
-      ambience.start();
       setStarted(true);
       flash(HUB_STRINGS[getLang()].welcomeBack(name));
     }, 50);
@@ -218,10 +218,37 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     };
   }, [auth.username]);
 
+  // Logout → AuthGate: stop audio and reset explore state so the next login doesn’t stack BGM
+  useEffect(() => {
+    if (!auth.ready || auth.username) return;
+    const id = window.setTimeout(() => {
+      helloDone.current = false;
+      setStarted(false);
+      setTutorialOpen(false);
+      setPhoneOpen(false);
+      setPhoneBusy(false);
+      music.stop();
+      ambience.stop();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [auth.ready, auth.username]);
+
   // Prefetch mamak job so entering the door never waits on a chunk
   useEffect(() => {
     void import("@/games/anne-maju/game");
   }, []);
+
+  // Live KL weather + AQI (server-proxied); poll while in the city
+  useEffect(() => {
+    if (!started) return;
+    let stop = false;
+    void import("@/world/atmosphere").then(({ startAtmospherePolling }) => {
+      if (!stop) startAtmospherePolling();
+    });
+    return () => {
+      stop = true;
+    };
+  }, [started]);
   useEffect(() => {
     return () => {
       if (doorTimer.current) clearTimeout(doorTimer.current);
@@ -236,8 +263,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     return stop;
   }, [payout]);
 
-  // City BGM + ambience while exploring; stop only for jobs / leave. Must restart whenever
-  // `started` flips — an older cleanup used to kill music after login and never bring it back.
+  // Sole owner of city BGM + ambience while exploring
   useEffect(() => {
     if (jobOpen || !started) {
       ambience.stop();
@@ -342,8 +368,6 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const start = () => {
     unlockAudio();
     sfx.start();
-    music.start("city");
-    ambience.start();
     setStarted(true);
   };
 
@@ -443,8 +467,18 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     }
     if (b.interior) {
       setInside(b);
-      emit({ type: "entered", place: b.id });
+      emit({ type: "entered", place: isHomeBuilding(b) ? "taman-ceria-home" : b.id });
+      if (isHomeBuilding(b)) {
+        setHome(b.id);
+        savePosition("taman-ceria", TAMAN_HOME_DOOR.x, TAMAN_HOME_DOOR.z);
+      }
     }
+  };
+
+  const sleepHome = () => {
+    playerShared.crouchUntil = Date.now() + 2200;
+    emit({ type: "sat", place: "taman-ceria-home" });
+    flash(tr.sleptHome);
   };
 
   const exitJob = () => {
@@ -455,8 +489,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       setJobOpen(null);
       softKerjaUrl(null);
       unlockAudio();
-      music.start("city");
-      ambience.start();
+      // City BGM resumes via the started/jobOpen effect
       for (const pay of settled.results) {
         emit({ type: "jobFinished", job: pay.job, earned: pay.earned, served: pay.served, mode: pay.mode });
         if (pay.earned > 0) {
@@ -716,7 +749,12 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
           <AnneMajuGame onExit={exitJob} embedded />
         </div>
       )}
-      {inside && <InteriorOverlay building={inside} onLeave={leaveInterior} />}
+      {inside &&
+        (isHomeBuilding(inside) ? (
+          <HomeInterior onLeave={leaveInterior} onSleep={sleepHome} />
+        ) : (
+          <InteriorOverlay building={inside} onLeave={leaveInterior} />
+        ))}
       {doorVeil && (
         <div
           className={`pointer-events-none fixed inset-0 z-[50] bg-[#1a1410] ${doorVeil === "cover" ? "door-veil" : "door-unveil"}`}
@@ -812,7 +850,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
               <ActionButton
                 icon={zone.interior.emoji}
                 label={zone.interior.title}
-                caption={tr.enter}
+                caption={isHomeBuilding(zone) ? tr.enterHome : tr.enter}
                 keyHint={!touch ? "E" : undefined}
                 tone="cream"
                 size="lg"

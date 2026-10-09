@@ -1,13 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/core/auth-client";
 import { XP_PER_LEVEL, unreadInboxCount, useProfile } from "@/core/profile";
 import { activeTaskSummary } from "@/core/tasks/engine";
+import { getAtmosphere, subscribeAtmosphere, type AtmosphereSnapshot } from "@/world/atmosphere";
 import { gameClockLabel, presetForFrac, type LightPresetId } from "@/world/lighting";
 import { Logo } from "@/shared/logo";
 import { useLang } from "@/shared/lang";
 import { HUB_STRINGS } from "./strings";
+
+function useAtmosphere(): AtmosphereSnapshot {
+  return useSyncExternalStore(subscribeAtmosphere, getAtmosphere, getAtmosphere);
+}
+
+function atmosphereChip(a: AtmosphereSnapshot, tr: (typeof HUB_STRINGS)["ms"]) {
+  const weather =
+    a.weather === "storm"
+      ? tr.weatherStorm
+      : a.weather === "rain"
+        ? tr.weatherRain
+        : a.weather === "cloud"
+          ? tr.weatherCloud
+          : tr.weatherClear;
+  const haze = a.haze === "heavy" ? tr.hazeHeavy : a.haze === "light" ? tr.hazeLight : "";
+  const bits = [a.aqi != null ? tr.aqiLabel(a.aqi) : null, haze || null, weather].filter(Boolean);
+  return bits.join(" · ");
+}
 
 export const rm = (sen: number) => `RM${(sen / 100).toFixed(2)}`;
 
@@ -31,6 +50,7 @@ export function WalletHud({ started }: { started: boolean }) {
   const auth = useAuth();
   const [clock, setClock] = useState(() => gameClockLabel());
   const [period, setPeriod] = useState(() => presetForFrac().id);
+  const atmo = useAtmosphere();
   useEffect(() => {
     if (!started) return;
     const tick = () => {
@@ -43,6 +63,7 @@ export function WalletHud({ started }: { started: boolean }) {
 
   const into = p.xp % XP_PER_LEVEL;
   const pct = Math.min(100, (into / XP_PER_LEVEL) * 100);
+  const chip = started ? atmosphereChip(atmo, tr) : "";
 
   return (
     <div className="edge-tl pointer-events-none absolute z-20">
@@ -63,6 +84,7 @@ export function WalletHud({ started }: { started: boolean }) {
             <div className="leading-none">
               <p className={`text-lg sm:text-xl ${statNum}`}>{clock}</p>
               <p className={`mt-0.5 text-[10px] tracking-wide uppercase ${statSub}`}>{periodLabel(period, tr)}</p>
+              {chip && <p className={`mt-1 max-w-[11rem] text-[10px] leading-tight sm:max-w-[14rem] ${statSub}`}>{chip}</p>}
             </div>
 
             <span className="mb-1 hidden h-7 w-px bg-ink/50 sm:block" aria-hidden />

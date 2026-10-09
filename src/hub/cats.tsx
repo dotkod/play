@@ -19,7 +19,7 @@ export type CatInfo = { id: string; name: string; coat: Coat; home: Region };
 
 // Each cat keeps to its own stretch of sidewalk
 export const CATS: CatInfo[] = [
-  { id: "oyen", name: "Oyen", coat: "oyen", home: { minX: 10, maxX: 24, minZ: -6.2, maxZ: -3.6 } },
+  { id: "oyen", name: "Oyen", coat: "oyen", home: { minX: 5, maxX: 16, minZ: -6.2, maxZ: -3.6 } },
   { id: "comot", name: "Comot", coat: "calico", home: { minX: -30, maxX: -12, minZ: -6.2, maxZ: -3.6 } },
   { id: "tompok", name: "Tompok", coat: "tuxedo", home: { minX: 27, maxX: 36, minZ: 3.6, maxZ: 6.2 } },
   { id: "hitam", name: "Si Hitam", coat: "black", home: { minX: -30, maxX: -10, minZ: 3.6, maxZ: 6.2 } },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef, useState, type RefObject } from "react";
+import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { Look } from "@/shared/three/look";
 import {
@@ -11,7 +11,6 @@ import {
   walkRouteDone,
 } from "@/core/walk-path";
 import { clearUserWaypoint, getUserWaypoint, getWaypoint } from "@/core/waypoint";
-import { useAuth } from "@/core/auth-client";
 import { currentOutfit } from "@/games/anne-maju/progress";
 import { sfx } from "@/shared/audio";
 import { Person, type Pose } from "@/shared/three/person";
@@ -20,16 +19,19 @@ import { input, lookAxis, moveVector, view } from "./controls";
 import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/bounds";
 import { TOWER_L, TOWER_R } from "@/world/districts/klcc/meta";
 import { TOWER_POS as MENARA_TOWER } from "@/world/districts/menara-lepak/meta";
+import { STADIUM, STADIUM_SOLID_R } from "@/world/districts/bukit-jalan/meta";
+import { PASAR_HALLS, pasarHallFootprint } from "@/world/districts/pasar-besar/buildings";
+import { PETALING_SHOPS, petalingFootprint } from "@/world/districts/petaling-lane/buildings";
 import { TERRACES } from "@/world/districts/taman-ceria/layout";
 import { takeTeleport } from "@/world/player-bridge";
+import { isWalkable, snapToWalkable } from "@/world/walkability";
 import { PHONE_DRAW_MS, player as playerShared } from "./traffic";
+import { HOME_BUILDING, homeDoorSpot } from "./home";
 import { type Building, BUILDINGS, doorSpot, footprint } from "./world-data";
 
 const SPEED = 6;
 const RADIUS = 0.45;
 const PLAYER_LOOK: Look = { skin: "#c98d60", shirt: "#fcd34d", pants: "#2a2a33", headwear: "short", hair: "#2b2018" };
-
-const DOOR_HALF = 1.25; // doorway width so you can step into enterable shops
 
 type Box = {
   id?: string;
@@ -37,28 +39,18 @@ type Box = {
   maxX: number;
   minZ: number;
   maxZ: number;
-  door?: { x0: number; x1: number; z0: number; z1: number };
 };
 
 // Solid footprints. Side/back pad = player radius; road-facing front stays flush with the
 // facade so the grass verge / outer sidewalk isn’t an invisible wall under the building shadow.
+// No door tunnels — enter via the door prompt → interior/job overlay (never walk through mesh).
 const FRONT_PAD = 0.08;
 const solids: Box[] = [
   ...BUILDINGS.map((b) => {
     const f = footprint(b);
-    const box: Box =
-      b.side === "north"
-        ? { id: b.id, minX: f.minX - RADIUS, maxX: f.maxX + RADIUS, minZ: f.minZ - RADIUS, maxZ: f.maxZ + FRONT_PAD }
-        : { id: b.id, minX: f.minX - RADIUS, maxX: f.maxX + RADIUS, minZ: f.minZ - FRONT_PAD, maxZ: f.maxZ + RADIUS };
-    if (b.game || b.interior || b.lrt) {
-      const depth = 1.6 + RADIUS;
-      if (b.side === "north") {
-        box.door = { x0: b.x - DOOR_HALF, x1: b.x + DOOR_HALF, z0: f.front - depth, z1: f.front + FRONT_PAD + 0.25 };
-      } else {
-        box.door = { x0: b.x - DOOR_HALF, x1: b.x + DOOR_HALF, z0: f.front - FRONT_PAD - 0.25, z1: f.front + depth };
-      }
-    }
-    return box;
+    return b.side === "north"
+      ? { id: b.id, minX: f.minX - RADIUS, maxX: f.maxX + RADIUS, minZ: f.minZ - RADIUS, maxZ: f.maxZ + FRONT_PAD }
+      : { id: b.id, minX: f.minX - RADIUS, maxX: f.maxX + RADIUS, minZ: f.minZ - FRONT_PAD, maxZ: f.maxZ + RADIUS };
   }),
   ...TERRACES.map((t) => ({
     minX: t.x - t.w / 2 - RADIUS,
@@ -78,14 +70,37 @@ const solids: Box[] = [
     minZ: MENARA_TOWER.z - 5 - RADIUS,
     maxZ: MENARA_TOWER.z + 5 + RADIUS,
   },
+  ...PETALING_SHOPS.map((s) => {
+    const f = petalingFootprint(s);
+    return {
+      id: s.id,
+      minX: f.minX - RADIUS,
+      maxX: f.maxX + RADIUS,
+      minZ: f.minZ - RADIUS,
+      maxZ: f.maxZ + RADIUS,
+    };
+  }),
+  ...PASAR_HALLS.map((h) => {
+    const f = pasarHallFootprint(h);
+    return {
+      id: h.id,
+      minX: f.minX - RADIUS,
+      maxX: f.maxX + RADIUS,
+      minZ: f.minZ - RADIUS,
+      maxZ: f.maxZ + RADIUS,
+    };
+  }),
 ];
-const blocked = (x: number, z: number) =>
-  solids.some((s) => {
-    if (s.id && view.cutawayIds.has(s.id)) return false;
-    if (!(x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ)) return false;
-    if (s.door && x > s.door.x0 && x < s.door.x1 && z > s.door.z0 && z < s.door.z1) return false;
-    return true;
-  });
+/** Stadium bowl solid — north approach along x=STADIUM.x stays open to the gate. */
+const STADIUM_APPROACH_HALF = 3.2;
+const blocked = (x: number, z: number) => {
+  if (solids.some((s) => x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ)) return true;
+  const dx = x - STADIUM.x;
+  const dz = z - STADIUM.z;
+  if (dx * dx + dz * dz >= (STADIUM_SOLID_R + RADIUS) ** 2) return false;
+  if (Math.abs(x - STADIUM.x) < STADIUM_APPROACH_HALF && z < STADIUM.z - 2) return false;
+  return true;
+};
 
 // Push the player out of any overlapping circle; returns true if something was in the way
 function pushOut(p: THREE.Vector3, list: Circle[]) {
@@ -110,8 +125,11 @@ function pushOut(p: THREE.Vector3, list: Circle[]) {
   return hit;
 }
 
-// Door zones for buildings you can walk into (jobs, interiors, LRT, soon)
-const zones = BUILDINGS.filter((b) => b.game || b.soon || b.lrt || b.interior).map((b) => ({ b, spot: doorSpot(b) }));
+// Door zones for buildings you can walk into (jobs, interiors, LRT, soon, home)
+const zones = [
+  ...BUILDINGS.filter((b) => b.game || b.soon || b.lrt || b.interior).map((b) => ({ b, spot: doorSpot(b) })),
+  { b: HOME_BUILDING, spot: homeDoorSpot() },
+];
 // Fallback goal: Anne Maju door when no task waypoint is set
 const fallbackGoal = doorSpot(BUILDINGS.find((b) => b.game)!);
 
@@ -210,11 +228,11 @@ export function Player({
     if (moving.current) {
       const nx = THREE.MathUtils.clamp(p.x + vx * SPEED * dt, WORLD_MIN_X, WORLD_MAX_X);
       const nz = THREE.MathUtils.clamp(p.z + vz * SPEED * dt, WORLD_MIN_Z, WORLD_MAX_Z);
-      // Slide along walls: try each axis separately
+      // Slide along walls + stay on pavement (no cutting across grass)
       const ox = p.x;
       const oz = p.z;
-      if (!blocked(nx, p.z)) p.x = nx;
-      if (!blocked(p.x, nz)) p.z = nz;
+      if (!blocked(nx, p.z) && isWalkable(nx, p.z)) p.x = nx;
+      if (!blocked(p.x, nz) && isWalkable(p.x, nz)) p.z = nz;
       // A footstep every ~1.1 m actually travelled
       stride.current.dist += Math.hypot(p.x - ox, p.z - oz);
       if (stride.current.dist > 1.1) {
@@ -222,7 +240,7 @@ export function Player({
         stride.current.alt = !stride.current.alt;
         sfx.step(stride.current.alt);
       }
-      if (blocked(nx, nz)) {
+      if (blocked(nx, nz) || !isWalkable(nx, nz)) {
         input.target = null;
         clearWalkRoute();
       }
@@ -236,6 +254,14 @@ export function Player({
     pushOut(p, dynamicColliders.vehicles);
     pushOut(p, dynamicColliders.cats);
     if (bumped && input.target && Math.hypot(input.target.x - p.x, input.target.z - p.z) < 1.5) input.target = null;
+    // Soft recovery if a teleport/spawn left you on grass
+    if (!isWalkable(p.x, p.z)) {
+      const s = snapToWalkable(p.x, p.z, 40);
+      if (s) {
+        p.x = s.x;
+        p.z = s.z;
+      }
+    }
     playerShared.x = p.x;
     playerShared.z = p.z;
     playerShared.rot = rot.current;
@@ -268,12 +294,13 @@ export function Player({
       } else {
         // Third-person follow — yaw only from Q/R / look pad
         const back = aspect < 1 ? 11 : 8.5;
-        const up = aspect < 1 ? 15 : 12;
+        const up = aspect < 1 ? 14 : 11;
         const ys = Math.sin(view.yaw);
         const yc = Math.cos(view.yaw);
         camPos.set(p.x + ys * back, up, p.z + yc * back);
         camera.position.copy(camPos);
-        camTarget.set(p.x - ys * 1.5, 1, p.z - yc * 1.5);
+        // Aim a bit higher so sky banners / atmosphere stay in frame
+        camTarget.set(p.x - ys * 1.5, 2.4, p.z - yc * 1.5);
         camera.lookAt(camTarget);
       }
     }
@@ -312,7 +339,6 @@ export function Player({
 
   // Wear whatever outfit was picked in Anne Maju
   const [look] = useState<Look>(() => ({ ...PLAYER_LOOK, ...currentOutfit().look }));
-  const auth = useAuth();
 
   const getPose = useMemo(
     () => (): Pose => {
@@ -336,7 +362,6 @@ export function Player({
   return (
     <>
       <Person look={look} getPose={getPose} />
-      {active && auth.username && <PlayerNameTag username={auth.username} pos={pos} />}
       {/* Ground ring so you can always spot yourself */}
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.55, 0.72, 32]} />
@@ -351,64 +376,4 @@ export function Player({
       </group>
     </>
   );
-}
-
-/** Small @username billboard above the head (canvas texture — no drei Html). */
-function PlayerNameTag({ username, pos }: { username: string; pos: RefObject<THREE.Vector3> }) {
-  const ref = useRef<THREE.Group>(null);
-  const tex = useMemo(() => playerNameTexture(username), [username]);
-  // Hide during dialogue close-up so it doesn’t sit in the NPC’s face
-  useFrame(({ camera }) => {
-    const g = ref.current;
-    if (!g) return;
-    const talking = view.talk != null;
-    g.visible = !talking;
-    if (talking) return;
-    g.position.set(pos.current.x, 2.05, pos.current.z);
-    g.quaternion.copy(camera.quaternion);
-  });
-  return (
-    <group ref={ref}>
-      <mesh>
-        <planeGeometry args={[1.35, 0.34]} />
-        <meshBasicMaterial map={tex} transparent toneMapped={false} depthWrite={false} />
-      </mesh>
-    </group>
-  );
-}
-
-const nameTextures = new Map<string, THREE.CanvasTexture>();
-
-function playerNameTexture(username: string) {
-  const key = `player-name:${username}`;
-  const hit = nameTextures.get(key);
-  if (hit) return hit;
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 64;
-  const g = c.getContext("2d")!;
-  const label = `@${username}`;
-  g.font = "bold 26px system-ui, sans-serif";
-  const tw = Math.min(236, g.measureText(label).width + 28);
-  const th = 36;
-  const x = (c.width - tw) / 2;
-  const y = (c.height - th) / 2;
-  g.fillStyle = "rgba(31,26,23,0.78)";
-  const r = 12;
-  g.beginPath();
-  g.moveTo(x + r, y);
-  g.arcTo(x + tw, y, x + tw, y + th, r);
-  g.arcTo(x + tw, y + th, x, y + th, r);
-  g.arcTo(x, y + th, x, y, r);
-  g.arcTo(x, y, x + tw, y, r);
-  g.closePath();
-  g.fill();
-  g.fillStyle = "#fbf3e4";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText(label, c.width / 2, c.height / 2 + 1, 220);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  nameTextures.set(key, tex);
-  return tex;
 }

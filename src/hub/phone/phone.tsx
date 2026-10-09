@@ -91,20 +91,30 @@ export function Phone({
 
   return (
     <div
-      className="absolute inset-0 z-40 flex items-end justify-center sm:items-center"
+      className="absolute inset-0 z-40 flex items-center justify-center px-3"
       style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif" }}
     >
       <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" aria-label={tr.close} onClick={dismiss} />
 
-      <div className="phone-rise relative z-10 mb-0 w-full max-w-[390px] px-0 sm:mb-4 sm:px-3">
-        <div className="relative mx-auto rounded-[2.75rem] bg-black p-[11px] shadow-[0_28px_90px_rgba(0,0,0,0.6)] ring-1 ring-white/20">
-          {/* Side buttons (decorative) */}
-          <span className="pointer-events-none absolute top-[120px] -left-[2px] h-8 w-[3px] rounded-l-sm bg-[#2a2a2c]" />
-          <span className="pointer-events-none absolute top-[168px] -left-[2px] h-14 w-[3px] rounded-l-sm bg-[#2a2a2c]" />
-          <span className="pointer-events-none absolute top-[230px] -left-[2px] h-14 w-[3px] rounded-l-sm bg-[#2a2a2c]" />
-          <span className="pointer-events-none absolute top-[180px] -right-[2px] h-20 w-[3px] rounded-r-sm bg-[#2a2a2c]" />
+      {/*
+        Lock 390∶844 with inline width+height (same cap). Flex parents were shrink-wrapping
+        the shell and ignoring aspect-ratio → skinny phone, overlapping dock icons.
+      */}
+      <div
+        className="phone-rise relative z-10 shrink-0"
+        style={{
+          width: "min(390px, calc(100vw - 24px), calc((100dvh - 24px) * 390 / 844))",
+          height: "min(844px, calc(100dvh - 24px), calc((100vw - 24px) * 844 / 390))",
+        }}
+      >
+        <div className="relative box-border h-full w-full rounded-[12.5%] bg-black p-[2.8%] shadow-[0_28px_90px_rgba(0,0,0,0.6)] ring-1 ring-white/20">
+          {/* Side buttons (decorative) — % positions scale with shell */}
+          <span className="pointer-events-none absolute top-[14%] -left-[0.5%] h-[4%] w-[0.8%] rounded-l-sm bg-[#2a2a2c]" />
+          <span className="pointer-events-none absolute top-[20%] -left-[0.5%] h-[7%] w-[0.8%] rounded-l-sm bg-[#2a2a2c]" />
+          <span className="pointer-events-none absolute top-[28%] -left-[0.5%] h-[7%] w-[0.8%] rounded-l-sm bg-[#2a2a2c]" />
+          <span className="pointer-events-none absolute top-[22%] -right-[0.5%] h-[10%] w-[0.8%] rounded-r-sm bg-[#2a2a2c]" />
 
-          <div className="relative flex h-[min(88dvh,740px)] flex-col overflow-hidden rounded-[2.15rem] bg-black">
+          <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[10.5%] bg-black">
             <div
               className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${
                 app === "home"
@@ -206,7 +216,7 @@ function HomeScreen({
         <p className="text-[13px] font-medium tracking-wide text-white/75 drop-shadow-sm">{subtitle}</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-x-2 gap-y-6 px-1">
+      <div className="grid grid-cols-4 gap-x-1 gap-y-5 px-0.5 sm:gap-x-2 sm:gap-y-6 sm:px-1">
         <IosIcon kind="mesej" label={tr.appMesej} badge={unread} onClick={() => onOpen("mesej")} />
         <IosIcon kind="tugasan" label={tr.appTugasan} badge={activeTasks} onClick={() => onOpen("tugasan")} />
         <IosIcon kind="profil" label={tr.appProfil} onClick={() => onOpen("profil")} />
@@ -216,8 +226,8 @@ function HomeScreen({
         <IosIcon kind="peta" label={tr.appPeta} onClick={() => onOpen("peta")} />
       </div>
 
-      <div className="mt-auto mb-1 rounded-[32px] border border-white/25 bg-white/20 p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
-        <div className="grid grid-cols-4 gap-1">
+      <div className="mt-auto mb-1 rounded-[28px] border border-white/25 bg-white/20 p-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-2xl sm:rounded-[32px] sm:p-3.5">
+        <div className="grid grid-cols-4 place-items-center gap-1">
           <DockIcon kind="mesej" onClick={() => onOpen("mesej")} badge={unread} />
           <DockIcon kind="tugasan" onClick={() => onOpen("tugasan")} badge={activeTasks} />
           <DockIcon kind="dompet" onClick={() => onOpen("dompet")} />
@@ -256,12 +266,12 @@ function IosIcon({
       type="button"
       disabled={soon}
       onClick={onClick}
-      className="relative flex flex-col items-center gap-1.5 disabled:opacity-45 active:scale-95"
+      className="relative flex w-full flex-col items-center gap-1.5 disabled:opacity-45 active:scale-95"
     >
-      {/* Outer shell has NO overflow so the badge can sit outside the rounded tile */}
-      <span className="relative size-[62px]">
+      {/* Square tile — % of column so it never squashes when the shell scales */}
+      <span className="relative aspect-square w-[min(62px,100%)]">
         <span
-          className="absolute inset-0 grid place-items-center overflow-hidden rounded-[15px] shadow-[0_10px_24px_rgba(0,0,0,0.28)] ring-1 ring-white/25"
+          className="absolute inset-0 grid place-items-center overflow-hidden rounded-[22%] shadow-[0_10px_24px_rgba(0,0,0,0.28)] ring-1 ring-white/25"
           style={{ background: APP_ICON[kind].bg }}
         >
           <AppGlyph kind={kind} />
@@ -273,16 +283,16 @@ function IosIcon({
           </span>
         )}
       </span>
-      <span className="max-w-[76px] truncate text-center text-[11px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{label}</span>
+      <span className="w-full truncate text-center text-[11px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{label}</span>
     </button>
   );
 }
 
 function DockIcon({ kind, onClick, badge }: { kind: IconKind; onClick: () => void; badge?: number }) {
   return (
-    <button type="button" onClick={onClick} className="relative mx-auto size-[54px] active:scale-95">
+    <button type="button" onClick={onClick} className="relative aspect-square w-[min(54px,100%)] active:scale-95">
       <span
-        className="absolute inset-0 grid place-items-center overflow-hidden rounded-[14px] shadow-[0_4px_12px_rgba(0,0,0,0.2)] ring-1 ring-white/30"
+        className="absolute inset-0 grid place-items-center overflow-hidden rounded-[22%] shadow-[0_4px_12px_rgba(0,0,0,0.2)] ring-1 ring-white/30"
         style={{ background: APP_ICON[kind].bg }}
       >
         <AppGlyph kind={kind} size={28} />

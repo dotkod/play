@@ -9,7 +9,7 @@ import { MENARA_BUS_STOP, TOWER_POS } from "@/world/districts/menara-lepak/meta"
 import { PASAR_BUS_STOP, PASAR_HALL } from "@/world/districts/pasar-besar/meta";
 import { PETALING_BUS_STOP, PETALING_STREET } from "@/world/districts/petaling-lane/meta";
 import { SENTRAL_BUS_STOP, SENTRAL_HALL } from "@/world/districts/sentral-lepak/meta";
-import { TAMAN_BUS_STOP, TAMAN_SOFA } from "@/world/districts/taman-ceria/meta";
+import { TAMAN_BUS_STOP, TAMAN_HOME_DOOR } from "@/world/districts/taman-ceria/meta";
 import { MENARA_106, TLX_BUS_STOP } from "@/world/districts/tlx/meta";
 
 export type Place = { id: string; x: number; z: number; label: { ms: string; en: string } };
@@ -34,9 +34,9 @@ export const PLACES: Place[] = [
   },
   {
     id: "taman-ceria-home",
-    x: TAMAN_SOFA.x,
-    z: TAMAN_SOFA.z,
-    label: { ms: "Rumah kau", en: "Your home" },
+    x: TAMAN_HOME_DOOR.x,
+    z: TAMAN_HOME_DOOR.z,
+    label: { ms: "Rumah Kak Yati", en: "Kak Yati's house" },
   },
   {
     id: "klcc-bus",
@@ -118,7 +118,7 @@ export const PLACES: Place[] = [
   },
   {
     id: "pasar-besar",
-    x: PASAR_HALL.x,
+    x: PASAR_HALL.x - 12,
     z: PASAR_HALL.z,
     label: { ms: "Pasar Besar", en: "Pasar Besar" },
   },

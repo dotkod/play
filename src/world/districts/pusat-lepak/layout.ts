@@ -45,13 +45,14 @@ export type Building = {
 };
 
 /**
- * Original 10 stay put. Phase 3 fills only free slots:
- * - north: west of cross (past parking) + east of cross (before Anne)
- * - south: east of cross (before Bank) + far east (past Dobi)
+ * Anne Maju owns the NE corner (east of ±ROAD_CLEAR). Other Phase 3 fills:
+ * - north: west of cross (Warung) — east gap after Anne is intentional
+ * - south: east of cross (Farmasi) + far east (Surau)
  * Never invade ±ROAD_CLEAR (Z-traffic) or overlap neighbours.
  */
 export const BUILDINGS: Building[] = [
-  { id: "anne-maju", kind: "mamak", sign: "RESTORAN ANNE MAJU", x: 15, side: "north", w: 10, d: 8, h: 5, color: "#f4efe4", game: { slug: "anne-maju", title: "Anne Maju", emoji: "🍵" } },
+  // NE corner mamak — west wall hugs ±ROAD_CLEAR; outdoor seating wraps the corner
+  { id: "anne-maju", kind: "mamak", sign: "RESTORAN ANNE MAJU", x: 9.8, side: "north", w: 10, d: 8, h: 5, color: "#f4efe4", game: { slug: "anne-maju", title: "Anne Maju", emoji: "🍵" } },
   {
     id: "runcit",
     kind: "shophouse",
@@ -163,18 +164,6 @@ export const BUILDINGS: Building[] = [
     interior: { title: "Warung Mak", emoji: "🍛", blurbMs: "Nasi panas, lauk empat jenis. Mak senyum dari belakang.", blurbEn: "Hot rice, four sides. Mak smiles from the back." },
   },
   {
-    id: "kedai-emas",
-    kind: "shophouse",
-    sign: "KEDAI EMAS",
-    x: 6.75,
-    side: "north",
-    w: 4.5,
-    d: 8,
-    h: 6.5,
-    color: "#f5e6a3",
-    interior: { title: "Kedai Emas", emoji: "💍", blurbMs: "Gelang berkilat dalam vitrin. Guard tengok kau.", blurbEn: "Bangles glitter in the case. The guard eyes you." },
-  },
-  {
     id: "farmasi",
     kind: "shophouse",
     sign: "FARMASI",
@@ -212,6 +201,22 @@ export function footprint(b: Building) {
   const front = dir * FRONT;
   const cz = front + (dir * b.d) / 2;
   return { cx: b.x, cz, front, facing: -dir, minX: b.x - b.w / 2, maxX: b.x + b.w / 2, minZ: Math.min(front, front + dir * b.d), maxZ: Math.max(front, front + dir * b.d) };
+}
+
+/** Round-table centres for mamak outdoor seating (front row + west corner wrap). */
+export function mamakTableSpots(b: Building): { x: number; z: number }[] {
+  const f = footprint(b);
+  const dir = b.side === "north" ? -1 : 1;
+  const frontZ = f.front + f.facing * 1.1;
+  const half = b.w / 2 - 1.5;
+  const westX = f.minX - 0.7;
+  return [
+    { x: b.x - half, z: frontZ },
+    { x: b.x, z: frontZ },
+    { x: b.x + half, z: frontZ },
+    { x: westX, z: f.front + dir * 1.7 },
+    { x: westX, z: f.front + dir * 3.5 },
+  ];
 }
 
 /** Dev assert: no pairwise overlap, no road invasion. */

@@ -5,12 +5,15 @@ import { STADIUM } from "@/world/districts/bukit-jalan/meta";
 import { KAMPUNG_CENTRE } from "@/world/districts/kampung-lepak/meta";
 import { TOWER_L, TOWER_R } from "@/world/districts/klcc/meta";
 import { TOWER_POS } from "@/world/districts/menara-lepak/meta";
+import { PASAR_HALLS } from "@/world/districts/pasar-besar/buildings";
 import { PASAR_HALL } from "@/world/districts/pasar-besar/meta";
 import { PETALING_STREET } from "@/world/districts/petaling-lane/meta";
 import { SENTRAL_HALL } from "@/world/districts/sentral-lepak/meta";
 import { TERRACES } from "@/world/districts/taman-ceria/layout";
 import { MENARA_106, TLX_PARK } from "@/world/districts/tlx/meta";
-import { ROAD_STRIPS, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
+import { PARKING_LOTS } from "@/world/parking-lots";
+import { ROAD_STRIPS, stripLength, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
+import { WALK_PLAZAS } from "@/world/walkability";
 import { paintMapGrass, paintMapLandmarks, paintMapLabels, paintMapTrees } from "./map-decor";
 import { BUS_STOP } from "./colliders";
 import { OUTER_BUS_PLACES, placeById } from "@/content/places";
@@ -93,27 +96,59 @@ export function paintCityBase(
   b.fill();
   b.fillStyle = "#7ec8a8";
   b.fillRect(X(TLX_PARK.x - TLX_PARK.w / 2), Z(TLX_PARK.z - TLX_PARK.d / 2), TLX_PARK.w * k, TLX_PARK.d * k);
-  b.fillStyle = "#e8c070";
-  b.fillRect(X(PASAR_HALL.x) - 8 * dpr, Z(PASAR_HALL.z) - 5 * dpr, 16 * dpr, 10 * dpr);
-  b.fillStyle = "#c8d4c0";
-  b.beginPath();
-  b.ellipse(X(STADIUM.x), Z(STADIUM.z), 12 * dpr, 8 * dpr, 0, 0, Math.PI * 2);
-  b.fill();
   b.fillStyle = "#f07178";
   b.fillRect(X(BINTIK_STRIP.x) - 6 * dpr, Z(BINTIK_STRIP.z) - 3 * dpr, 12 * dpr, 6 * dpr);
   b.fillStyle = "#8fbc6e";
   b.fillRect(X(KAMPUNG_CENTRE.x) - 8 * dpr, Z(KAMPUNG_CENTRE.z) - 6 * dpr, 16 * dpr, 12 * dpr);
   b.fillStyle = "#e8a87c";
-  b.fillRect(X(PETALING_STREET.x) - 3 * dpr, Z(PETALING_STREET.z) - 8 * dpr, 6 * dpr, 16 * dpr);
+  b.fillRect(X(PETALING_STREET.x) - 3 * dpr, Z(-52) - 2 * dpr, 6 * dpr, (Z(-14) - Z(-52)) + 4 * dpr);
   b.fillStyle = "#c5ced8";
   b.fillRect(X(SENTRAL_HALL.x) - 8 * dpr, Z(SENTRAL_HALL.z) - 5 * dpr, 16 * dpr, 10 * dpr);
 
-  // Alleys + round-capped roads (soft L-curls / cul-de-sacs)
+  // Alleys + plazas under roads
   for (const strip of WALK_PATHS) paintStrip(b, X, Z, k, strip, WALK_PATH_HALF, PATH);
-  for (const strip of ROAD_STRIPS) strokeStrip(b, X, Z, k, strip, WALK_HALF, WALK);
+  for (const p of WALK_PLAZAS) {
+    b.fillStyle = PATH;
+    b.fillRect(X(p.x - p.w / 2), Z(p.z - p.d / 2), p.w * k, p.d * k);
+  }
+  for (const lot of PARKING_LOTS) {
+    b.fillStyle = "#5a6068";
+    b.fillRect(X(lot.x - lot.w / 2), Z(lot.z - lot.d / 2), lot.w * k, lot.d * k);
+    b.fillStyle = "#1f5fa8";
+    b.beginPath();
+    b.roundRect(X(lot.x) - 5 * dpr, Z(lot.z) - 5 * dpr, 10 * dpr, 10 * dpr, 2 * dpr);
+    b.fill();
+    b.fillStyle = "#f4f1ea";
+    b.font = `900 ${Math.round(9 * dpr)}px system-ui, sans-serif`;
+    b.textAlign = "center";
+    b.textBaseline = "middle";
+    b.fillText("P", X(lot.x), Z(lot.z));
+  }
+  // Roads on top of plazas/lots so the Pasar L stays continuous
+  // Short driveway stubs: narrow apron (match 3D) so the map isn’t full of fat beige blobs
+  for (const strip of ROAD_STRIPS) {
+    const half = stripLength(strip) < 16 ? ROAD_HALF + 1.4 : WALK_HALF;
+    strokeStrip(b, X, Z, k, strip, half, WALK);
+  }
   for (const strip of ROAD_STRIPS) strokeStrip(b, X, Z, k, strip, ROAD_HALF, ROAD);
 
-  // Landmark icons on top of asphalt
+  // Pasar halls + stadium AFTER roads (never under asphalt / labels)
+  b.fillStyle = "#e8c070";
+  b.strokeStyle = "#1f1a17";
+  b.lineWidth = 1.5 * dpr;
+  for (const h of PASAR_HALLS) {
+    b.fillRect(X(h.x - h.w / 2), Z(h.z - h.d / 2), h.w * k, h.d * k);
+    b.strokeRect(X(h.x - h.w / 2), Z(h.z - h.d / 2), h.w * k, h.d * k);
+  }
+  b.fillStyle = "#c8d4c0";
+  b.beginPath();
+  b.ellipse(X(STADIUM.x), Z(STADIUM.z), 11 * dpr, 9 * dpr, 0, 0, Math.PI * 2);
+  b.fill();
+  b.strokeStyle = "#1f1a17";
+  b.lineWidth = 1.5 * dpr;
+  b.stroke();
+
+  // Landmark icons on top of asphalt — off the carriageway centres
   b.font = `${Math.round(12 * dpr)}px system-ui, sans-serif`;
   b.textAlign = "center";
   b.textBaseline = "middle";
@@ -130,7 +165,7 @@ export function paintCityBase(
   b.fillRect(X(MENARA_106.x) - 2.5 * dpr, Z(MENARA_106.z) - 10 * dpr, 5 * dpr, 20 * dpr);
   b.fillStyle = "#1f1a17";
   b.fillText("🏙", X(MENARA_106.x), Z(MENARA_106.z));
-  b.fillText("🛒", X(PASAR_HALL.x), Z(PASAR_HALL.z));
+  b.fillText("🛒", X(PASAR_HALL.x - 12), Z(PASAR_HALL.z));
   b.fillText("🏟", X(STADIUM.x), Z(STADIUM.z));
   b.fillText("✨", X(BINTIK_STRIP.x), Z(BINTIK_STRIP.z));
   b.fillText("🏡", X(KAMPUNG_CENTRE.x), Z(KAMPUNG_CENTRE.z));

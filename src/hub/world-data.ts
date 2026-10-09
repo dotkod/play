@@ -7,6 +7,7 @@ export {
   EXTENT,
   footprint,
   FRONT,
+  mamakTableSpots,
   ROAD_CLEAR,
   ROAD_HALF,
   SIDEWALK_MID,

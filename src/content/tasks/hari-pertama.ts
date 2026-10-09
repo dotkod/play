@@ -83,8 +83,8 @@ export const HARI_PERTAMA: Task[] = [
     title: { ms: "Pulang ke Taman Ceria", en: "Head home to Taman Ceria" },
     giver: "kak-yati",
     intro: {
-      ms: "Bas ke Taman Ceria dah ready! Naik bas (atau jalan) dan duduk kat sofa rumah kau — rehat sikit.",
-      en: "The bus to Taman Ceria is ready! Take the bus (or walk) and sit on your home sofa — rest a bit.",
+      ms: "Bas ke Taman Ceria dah ready! Naik bas (atau jalan), masuk rumah kau, duduk sofa atau tidur sekejap — rehat sikit.",
+      en: "The bus to Taman Ceria is ready! Take the bus (or walk), go inside your home, sit on the sofa or nap — rest a bit.",
     },
     objectives: [
       { type: "goTo", place: "taman-ceria-home" },

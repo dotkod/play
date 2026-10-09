@@ -630,14 +630,15 @@ portrait viewport, OG art regenerated if visuals changed, CHANGELOG updated, dep
 - [x] Road/lane graph + ROAD_STRIPS traffic (cars/buses/bikes on full-city corridors; Pusat signals).
 - [x] District/chunk loader with impostors; perf overlay (`?perf=1`).
 - [ ] Instancing + merged static geometry; facade atlas (partial — deferred polish).
-- [x] Day/night lighting presets (no weather yet).
+- [x] Day/night lighting presets.
+- [x] Live KL weather + jerebu haze (Open-Meteo + WAQI; atmosphere fog/rain/HUD).
 - [x] Second district: Taman Ceria (walk + bus); KLCC remains Phase 3.
 - **Done when:** two districts exist, walking between them streams smoothly at 30+ fps on a mid-range phone.
 
 ### Phase 3: KL landmarks & districts (one per PR)
 - [x] Pusat Lepak expanded (Masjid Lepak + river stub in 0.5.1; more shophouses in 0.7.0)
 - [x] KLCC + Menara Berkembar + park/fountain (0.5.0)
-- [x] Taman Ceria (housing, playground, home sofa; pasar malam later)
+- [x] Taman Ceria (aligned terrace row + sidewalk, playground, enterable Rumah Kak Yati; pasar malam later)
 - [x] Menara Lepak (0.6.0)
 - [x] TLX + Menara 106 (0.7.0)
 - [x] Bukit Bintik (0.7.0)

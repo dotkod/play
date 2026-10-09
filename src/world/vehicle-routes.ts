@@ -3,6 +3,7 @@
  * Strip ends link to other strips at junctions so traffic can turn — not only U-turn.
  */
 
+import { PARKING_LOTS } from "./parking-lots";
 import { ROAD_STRIPS, type RoadStrip } from "./walk-spine";
 
 export type VehicleLane = {
@@ -47,12 +48,39 @@ function laneEnds(s: RoadStrip, dir: 1 | -1): { a: { x: number; z: number }; b: 
     : { a: { x, z: z1 }, b: { x, z: z0 } };
 }
 
+/** True if this asphalt strip is only a parking driveway (map paint OK, no city traffic). */
+function isParkingDrive(s: RoadStrip) {
+  for (const lot of PARKING_LOTS) {
+    const d = lot.drive;
+    if (s.axis !== d.axis) continue;
+    if (s.axis === "z" && d.axis === "z") {
+      if (Math.abs(s.x - d.x0) > 0.6) continue;
+      const a0 = Math.min(s.z0, s.z1);
+      const a1 = Math.max(s.z0, s.z1);
+      const b0 = Math.min(d.z0, d.z1);
+      const b1 = Math.max(d.z0, d.z1);
+      if (a0 <= b1 + 0.5 && b0 <= a1 + 0.5) return true;
+    } else if (s.axis === "x" && d.axis === "x") {
+      if (Math.abs(s.z - d.z0) > 0.6) continue;
+      const a0 = Math.min(s.x0, s.x1);
+      const a1 = Math.max(s.x0, s.x1);
+      const b0 = Math.min(d.x0, d.x1);
+      const b1 = Math.max(d.x0, d.x1);
+      if (a0 <= b1 + 0.5 && b0 <= a1 + 0.5) return true;
+    }
+  }
+  return false;
+}
+
 function buildLanes(): VehicleLane[] {
   const out: VehicleLane[] = [];
   ROAD_STRIPS.forEach((s, i) => {
+    // Driveways stay on the map / walk spine but city traffic must not peel into lots
+    if (isParkingDrive(s)) return;
     const span = stripSpan(s);
-    // Keep arterials busy but not packed — overcrowding causes stacking at ends
-    const perDir = span > 100 ? 3 : span > 50 ? 2 : span > 25 ? 1 : 1;
+    // Keep arterials flowing — fewer cars = less junction stacking / overlap.
+    // Tiny stubs stay empty (cars still hop onto them at junctions if useful).
+    const perDir = span > 120 ? 3 : span > 70 ? 2 : span > 42 ? 1 : 0;
     for (const dir of [1, -1] as const) {
       const { a, b } = laneEnds(s, dir);
       const length = Math.hypot(b.x - a.x, b.z - a.z);
@@ -113,25 +141,41 @@ export function reverseLane(lane: VehicleLane): VehicleLane {
   return twin ?? lane;
 }
 
+function laneById(id: string) {
+  return VEHICLE_LANES.find((l) => l.id === id);
+}
+
+/** Prefer turns onto roads that themselves connect elsewhere — never pour traffic into stubs / parking drives. */
+function isUsefulTurn(hop: LaneHop) {
+  const t = laneById(hop.laneId);
+  // Parking driveways & dead-end aprons are short; keep city cars on real arterials
+  if (!t || t.length < 22) return false;
+  const next = LANE_HOPS[t.id] ?? [];
+  return next.some((h) => {
+    const o = laneById(h.laneId);
+    return o && o.strip !== t.strip && o.length >= 22;
+  });
+}
+
 /**
- * Pick next lane at strip end: prefer turns onto other strips (70%), else U-turn.
- * Keeps traffic circulating through the city instead of bouncing forever on one road.
+ * Pick next lane at strip end: prefer turns onto other strips (~88%), U-turn last.
+ * Constant U-turns mid-city read as cars reversing. Parking stubs stay off-limits.
  */
 export function pickNextLane(lane: VehicleLane): LaneHop {
   const hops = LANE_HOPS[lane.id] ?? [];
-  const turns = hops.filter((h) => {
-    const t = VEHICLE_LANES.find((l) => l.id === h.laneId);
-    return t && t.strip !== lane.strip;
+  const useful = hops.filter((h) => {
+    const t = laneById(h.laneId);
+    return t && t.strip !== lane.strip && isUsefulTurn(h);
   });
   const uturn = hops.find((h) => {
-    const t = VEHICLE_LANES.find((l) => l.id === h.laneId);
+    const t = laneById(h.laneId);
     return t && t.strip === lane.strip;
   });
-  if (turns.length && Math.random() < 0.72) {
-    return turns[Math.floor(Math.random() * turns.length)];
+  if (useful.length && Math.random() < 0.88) {
+    return useful[Math.floor(Math.random() * useful.length)];
   }
+  if (useful.length) return useful[Math.floor(Math.random() * useful.length)];
   if (uturn) return uturn;
-  if (turns.length) return turns[Math.floor(Math.random() * turns.length)];
   const back = reverseLane(lane);
-  return { laneId: back.id, entryS: 3 };
+  return { laneId: back.id, entryS: 4 };
 }

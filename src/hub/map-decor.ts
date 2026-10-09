@@ -1,5 +1,9 @@
 import { hashString } from "@/shared/rng";
-import { PLAYGROUND } from "@/world/districts/taman-ceria/layout";
+import { STADIUM, STADIUM_SOLID_R } from "@/world/districts/bukit-jalan/meta";
+import { PASAR_HALLS, pasarHallFootprint } from "@/world/districts/pasar-besar/buildings";
+import { PETALING_SHOPS, petalingFootprint } from "@/world/districts/petaling-lane/buildings";
+import { PLAYGROUND, TERRACES } from "@/world/districts/taman-ceria/layout";
+import { PARKING_LOTS } from "@/world/parking-lots";
 import { ROAD_STRIPS, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
 import { BUILDINGS, footprint, WALK_HALF } from "./world-data";
 
@@ -28,22 +32,40 @@ function nearStrip(x: number, z: number, pad: number) {
 
 function nearRoad(x: number, z: number) {
   // Keep canopy clear of carriageway + verge (trees in the road looked broken)
-  return nearStrip(x, z, 3.2);
+  return nearStrip(x, z, 4.0);
 }
 
+function inAabb(x: number, z: number, minX: number, maxX: number, minZ: number, maxZ: number, pad: number) {
+  return x > minX - pad && x < maxX + pad && z > minZ - pad && z < maxZ + pad;
+}
+
+/** Canopy-aware solid cull — Pusat, Petaling, terraces, lots, landmarks. */
 function inBuilding(x: number, z: number) {
+  const pad = 4.0;
   for (const b of BUILDINGS) {
     const f = footprint(b);
-    if (x > f.minX - 3 && x < f.maxX + 3 && z > f.minZ - 3 && z < f.maxZ + 3) return true;
+    if (inAabb(x, z, f.minX, f.maxX, f.minZ, f.maxZ, pad)) return true;
+  }
+  for (const s of PETALING_SHOPS) {
+    const f = petalingFootprint(s);
+    if (inAabb(x, z, f.minX, f.maxX, f.minZ, f.maxZ, pad)) return true;
+  }
+  for (const h of PASAR_HALLS) {
+    const f = pasarHallFootprint(h);
+    if (inAabb(x, z, f.minX, f.maxX, f.minZ, f.maxZ, pad)) return true;
+  }
+  for (const t of TERRACES) {
+    if (inAabb(x, z, t.x - t.w / 2, t.x + t.w / 2, t.z - t.d / 2, t.z + t.d / 2, pad)) return true;
+  }
+  for (const p of PARKING_LOTS) {
+    if (inAabb(x, z, p.x - p.w / 2, p.x + p.w / 2, p.z - p.d / 2, p.z + p.d / 2, pad)) return true;
   }
   const pg = PLAYGROUND;
-  if (x > pg.x - pg.w / 2 - 2 && x < pg.x + pg.w / 2 + 2 && z > pg.z - pg.d / 2 - 2 && z < pg.z + pg.d / 2 + 2) {
-    return true;
-  }
+  if (inAabb(x, z, pg.x - pg.w / 2, pg.x + pg.w / 2, pg.z - pg.d / 2, pg.z + pg.d / 2, 2)) return true;
   // Soft landmark footprints (map-only props that look wrong with trees through them)
   if (Math.hypot(x + 28, z - 22) < 12) return true; // Masjid Lepak
   if (x > -40 && x < -24 && z > 4 && z < 60) return true; // Sungai Lepak
-  if (Math.hypot(x - 12, z - 76) < 14) return true; // stadium bowl
+  if (Math.hypot(x - STADIUM.x, z - STADIUM.z) < STADIUM_SOLID_R + 2) return true;
   return false;
 }
 
@@ -63,12 +85,11 @@ export const MAP_BLOCKS: MapBlock[] = [
   { x: 11, z: -62, w: 7, d: 9, color: "#a8b4c0" },
   { x: -9, z: -78, w: 9, d: 8, color: "#d0d8e0" },
   { x: 12, z: -82, w: 8, d: 12, color: "#b8c4d0" },
-  // South toward Pasar / stadium
-  { x: -10, z: 50, w: 8, d: 7, color: "#c4b8a0" },
-  { x: 11, z: 52, w: 7, d: 8, color: "#d0c4a8" },
-  { x: 22, z: 68, w: 9, d: 8, color: "#b8b0a0" },
-  // Petaling / Sentral / Bintik / Kampung pockets
-  { x: 22, z: -36, w: 6, d: 8, color: "#e8a87c" },
+  // South pockets — well clear of arterial x=0, spur z=76, stadium (22,90), pasar halls
+  { x: -28, z: 42, w: 8, d: 7, color: "#c4b8a0" },
+  { x: 38, z: 52, w: 7, d: 8, color: "#d0c4a8" },
+  { x: 40, z: 66, w: 8, d: 7, color: "#b8b0a0" },
+  // Sentral / Bintik / Kampung pockets (no block on the Petaling spur mouth)
   { x: -28, z: -56, w: 10, d: 8, color: "#c5ced8" },
   { x: 56, z: 14, w: 7, d: 6, color: "#3a3f46" },
   { x: -52, z: 44, w: 8, d: 6, color: "#8fbc6e" },
@@ -88,7 +109,7 @@ export const MAP_TREES: MapTree[] = (() => {
       const wx = x + jx;
       const wz = z + jz;
       if (nearRoad(wx, wz) || inBuilding(wx, wz)) continue;
-      if (MAP_BLOCKS.some((bl) => Math.abs(wx - bl.x) < bl.w / 2 + 3.5 && Math.abs(wz - bl.z) < bl.d / 2 + 3.5)) {
+      if (MAP_BLOCKS.some((bl) => Math.abs(wx - bl.x) < bl.w / 2 + 5 && Math.abs(wz - bl.z) < bl.d / 2 + 5)) {
         continue;
       }
       // Keep parks open — only ~28% of far cells get a tree
@@ -205,9 +226,9 @@ export function paintMapLabels(
   label("Menara Lepak", -90, 12);
   label("TLX", 70, -74);
   label("Bukit Bintik", 50, 26);
-  label("Bukit Jalan", 12, 82);
+  label("Bukit Jalan", 36, 90);
   label("Kampung", -65, 54);
-  label("Pasar Besar", 0, 62);
+  label("Pasar Besar", -20, 60);
   label("Petaling", 30, -30);
   label("Sentral", -40, -54);
 }
