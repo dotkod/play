@@ -5,6 +5,9 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.16
+- Full map pan stays inside the city bounds (no dragging into empty grass)
+
 ### 0.10.15
 - Dialogue: no dim overlay; camera zooms in on you + the NPC (they face each other)
 

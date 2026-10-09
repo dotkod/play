@@ -15,11 +15,27 @@ import {
   paintCityBase,
   worldFromCanvas,
 } from "./map-draw";
+import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/bounds";
 import { useLang } from "@/shared/lang";
 import { player } from "./traffic";
 import { HUB_STRINGS } from "./strings";
 
 const METERS_PER_PX = 0.22; // zoomed-in vs corner minimap
+
+/** Keep the viewport over painted city — no empty grass beyond WORLD_* bounds. */
+function clampPan(x: number, z: number, canvasW: number, canvasH: number, k: number) {
+  const halfW = canvasW / (2 * k);
+  const halfH = canvasH / (2 * k);
+  const minX = WORLD_MIN_X + halfW;
+  const maxX = WORLD_MAX_X - halfW;
+  const minZ = WORLD_MIN_Z + halfH;
+  const maxZ = WORLD_MAX_Z - halfH;
+  if (minX > maxX) x = (WORLD_MIN_X + WORLD_MAX_X) / 2;
+  else x = Math.min(maxX, Math.max(minX, x));
+  if (minZ > maxZ) z = (WORLD_MIN_Z + WORLD_MAX_Z) / 2;
+  else z = Math.min(maxZ, Math.max(minZ, z));
+  return { x, z };
+}
 
 export function CityMap({ open, onClose }: { open: boolean; onClose: () => void }) {
   const lang = useLang();
@@ -73,6 +89,7 @@ export function CityMap({ open, onClose }: { open: boolean; onClose: () => void 
       raf = requestAnimationFrame(draw);
       if (t - last < 33) return;
       last = t;
+      pan.current = clampPan(pan.current.x, pan.current.z, c.width, c.height, k);
       const ox = X(pan.current.x) - c.width / 2;
       const oz = Z(pan.current.z) - c.height / 2;
       view.current = { ox, oz, k };
@@ -214,11 +231,16 @@ export function CityMap({ open, onClose }: { open: boolean; onClose: () => void 
               const dy = e.clientY - d.sy;
               if (Math.hypot(dx, dy) > 8) d.moved = true;
               if (!d.moved) return;
-              // Drag map under finger (invert screen delta → world)
-              pan.current = {
-                x: d.px - dx * METERS_PER_PX,
-                z: d.pz - dy * METERS_PER_PX,
-              };
+              // Drag map under finger (invert screen delta → world), clamped to city
+              const c = canvas.current;
+              const k = c ? Math.min(2, window.devicePixelRatio || 1) / METERS_PER_PX : 1 / METERS_PER_PX;
+              pan.current = clampPan(
+                d.px - dx * METERS_PER_PX,
+                d.pz - dy * METERS_PER_PX,
+                c?.width ?? 1,
+                c?.height ?? 1,
+                k,
+              );
             }}
             onPointerUp={endDrag}
             onPointerCancel={() => {
