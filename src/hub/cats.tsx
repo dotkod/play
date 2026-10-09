@@ -3,6 +3,8 @@
 import { useFrame } from "@react-three/fiber";
 import { memo, useRef } from "react";
 import * as THREE from "three";
+import { emit } from "@/core/events";
+import { recordCatPet } from "@/core/profile";
 import { sfx } from "@/shared/audio";
 import { Box, RBox } from "@/shared/three/toon";
 import { dynamicColliders } from "./colliders";
@@ -81,6 +83,8 @@ export function petCat(index: number) {
   try {
     localStorage.setItem(PET_KEY, String(n));
   } catch {}
+  recordCatPet();
+  emit({ type: "catPetted", id: CATS[index].id });
   return n;
 }
 

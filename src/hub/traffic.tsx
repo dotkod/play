@@ -8,23 +8,34 @@ import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
 import { dynamicColliders } from "./colliders";
-import { EXTENT, ROAD_HALF, WALK_HALF } from "./world-data";
+import { type Axis, signalFor } from "@/world/road-graph";
+import { PHONE_DRAW_MS, player } from "@/world/player-bridge";
+import { pointOnLane, reverseLane, VEHICLE_LANES, type VehicleLane } from "@/world/vehicle-routes";
+import { BUILDINGS, ROAD_HALF, WALK_HALF, buildingBlocksCrossRoad, footprint } from "./world-data";
+
+export type { Axis };
+export { signalFor, player, PHONE_DRAW_MS };
+
+// Guard: a shophouse overlapping the cross-road corridor will swallow Z-lane cars
+if (process.env.NODE_ENV !== "production") {
+  for (const b of BUILDINGS) {
+    if (buildingBlocksCrossRoad(b)) {
+      console.error(`[traffic] ${b.id} overlaps cross-road corridor — move it clear of ±ROAD_CLEAR`);
+    }
+  }
+}
+
+/** Inflated building AABBs — vehicles must not sit inside these. */
+const BUILDING_HIT = BUILDINGS.map((b) => {
+  const f = footprint(b);
+  const pad = 0.35;
+  return { minX: f.minX - pad, maxX: f.maxX + pad, minZ: f.minZ - pad, maxZ: f.maxZ + pad };
+});
+const inBuilding = (x: number, z: number) => BUILDING_HIT.some((s) => x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ);
 
 // ---------- Traffic lights ----------
 
-export type Axis = "x" | "z";
 type Signal = "green" | "yellow" | "red";
-
-const CYCLE = 18;
-// x-axis (main road) green 0-7, yellow 7-9, then z-axis green 9-16, yellow 16-18
-export function signalFor(axis: Axis, t: number): Signal {
-  const p = t % CYCLE;
-  const own = axis === "x" ? p : (p + CYCLE / 2) % CYCLE;
-  return own < 7 ? "green" : own < 9 ? "yellow" : "red";
-}
-
-// Where the player is, so vehicles can stop for them
-export const player = { x: 0, z: 0, rot: 0, crouchUntil: 0 };
 
 // Each pole faces traffic arriving from one side
 const POLES: { axis: Axis; x: number; z: number; rotY: number }[] = [
@@ -68,12 +79,21 @@ function TrafficPole({ axis, x, z, rotY }: { axis: Axis; x: number; z: number; r
   );
 }
 
-// ---------- Vehicles ----------
+// ---------- Vehicles (city-wide lanes from ROAD_STRIPS) ----------
 
 type Kind = "hatch" | "sedan" | "suv" | "mpv" | "taxi" | "lorry" | "bus" | "bike";
-type Vehicle = { id: number; kind: Kind; axis: Axis; dir: 1 | -1; pos: number; speed: number; max: number; color: string; rider: number; honkedAt: number };
+type Vehicle = {
+  id: number;
+  kind: Kind;
+  laneId: string;
+  s: number;
+  speed: number;
+  max: number;
+  color: string;
+  rider: number;
+  honkedAt: number;
+};
 
-// Size and behaviour per vehicle type; length drives spacing, stop lines and collision shape
 const SPECS: Record<Kind, { len: number; width: number; speed: [number, number]; weight: number }> = {
   hatch: { len: 3.5, width: 1.7, speed: [7, 9], weight: 3 },
   sedan: { len: 4.3, width: 1.8, speed: [7, 9], weight: 3 },
@@ -86,14 +106,11 @@ const SPECS: Record<Kind, { len: number; width: number; speed: [number, number];
 };
 const lengthOf = (v: Vehicle) => SPECS[v.kind].len;
 
-const LANE = 1.5;
-const STOP_AT = WALK_HALF + 0.6; // stop line, measured from the junction centre
+const STOP_AT = WALK_HALF + 0.6;
+const FOLLOW_GAP = 2.4;
 const CAR_COLORS = ["#d8352a", "#2f6fd6", "#f2f2ee", "#1f1f24", "#f2b33d", "#9aa3ab", "#2f8f86", "#7a4a2e", "#c7b2e6"];
 
-// Drive on the left: facing +x the left side is -z; facing +z the left side is +x
-export function laneOffset(axis: Axis, dir: 1 | -1) {
-  return axis === "x" ? -dir * LANE : dir * LANE;
-}
+const LANE_BY_ID = Object.fromEntries(VEHICLE_LANES.map((l) => [l.id, l])) as Record<string, VehicleLane>;
 
 function weightedKind(allowBus: boolean): Kind {
   const kinds = (Object.keys(SPECS) as Kind[]).filter((k) => allowBus || k !== "bus");
@@ -102,45 +119,59 @@ function weightedKind(allowBus: boolean): Kind {
   return "sedan";
 }
 
+function needGap(a: Vehicle, b: Vehicle) {
+  return (lengthOf(a) + lengthOf(b)) / 2 + FOLLOW_GAP;
+}
+
 function spawnVehicles(): Vehicle[] {
   const list: Vehicle[] = [];
   let id = 0;
-  const lanes: [Axis, 1 | -1][] = [
-    ["x", 1],
-    ["x", -1],
-    ["z", 1],
-    ["z", -1],
-  ];
-  for (const [axis, dir] of lanes) {
-    const count = axis === "x" ? 5 : 4;
+  for (const lane of VEHICLE_LANES) {
     let busUsed = false;
-    for (let i = 0; i < count; i++) {
-      // At most one bus per lane so queues stay readable
-      const kind = weightedKind(!busUsed);
+    let cursor = 4 + Math.random() * 3;
+    for (let i = 0; i < lane.capacity; i++) {
+      const kind = weightedKind(!busUsed && lane.length > 40);
       if (kind === "bus") busUsed = true;
+      const len = SPECS[kind].len;
+      cursor += len / 2;
+      if (cursor + len / 2 > lane.length - 3) break;
       const [lo, hi] = SPECS[kind].speed;
       const max = lo + Math.random() * (hi - lo);
       list.push({
         id: id++,
         kind,
-        axis,
-        dir,
-        pos: -EXTENT + (i / count) * EXTENT * 2 + Math.random() * 4,
-        speed: max,
+        laneId: lane.id,
+        s: cursor,
+        speed: max * 0.55,
         max,
         color: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)],
         rider: Math.floor(Math.random() * RIDERS.length),
         honkedAt: -99,
       });
+      cursor += len / 2 + FOLLOW_GAP + 2;
     }
   }
   return list;
 }
 
-// Signed distance travelled "along" the lane, so ahead is always larger
-const along = (v: Vehicle) => v.pos * v.dir;
+/** Nose distance to Pusat stop line when heading into the junction on a main strip. */
+function distToStopLine(lane: VehicleLane, x: number, z: number, bodyLen: number): number | null {
+  const headingToCentre =
+    lane.axis === "x"
+      ? Math.sign(lane.b.x - lane.a.x) === Math.sign(0 - x) && Math.abs(x) > 0.5
+      : Math.sign(lane.b.z - lane.a.z) === Math.sign(0 - z) && Math.abs(z) > 0.5;
+  if (!headingToCentre) return null;
+  if (lane.axis === "x") {
+    if (Math.abs(z) > 3.2) return null;
+    const nose = Math.abs(x) - bodyLen / 2;
+    return nose - STOP_AT;
+  }
+  if (Math.abs(x) > 3.2) return null;
+  const nose = Math.abs(z) - bodyLen / 2;
+  return nose - STOP_AT;
+}
 
-// Simulation state lives outside React: it is mutated every frame and never drives a re-render
+// Simulation state lives outside React
 let fleet: Vehicle[] | null = null;
 let engineTick = 0;
 const getFleet = () => (fleet ??= spawnVehicles());
@@ -157,72 +188,130 @@ export const Traffic = memo(function Traffic() {
     let nearestBike = false;
     const circles = dynamicColliders.vehicles;
     circles.length = 0;
+
     for (const v of all) {
-      const me = along(v);
+      const lane = LANE_BY_ID[v.laneId];
+      if (!lane) continue;
       const length = lengthOf(v);
       let target = v.max;
+      const here = pointOnLane(lane, v.s);
 
-      // Red or late yellow: stop at the line if we haven't reached it yet
-      const signal = signalFor(v.axis, t);
-      const toLine = -STOP_AT - length / 2 - me; // distance from our nose to the stop line
-      if (signal !== "green" && toLine > -0.2 && toLine < 14) {
-        if (!(signal === "yellow" && toLine < 2.5)) target = Math.min(target, Math.max(0, toLine - 0.3) * 1.6);
-      }
-
-      // Keep a gap to whoever is ahead in the same lane
-      for (const o of all) {
-        if (o === v || o.axis !== v.axis || o.dir !== v.dir) continue;
-        let gap = along(o) - me;
-        if (gap < 0) gap += EXTENT * 2;
-        const need = (length + lengthOf(o)) / 2 + 1.6;
-        if (gap < need + 6) target = Math.min(target, Math.max(0, gap - need) * 1.8);
-      }
-
-      // Brake for the player standing in our lane
-      const lane = laneOffset(v.axis, v.dir);
-      const px = v.axis === "x" ? player.x : player.z;
-      const pl = v.axis === "x" ? player.z : player.x;
-      const ahead = px * v.dir - me;
-      if (Math.abs(pl - lane) < 1.6 && ahead > 0 && ahead < length / 2 + 5) {
-        target = Math.min(target, Math.max(0, ahead - length / 2 - 1.2) * 2);
-        // Impatient honk when you're standing in the road, at most every few seconds per vehicle
-        if (ahead < length / 2 + 3 && t - v.honkedAt > 4) {
-          v.honkedAt = t;
-          sfx.horn();
+      // Pusat lights on the main cross (strips through origin)
+      const toLine = distToStopLine(lane, here.x, here.z, length);
+      if (toLine != null && toLine > -0.2 && toLine < 14) {
+        const signal = signalFor(lane.axis, t);
+        if (signal !== "green" && !(signal === "yellow" && toLine < 2.5)) {
+          target = Math.min(target, Math.max(0, toLine - 0.3) * 1.6);
         }
       }
 
-      // Ease towards the target speed: brake harder than we accelerate (heavy vehicles accelerate slower)
-      const heavy = v.kind === "lorry" || v.kind === "bus";
-      const rate = target < v.speed ? 14 : heavy ? 2.5 : 4;
-      v.speed += Math.sign(target - v.speed) * Math.min(Math.abs(target - v.speed), rate * dt);
-      v.pos += v.dir * v.speed * dt;
-      if (v.pos * v.dir > EXTENT) v.pos -= v.dir * EXTENT * 2;
+      // Gap to leader on the same lane
+      for (const o of all) {
+        if (o === v || o.laneId !== v.laneId) continue;
+        const gap = o.s - v.s;
+        if (gap <= 0) continue;
+        const need = needGap(v, o);
+        if (gap < need + 8) target = Math.min(target, Math.max(0, gap - need) * 2.2);
+      }
 
-      const vx = v.axis === "x" ? v.pos : lane;
-      const vz = v.axis === "x" ? lane : v.pos;
-      // Body as a chain of circles along the direction of travel
+      // Brake for player ahead in this lane
+      {
+        const pAlong =
+          lane.axis === "x"
+            ? (player.x - lane.a.x) * Math.sign(lane.b.x - lane.a.x)
+            : (player.z - lane.a.z) * Math.sign(lane.b.z - lane.a.z);
+        const pLat = lane.axis === "x" ? player.z - here.z : player.x - here.x;
+        const ahead = pAlong - v.s;
+        if (Math.abs(pLat) < 1.7 && ahead > 0 && ahead < length / 2 + 5) {
+          target = Math.min(target, Math.max(0, ahead - length / 2 - 1.2) * 2);
+          if (ahead < length / 2 + 3 && t - v.honkedAt > 4) {
+            v.honkedAt = t;
+            sfx.horn();
+          }
+        }
+      }
+
+      // Pedestrians in the carriageway
+      for (const person of dynamicColliders.people) {
+        if (!person) continue;
+        const pAlong =
+          lane.axis === "x"
+            ? (person.x - lane.a.x) * Math.sign(lane.b.x - lane.a.x)
+            : (person.z - lane.a.z) * Math.sign(lane.b.z - lane.a.z);
+        const pLat = lane.axis === "x" ? person.z - here.z : person.x - here.x;
+        if (Math.abs(pLat) > 1.8 + person.r) continue;
+        const ahead = pAlong - v.s;
+        if (ahead > 0 && ahead < length / 2 + 4) {
+          target = Math.min(target, Math.max(0, ahead - length / 2 - 0.8) * 2.5);
+        }
+      }
+
+      const heavy = v.kind === "lorry" || v.kind === "bus";
+      const rate = target < v.speed ? 16 : heavy ? 2.5 : 4;
+      v.speed += Math.sign(target - v.speed) * Math.min(Math.abs(target - v.speed), rate * dt);
+      let nextS = v.s + v.speed * dt;
+      const probe = pointOnLane(lane, Math.min(nextS, lane.length));
+      if (inBuilding(probe.x, probe.z)) {
+        v.speed = 0;
+        nextS = v.s;
+      }
+
+      // End of strip → turn around onto the opposite lane
+      if (nextS >= lane.length - 1) {
+        const back = reverseLane(lane);
+        v.laneId = back.id;
+        v.s = 2 + Math.random();
+        v.speed *= 0.4;
+      } else {
+        v.s = nextS;
+      }
+    }
+
+    // Hard bumper separation on each lane
+    for (const v of all) {
+      let leader: Vehicle | null = null;
+      let leaderGap = Infinity;
+      for (const o of all) {
+        if (o === v || o.laneId !== v.laneId) continue;
+        const gap = o.s - v.s;
+        if (gap <= 0) continue;
+        if (gap < leaderGap) {
+          leaderGap = gap;
+          leader = o;
+        }
+      }
+      if (leader) {
+        const need = needGap(v, leader);
+        if (leaderGap < need) {
+          v.s = leader.s - need;
+          v.speed = Math.min(v.speed, Math.min(leader.speed, 1));
+        }
+      }
+    }
+
+    for (const v of all) {
+      const lane = LANE_BY_ID[v.laneId];
+      if (!lane) continue;
+      const { x: vx, z: vz, rotY } = pointOnLane(lane, v.s);
       const spec = SPECS[v.kind];
       const n = Math.max(2, Math.ceil(spec.len / 2));
       const r = spec.width / 2 + 0.1;
+      const fx = Math.sin(rotY);
+      const fz = Math.cos(rotY);
       for (let i = 0; i < n; i++) {
         const o = -spec.len / 2 + r + (i / (n - 1)) * (spec.len - 2 * r);
-        circles.push(v.axis === "x" ? { x: vx + o, z: vz, r } : { x: vx, z: vz + o, r });
+        circles.push({ x: vx + fx * o, z: vz + fz * o, r });
       }
-      // Track the closest moving vehicle for the engine sound
       const d = Math.hypot(vx - player.x, vz - player.z) - v.speed * 0.1;
       if (d < nearest) {
         nearest = d;
         nearestBike = v.kind === "bike";
       }
-
       const g = refs.current[v.id];
       if (!g) continue;
-      if (v.axis === "x") g.position.set(v.pos, 0, lane);
-      else g.position.set(lane, 0, v.pos);
-      g.rotation.y = v.axis === "x" ? (v.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : v.dir > 0 ? 0 : Math.PI;
+      g.position.set(vx, 0, vz);
+      g.rotation.y = rotY;
     }
-    // ~10 Hz is plenty for the engine sound and keeps the audio automation timeline short
     if ((engineTick = (engineTick + 1) % 6) === 0) ambience.setEngine(Math.max(0, 1 - nearest / 14), nearestBike);
   });
 

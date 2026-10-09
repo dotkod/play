@@ -98,6 +98,8 @@ const ms = {
   resume: "▶ Sambung",
   restart: "↻ Mula semula",
   quit: "← Keluar ke Kuala Lepak",
+  walkOut: "← Jalan keluar",
+  walkOutWide: "Keluar ke jalan",
   language: "Bahasa",
   sound: "Bunyi",
   // Tutorial
@@ -234,6 +236,8 @@ const en: Strings = {
   resume: "▶ Resume",
   restart: "↻ Restart",
   quit: "← Back to Kuala Lepak",
+  walkOut: "← Walk out",
+  walkOutWide: "Walk out to the street",
   language: "Language",
   sound: "Sound",
   practice: "Practice",

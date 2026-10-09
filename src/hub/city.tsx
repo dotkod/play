@@ -1,11 +1,13 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { memo, useMemo, useRef } from "react";
+import { memo, useMemo, useRef, type ReactNode } from "react";
 import * as THREE from "three";
+import { etaLabel, nextArrivals } from "@/content/transit/bus-routes";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, RBox, ToonMaterial, toonGradient } from "@/shared/three/toon";
+import { ROAD_STRIPS } from "@/world/walk-spine";
 import { BUS_STOP, STALL, streetSpots } from "./colliders";
 import { view } from "./controls";
 import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
@@ -29,10 +31,22 @@ export const City = memo(function City({ onBuilding }: { onBuilding: (b: Buildin
 
 function Ground() {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]} receiveShadow>
-      <planeGeometry args={[200, 200]} />
-      <meshToonMaterial color="#86c27a" gradientMap={toonGradient()} />
-    </mesh>
+    <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]} receiveShadow>
+        <planeGeometry args={[320, 320]} />
+        <meshToonMaterial color="#86c27a" gradientMap={toonGradient()} />
+      </mesh>
+      {/* Sungai Lepak + Masjid Lepak (Phase 3 Pusat expand stub) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-31, 0.02, 32]} receiveShadow>
+        <planeGeometry args={[14, 52]} />
+        <meshToonMaterial color="#6ec4e8" gradientMap={toonGradient()} />
+      </mesh>
+      <group position={[-28, 0, 22]}>
+        <RBox size={[10, 0.4, 10]} radius={0.2} position={[0, 0.2, 0]} color="#e8eef4" />
+        <Ball radius={2.2} position={[0, 2.8, 0]} color="#1f8a4c" />
+        <Ball radius={1.6} position={[0, 3.8, 0]} color="#248a4c" />
+      </group>
+    </>
   );
 }
 
@@ -41,12 +55,65 @@ const WALK = "#d9d5cc";
 const CURB = "#b9b4a8";
 const LEN = EXTENT * 2 + 20;
 
-function Strip({ w, d, x = 0, z = 0, y = 0, color }: { w: number; d: number; x?: number; z?: number; y?: number; color: string }) {
+function Strip({
+  w,
+  d,
+  x = 0,
+  z = 0,
+  y = 0,
+  color,
+  offset = 0,
+}: {
+  w: number;
+  d: number;
+  x?: number;
+  z?: number;
+  y?: number;
+  color: string;
+  /** polygonOffset units — separates coplanar crossing strips */
+  offset?: number;
+}) {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, y, z]} receiveShadow>
       <planeGeometry args={[w, d]} />
-      <meshToonMaterial color={color} gradientMap={toonGradient()} />
+      <meshToonMaterial
+        color={color}
+        gradientMap={toonGradient()}
+        polygonOffset={offset !== 0}
+        polygonOffsetFactor={offset}
+        polygonOffsetUnits={offset}
+      />
     </mesh>
+  );
+}
+
+/** Full-city asphalt + sidewalks from ROAD_STRIPS. Walks under roads; Z-axis asphalt slightly above X (clean junctions). */
+function CityRoadStrips() {
+  const walks: ReactNode[] = [];
+  const roads: ReactNode[] = [];
+  ROAD_STRIPS.forEach((s, i) => {
+    if (s.axis === "x") {
+      const x0 = Math.min(s.x0, s.x1);
+      const x1 = Math.max(s.x0, s.x1);
+      const w = x1 - x0;
+      const cx = (x0 + x1) / 2;
+      walks.push(<Strip key={`w${i}`} w={w} d={WALK_HALF * 2} x={cx} z={s.z} y={0.004} color={WALK} />);
+      roads.push(<Strip key={`r${i}`} w={w} d={ROAD_HALF * 2} x={cx} z={s.z} y={0.02} color={ROAD} offset={-1} />);
+      return;
+    }
+    const z0 = Math.min(s.z0, s.z1);
+    const z1 = Math.max(s.z0, s.z1);
+    const d = z1 - z0;
+    const cz = (z0 + z1) / 2;
+    walks.push(<Strip key={`w${i}`} w={WALK_HALF * 2} d={d} x={s.x} z={cz} y={0.004} color={WALK} />);
+    // Slightly higher than X roads so the cross reads as one surface without z-fight
+    roads.push(<Strip key={`r${i}`} w={ROAD_HALF * 2} d={d} x={s.x} z={cz} y={0.028} color={ROAD} offset={-2} />);
+  });
+  return (
+    <>
+      {walks}
+      {roads}
+    </>
   );
 }
 
@@ -60,31 +127,25 @@ function Roads() {
   const crossAt = WALK_HALF + 1.6;
   return (
     <group>
-      {/* Sidewalks first, roads on top so the junction stays clean */}
-      <Strip w={LEN} d={WALK_HALF * 2} y={0.005} color={WALK} />
-      <Strip w={WALK_HALF * 2} d={LEN} y={0.006} color={WALK} />
-      <Strip w={LEN} d={ROAD_HALF * 2} y={0.01} color={ROAD} />
-      <Strip w={ROAD_HALF * 2} d={LEN} y={0.011} color={ROAD} />
-      {/* Curbs */}
+      <CityRoadStrips />
+      {/* Pusat junction curbs / dashes / zebra (local polish on the main cross) */}
       {[-1, 1].map((s) => (
         <group key={s}>
           <Box size={[LEN, 0.12, 0.18]} position={[0, 0.06, s * ROAD_HALF]} color={CURB} outline={false} />
           <Box size={[0.18, 0.12, LEN]} position={[s * ROAD_HALF, 0.06, 0]} color={CURB} outline={false} />
         </group>
       ))}
-      {/* Centre dashes */}
       {dashes.map((p) => (
         <group key={p}>
-          <Box size={[2, 0.02, 0.15]} position={[p, 0.02, 0]} color="#f2d24b" outline={false} />
-          <Box size={[0.15, 0.02, 2]} position={[0, 0.02, p]} color="#f2d24b" outline={false} />
+          <Box size={[2, 0.02, 0.15]} position={[p, 0.03, 0]} color="#f2d24b" outline={false} />
+          <Box size={[0.15, 0.02, 2]} position={[0, 0.03, p]} color="#f2d24b" outline={false} />
         </group>
       ))}
-      {/* Zebra crossings on all four arms */}
       {[-1, 1].map((s) =>
         zebra.map((o) => (
           <group key={`${s}${o}`}>
-            <Box size={[1.4, 0.02, 0.45]} position={[s * crossAt, 0.021, o]} color="#f4f1ea" outline={false} />
-            <Box size={[0.45, 0.02, 1.4]} position={[o, 0.021, s * crossAt]} color="#f4f1ea" outline={false} />
+            <Box size={[1.4, 0.02, 0.45]} position={[s * crossAt, 0.031, o]} color="#f4f1ea" outline={false} />
+            <Box size={[0.45, 0.02, 1.4]} position={[o, 0.031, s * crossAt]} color="#f4f1ea" outline={false} />
           </group>
         )),
       )}
@@ -119,22 +180,86 @@ const StreetProps = memo(function StreetProps() {
 
 // ---------- Street furniture ----------
 
-// Bus shelter: roof, back panel, bench and a "BAS" sign post
+// Bus shelter: roof, back panel, bench and a tall "BAS" blade sign with live ETAs.
+let basCanvas: HTMLCanvasElement | null = null;
+let basTex: THREE.CanvasTexture | null = null;
+let basPaintedAt = -1;
+
+function paintBasSign(now = new Date()) {
+  if (!basCanvas) {
+    basCanvas = document.createElement("canvas");
+    basCanvas.width = 128;
+    basCanvas.height = 256;
+  }
+  const c = basCanvas;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "#1f5fa8";
+  g.fillRect(0, 0, 128, 256);
+  g.fillStyle = "#fcd34d";
+  g.fillRect(8, 8, 112, 40);
+  g.fillStyle = "#1f1a17";
+  g.font = "bold 32px system-ui, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText("BAS", 64, 28);
+  g.fillStyle = "#ffffff";
+  g.font = "bold 14px system-ui, sans-serif";
+  g.fillText("RapidLepak", 64, 62);
+
+  const arrivals = nextArrivals(now);
+  let y = 95;
+  for (const { route, eta } of arrivals) {
+    g.fillStyle = route.color;
+    g.fillRect(10, y - 14, 108, 32);
+    g.fillStyle = "#ffffff";
+    g.font = "bold 16px system-ui, sans-serif";
+    g.textAlign = "left";
+    g.fillText(route.id, 18, y + 2);
+    g.textAlign = "right";
+    g.fillText(etaLabel(eta, "ms"), 110, y + 2);
+    y += 40;
+  }
+  g.fillStyle = "#fcd34d";
+  g.font = "22px system-ui";
+  g.textAlign = "center";
+  g.fillText("🚌", 64, 230);
+
+  if (!basTex) {
+    basTex = new THREE.CanvasTexture(c);
+    basTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  basTex.needsUpdate = true;
+  basPaintedAt = Math.floor(now.getTime() / 15_000);
+  return basTex;
+}
+
 const BusStop = memo(function BusStop() {
   const { x, z } = BUS_STOP;
+  const sign = useMemo(() => paintBasSign(), []);
+  useFrame(() => {
+    const slot = Math.floor(Date.now() / 15_000);
+    if (slot !== basPaintedAt) paintBasSign();
+  });
   return (
     <group position={[x, 0, z]}>
-      <Box size={[4.2, 0.12, 1.6]} position={[0, 2.5, 0]} color="#2f6fd6" />
+      <Box size={[4.2, 0.14, 1.8]} position={[0, 2.55, 0]} color="#1f5fa8" />
+      <Box size={[4.0, 0.06, 1.6]} position={[0, 2.64, 0]} color="#fcd34d" outline={false} />
       <Box size={[4.2, 2.3, 0.08]} position={[0, 1.3, 0.75]} color="#bfe6ef" />
       {[-2, 2].map((dx) => (
         <Box key={dx} size={[0.1, 2.5, 0.1]} position={[dx, 1.25, -0.6]} color="#6b7178" outline={false} />
       ))}
       <Box size={[3, 0.1, 0.5]} position={[0.3, 0.5, 0.4]} color="#b9773f" />
       <Box size={[3, 0.45, 0.08]} position={[0.3, 0.3, 0.62]} color="#6b7178" outline={false} />
-      <group position={[-2.6, 0, -0.5]}>
-        <Cyl top={0.05} bottom={0.05} height={2.6} position={[0, 1.3, 0]} color="#6b7178" outline={false} />
-        <Box size={[0.7, 0.5, 0.06]} position={[0, 2.5, 0]} color="#1f5fa8" />
-        <Box size={[0.4, 0.14, 0.07]} position={[0, 2.5, 0]} color="#ffffff" outline={false} />
+      <group position={[-2.8, 0, 0.2]}>
+        <Cyl top={0.07} bottom={0.09} height={3.4} position={[0, 1.7, 0]} color="#374151" outline={false} />
+        <mesh position={[0, 3.55, 0]}>
+          <planeGeometry args={[1.1, 2.2]} />
+          <meshBasicMaterial map={sign} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 3.55, 0]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[1.1, 2.2]} />
+          <meshBasicMaterial map={sign} toneMapped={false} />
+        </mesh>
       </group>
     </group>
   );
@@ -202,7 +327,7 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
       <Box size={[b.w, 0.18, 1.6]} position={[b.x, b.kind === "mall" ? 4.2 : 3.1, f.front + f.facing * 0.8]} color={b.kind === "mamak" ? "#2f8f86" : shade(b.color)} />
       {b.kind === "mamak" && <MamakFront b={b} />}
       {b.kind === "lrt" && <LrtPlatform b={b} />}
-      {(b.game || b.soon) && <FloatingLabel b={b} />}
+      {(b.game || b.soon || b.lrt || b.interior) && <FloatingLabel b={b} />}
     </group>
   );
 }
@@ -289,7 +414,7 @@ function FloatingLabel({ b }: { b: Building }) {
           <meshBasicMaterial map={tex} transparent toneMapped={false} depthWrite={false} />
         </mesh>
       </group>
-      {b.game && <DoorMarker x={spot.x} z={spot.z} />}
+      {(b.game || b.interior) && <DoorMarker x={spot.x} z={spot.z} />}
     </>
   );
 }
@@ -425,8 +550,8 @@ function facadeTexture(b: Building) {
 }
 
 function labelTexture(b: Building) {
-  const info = b.game ?? b.soon!;
-  const live = !!b.game;
+  const info = b.game ?? b.soon ?? b.interior ?? { title: "Stesen LRT", emoji: "🚇" };
+  const live = !!(b.game || b.lrt || b.interior);
   return cached(
     `label:${b.id}`,
     (g, c) => {

@@ -38,13 +38,13 @@ Section 13 is the phased roadmap with acceptance criteria.
 | | |
 |---|---|
 | Product | **Kuala Lepak** (city / open world) + mini-games ("jobs"). First job: **Anne Maju** (mamak drink game) |
-| Live URL | https://play.dotkod.com (city at `/`, Anne Maju at `/anne-maju`) |
+| Live URL | https://kl.dotkod.com (city at `/`; Anne Maju is a door overlay — `/anne-maju` is the same city shell) |
 | Repo | https://github.com/dotkod/play (public), branch `main` auto-deploys to production |
 | Hosting | Vercel project **`play`** (team `sattiyans`), Git-connected |
 | Data | Upstash Redis (Vercel Marketplace, resource `anne-maju-scores`) for leaderboards |
 | Languages | Bahasa Malaysia (default) + English, switchable in-game |
 | Platforms | Mobile browser first (landscape for games), desktop supported |
-| Current game version | Anne Maju **v1.5.1** (see `CHANGELOG.md`) |
+| Current game version | Kuala Lepak **v0.3.0**, Anne Maju **v1.5.2** (see `CHANGELOG.md`) |
 
 ### What exists today
 
@@ -52,7 +52,7 @@ Section 13 is the phased roadmap with acceptance criteria.
 - Single junction town: one main road (x axis), one cross road (z axis), 10 buildings.
 - Start screen (logo, tagline, "Mula jalan"), camera orbits until the player starts.
 - Third-person player: WASD/arrows, touch joystick, tap/click-to-walk, tap a building to walk to its door.
-- Follow camera that swings to face whichever sidewalk you're on; cutaway hides near-side buildings.
+- Follow camera: position tracks you; yaw is user-only (Q/R or right look pad) — no auto rotate; cutaway hides near-side buildings.
 - Traffic: hatchback, sedan, SUV, MPV, taxi, lorry, bus, delivery bikes (green/orange/pink colourways, no logos). Drive on the **left**, stop at red lights, keep gaps, brake and honk for the player.
 - Pedestrians (office workers, students, aunties, joggers, elders, umbrellas, kids), bus stop crowd, nasi lemak stall.
 - Street cats (Oyen, Comot, Tompok, Si Hitam, Putih): wander/sit/groom/sleep, meow, can be **petted** (crouch, purr, hearts, follow you).
@@ -61,7 +61,7 @@ Section 13 is the phased roadmap with acceptance criteria.
 - Doors: Restoran Anne Maju (playable), Stesen LRT ("akan datang").
 - Returning from a game respawns you at that building's door.
 
-**Anne Maju (`/anne-maju`, `src/games/anne-maju/`)**
+**Anne Maju (city door overlay + `/anne-maju` redirect, `src/games/anne-maju/`)**
 - 90-second mamak shift: customers (groups of 1–3) order drinks, player builds them in 4 steps on a 3D counter (cup → powder → milk → sugar), taps the customer to serve.
 - Tutorial on first play, pause + auto-pause, order slip, wrong-drink explanations, combos, coin fly, mood faces, haptics.
 - Menu unlocks and outfits by career earnings; outfits also apply to the city character.
@@ -113,8 +113,8 @@ src/
     hub-client.tsx          dynamic(..., { ssr: false }) wrapper (depends on sessionStorage)
     world.tsx               <Canvas>: lights, city, traffic, NPCs, cats, player, poster camera
     world-data.ts           Layout constants + BUILDINGS list (data-driven)
-    city.tsx                Ground, roads, props, buildings (facade textures), mamak front, labels
-    traffic.tsx             Traffic lights + vehicle simulation and models
+    city.tsx                Ground, roads (ROAD_STRIPS), props, buildings, mamak front, labels
+    traffic.tsx             Traffic lights + vehicles on city-wide lanes
     npcs.tsx                Walking pedestrians + standing crowd
     cats.tsx                Street cats: behaviour, petting, models
     player.tsx              Player controller, follow camera, collisions, door zones
@@ -123,6 +123,9 @@ src/
     minimap.tsx             2D canvas minimap
     poster.tsx              City OG poster composition
     strings.ts              City UI strings (BM/EN)
+  world/
+    vehicle-routes.ts       Lanes from ROAD_STRIPS (shared with map / 3D asphalt)
+    walk-spine.ts           ROAD_STRIPS + wayfinder spine
   games/anne-maju/          The mamak job (see meta.ts for version)
     game.tsx                All game UI + loop
     state.ts                Pure reducer (phases, customers, serving, pause, tutorial…)
@@ -284,7 +287,7 @@ Transit is both **fast travel** and **gameplay** (rides, crowds, the LRT job).
 - Elevated guideways visible in the city (the current Stesen LRT platform is the template).
 
 ### 6.4 Day/night & weather (later phases)
-- Game clock: 1 game day = 24 real minutes (configurable). Lighting presets: pagi, tengah hari,
+- Game clock: follows the player's **real local time**. Lighting presets: pagi, tengah hari,
   petang (golden), malam (neon, building windows lit, landmarks illuminated).
 - Weather: hujan lebat (heavy rain, sudden, short; NPCs open umbrellas and take shelter
   under five-foot ways), jerebu (haze) event.
@@ -566,8 +569,9 @@ Barks (random, per NPC type):
 
 ## 12. Jobs (mini-games) & transport
 
-Every job is a standalone route (`/job-slug`) with its own leaderboard, version, changelog
-entry, share card and OG image, **and** a building/door in the city.
+Every job has its own leaderboard, version, changelog entry, share card and OG image,
+**and** a building/door in the city. Prefer embedding the job as a hub overlay (Anne Maju);
+keep share routes (`/<slug>/k/...`) and optional SEO redirects.
 
 ### 12.1 Job contract
 - Lives in `src/games/<slug>/` with `meta.ts` (`name`, `slug`, `version`, copy, `storageKey`).
@@ -605,41 +609,44 @@ Each phase ends with: typecheck + lint + build passing, tested on a phone-sized 
 portrait viewport, OG art regenerated if visuals changed, CHANGELOG updated, deployed.
 
 ### Phase 0: Foundations (core systems, no new art)
-- [ ] `src/core/profile.ts` with schema + migrations from existing localStorage keys.
-- [ ] `src/core/events.ts` typed event bus.
-- [ ] City HUD: wallet (RM), level/XP bar, phone button.
-- [ ] Anne Maju returns results to the city (`sessionStorage` handoff → profile + event).
+- [x] `src/core/profile.ts` with schema + migrations from existing localStorage keys.
+- [x] `src/core/events.ts` typed event bus.
+- [x] City HUD: wallet (RM), level/XP bar, phone button.
+- [x] Anne Maju returns results to the city (`sessionStorage` handoff → profile + event).
 - **Done when:** finishing an Anne Maju shift and returning shows the RM added to the wallet.
 
 ### Phase 1: Phone, tasks, dialogue, "Hari Pertama"
-- [ ] Phone shell + Mesej, Tugasan, Dompet, Tetapan apps.
-- [ ] Task engine + schema + persistence; waypoint arrow + minimap markers.
-- [ ] Dialogue engine + UI + NPC interaction prompt.
-- [ ] Spawn named NPCs in Pusat Lepak: Uncle Raju, Makcik Kiah, Pakcik Osman, Uncle Ah Seng.
-- [ ] Storyline "Hari Pertama" steps 1–5 (step 6 needs Taman Ceria: stub with a "coming soon" bus).
-- [ ] Daily tasks (3 rotating).
+- [x] Phone shell + Mesej, Tugasan, Dompet, Tetapan apps.
+- [x] Task engine + schema + persistence; waypoint arrow + minimap markers.
+- [x] Dialogue engine + UI + NPC interaction prompt.
+- [x] Spawn named NPCs in Pusat Lepak: Uncle Raju, Makcik Kiah, Pakcik Osman, Uncle Ah Seng.
+- [x] Storyline "Hari Pertama" steps 1–5 (step 6 needs Taman Ceria: stub with a "coming soon" bus).
+- [x] Daily tasks (3 rotating).
+- [x] Optional cloud account (`@username` + 8-digit PIN) with guest local save + merge on register.
 - **Done when:** a new player can complete Hari Pertama in ~10 minutes, entirely guided by the phone.
 
 ### Phase 2: World architecture for a big city
-- [ ] Road/lane graph replacing the hard-coded junction; traffic + NPC pathing on it.
-- [ ] District/chunk loader with impostors and LOD; perf overlay.
-- [ ] Instancing + merged static geometry; facade atlas.
-- [ ] Day/night lighting presets (no weather yet).
+- [x] Road/lane graph + ROAD_STRIPS traffic (cars/buses/bikes on full-city corridors; Pusat signals).
+- [x] District/chunk loader with impostors; perf overlay (`?perf=1`).
+- [ ] Instancing + merged static geometry; facade atlas (partial — deferred polish).
+- [x] Day/night lighting presets (no weather yet).
+- [x] Second district: Taman Ceria (walk + bus); KLCC remains Phase 3.
 - **Done when:** two districts exist, walking between them streams smoothly at 30+ fps on a mid-range phone.
 
 ### Phase 3: KL landmarks & districts (one per PR)
-- [ ] Pusat Lepak expanded (Masjid Lepak, river, more shophouses)
-- [ ] KLCC + Menara Berkembar + park/fountain
-- [ ] Taman Ceria (housing, playground, pasar malam) + home sofa
-- [ ] Menara Lepak
-- [ ] TLX + Menara 106
-- [ ] Bukit Bintik
-- [ ] Bukit Jalan + Stadium
-- [ ] Kampung Lepak, Pasar Besar, Petaling Lane, Sentral Lepak
+- [x] Pusat Lepak expanded (Masjid Lepak + river stub in 0.5.1; more shophouses in 0.7.0)
+- [x] KLCC + Menara Berkembar + park/fountain (0.5.0)
+- [x] Taman Ceria (housing, playground, home sofa; pasar malam later)
+- [x] Menara Lepak (0.6.0)
+- [x] TLX + Menara 106 (0.7.0)
+- [x] Bukit Bintik (0.7.0)
+- [x] Bukit Jalan + Stadium (0.7.0)
+- [x] Kampung Lepak, Pasar Besar, Petaling Lane, Sentral Lepak (0.7.0)
 
 ### Phase 4: Transit
-- [ ] Bus routes + stops with arrival times
-- [ ] LRT Laluan Kelana stations + rides (fast travel)
+- [x] Bus routes + stops with arrival times (0.9.0 — B101/B202 + ETA + RM1)
+- [x] Anne Maju embedded in city + enterable Pusat shophouses (0.10.0)
+- [x] LRT Laluan Kelana stations + rides (fast travel) (0.8.0)
 - [ ] MRT Laluan Hijau, Monorel Lepak
 - [ ] Peta app fast travel; taxi via Kumar
 

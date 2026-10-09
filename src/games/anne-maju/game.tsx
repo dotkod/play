@@ -3,6 +3,7 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { queueJobResult } from "@/core/job-handoff";
 import { music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { hashString, rand, seedRandom, unseedRandom } from "@/shared/rng";
 import { shareResult, type ShareOutcome } from "@/shared/share";
@@ -67,7 +68,16 @@ const vibrate = (pattern: number | number[]) => {
 
 type ShiftResult = { before: number; after: number; unlocks: Unlock[]; outfits: string[] };
 
-export function AnneMajuGame({ challenge }: { challenge?: number }) {
+export function AnneMajuGame({
+  challenge,
+  onExit,
+  embedded = false,
+}: {
+  challenge?: number;
+  onExit?: () => void;
+  /** Mounted inside the city hub — exit feels like leaving the shop, not a site. */
+  embedded?: boolean;
+}) {
   const [s, dispatch] = useReducer(reducer, initialState);
   const [serveEvent, setServeEvent] = useState<{ table: number; id: number } | null>(null);
   const [combo, setCombo] = useState<{ n: number; id: number } | null>(null);
@@ -86,13 +96,16 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
   const menu: Menu = s.mode === "daily" ? FULL_MENU : menuFor(careerSen);
   const anneLook = useMemo<Look>(() => ({ ...ANNE_LOOK, ...outfit.look }), [outfit]);
 
-  // Shift ended: bank the earnings and work out what got unlocked
+  // Shift ended: bank career unlocks, and stash a city payout for when you walk back
   const finishShift = useCallback((cur: GameState) => {
     const before = career();
     const after = addCareer(cur.earned);
     const outfits = OUTFITS.filter((o) => o.at > before && o.at <= after).map((o) => o.emoji);
     setResult({ before, after, unlocks: newUnlocks(before, after), outfits });
     setCareerSen(after);
+    if (cur.phase !== "tutorial" && cur.earned > 0) {
+      queueJobResult({ job: GAME.slug, earned: cur.earned, served: cur.served, mode: cur.mode });
+    }
     unseedRandom();
   }, []);
 
@@ -194,7 +207,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
 
   if (s.phase === "intro" || s.phase === "over") {
     return (
-      <div className="relative h-dvh w-full overflow-hidden select-none">
+      <div className="fixed inset-0 z-40 overflow-hidden select-none">
         <DemoBackdrop anneLook={anneLook} />
         {s.phase === "intro" ? (
           <Intro
@@ -212,7 +225,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
           <GameOver s={s} result={result} careerSen={careerSen} onRestart={() => startShift(s.mode)} />
         )}
         <div className="edge-tl absolute">
-          <BackToPlay />
+          <BackToPlay onExit={onExit} embedded={embedded} />
         </div>
         <div className="edge-tr absolute flex gap-2">
           <LangToggle />
@@ -262,8 +275,8 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
   const hintValue = tutorial && step && !offTrack ? TUTORIAL_ORDER[step] : null;
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden select-none">
-      <div className="relative min-w-0 flex-1">
+    <div className="fixed inset-0 z-40 flex overflow-hidden select-none max-[520px]:flex-col [@media(max-height:420px)]:flex-col">
+      <div className="relative min-h-0 min-w-0 flex-1">
         <MamakScene
           s={s}
           cupReady={isCupComplete(s.cup)}
@@ -311,7 +324,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
           </div>
         )}
       </div>
-      <div className="safe-pr flex h-full w-[min(380px,46vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)]">
+      <div className="safe-pr flex h-full w-[min(380px,46vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)] max-[520px]:h-[min(42%,280px)] max-[520px]:w-full max-[520px]:shadow-[0_-4px_20px_rgba(0,0,0,0.15)] [@media(max-height:420px)]:h-[min(42%,260px)] [@media(max-height:420px)]:w-full">
         <StepRail
           cup={s.cup}
           onRewind={(part) => {
@@ -323,7 +336,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
             dispatch({ type: "discard" });
           }}
         />
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1 overflow-hidden">
           <DrinkStation cup={s.cup} lang={lang} onPick={onPick} menu={menu} hint={hintValue} />
           {tutorial && (
             <p className="pointer-events-none absolute inset-x-2 top-2 rounded-xl bg-amber-300 px-3 py-1.5 text-center text-sm font-extrabold text-ink shadow-[0_3px_0_#1f1a17]">
@@ -338,7 +351,7 @@ export function AnneMajuGame({ challenge }: { challenge?: number }) {
           )}
         </div>
       </div>
-      {s.phase === "paused" && <PauseMenu onResume={resume} onRestart={() => startShift(s.mode)} />}
+      {s.phase === "paused" && <PauseMenu onResume={resume} onRestart={() => startShift(s.mode)} onExit={onExit} embedded={embedded} />}
       {s.phase === "tutorialDone" && (
         <Modal>
           <p className="text-3xl font-extrabold">{tr.tutorialDoneTitle}</p>
@@ -457,7 +470,17 @@ function Modal({ children }: { children: ReactNode }) {
   );
 }
 
-function PauseMenu({ onResume, onRestart }: { onResume: () => void; onRestart: () => void }) {
+function PauseMenu({
+  onResume,
+  onRestart,
+  onExit,
+  embedded,
+}: {
+  onResume: () => void;
+  onRestart: () => void;
+  onExit?: () => void;
+  embedded?: boolean;
+}) {
   const tr = useT();
   return (
     <Modal>
@@ -480,7 +503,7 @@ function PauseMenu({ onResume, onRestart }: { onResume: () => void; onRestart: (
         <span>{tr.sound}</span>
         <MuteButton />
       </div>
-      <BackToPlay wide />
+      <BackToPlay wide onExit={onExit} embedded={embedded} />
       <Version className="text-ink/40" />
     </Modal>
   );
@@ -512,22 +535,32 @@ function MuteButton() {
   );
 }
 
-// Back to the Play city; the hub reads this key to put you outside the restaurant door
-function BackToPlay({ wide = false }: { wide?: boolean }) {
+// Embedded: walk out of the mamak (same session). Else: link home + spawn at the door.
+function BackToPlay({ wide = false, onExit, embedded = false }: { wide?: boolean; onExit?: () => void; embedded?: boolean }) {
   const tr = useT();
+  const leave = () => {
+    music.stop();
+    unseedRandom();
+    if (onExit) {
+      onExit();
+      return;
+    }
+    try {
+      sessionStorage.setItem("dotkod-play:spawn", GAME.slug);
+    } catch {}
+  };
+  const label = embedded ? (wide ? tr.walkOutWide : tr.walkOut) : wide ? tr.quit : "← KUALA LEPAK";
+  const cls = `flex h-9 items-center justify-center gap-1 rounded-xl bg-ink/80 px-3 text-sm font-extrabold text-amber-300 shadow-lg active:scale-95 ${wide ? "w-full" : ""}`;
+  if (onExit || embedded) {
+    return (
+      <button type="button" onClick={leave} className={cls}>
+        {label}
+      </button>
+    );
+  }
   return (
-    <Link
-      href="/"
-      onClick={() => {
-        music.stop();
-        unseedRandom();
-        try {
-          sessionStorage.setItem("dotkod-play:spawn", GAME.slug);
-        } catch {}
-      }}
-      className={`flex h-9 items-center justify-center gap-1 rounded-xl bg-ink/80 px-3 text-sm font-extrabold text-amber-300 shadow-lg active:scale-95 ${wide ? "w-full" : ""}`}
-    >
-      {wide ? tr.quit : "← KUALA LEPAK"}
+    <Link href="/" onClick={leave} className={cls}>
+      {label}
     </Link>
   );
 }
@@ -732,7 +765,17 @@ function OutfitPicker({ careerSen, outfitId, onOutfit }: { careerSen: number; ou
   );
 }
 
-function GameOver({ s, result, careerSen, onRestart }: { s: GameState; result: ShiftResult | null; careerSen: number; onRestart: () => void }) {
+function GameOver({
+  s,
+  result,
+  careerSen,
+  onRestart,
+}: {
+  s: GameState;
+  result: ShiftResult | null;
+  careerSen: number;
+  onRestart: () => void;
+}) {
   const tr = useT();
   const lang = useLang();
   const { best, submit } = useBestScore(GAME.storageKey);

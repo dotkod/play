@@ -28,6 +28,33 @@
     0%, 100% { transform: translateY(0); opacity: 0.6; }
     50% { transform: translateY(-3px); opacity: 1; }
   }
+  @keyframes phone-rise {
+    from { transform: translateY(28px) scale(0.88); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+}
+
+.phone-rise {
+  animation: phone-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* City ↔ job door: cover then reveal so it feels like walking in, not a page load */
+@keyframes door-veil {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes job-settle {
+  from { opacity: 0; transform: scale(1.02); }
+  to { opacity: 1; transform: scale(1); }
+}
+.door-veil {
+  animation: door-veil 0.32s ease-out both;
+}
+.door-unveil {
+  animation: door-veil 0.38s ease-in reverse both;
+}
+.job-settle {
+  animation: job-settle 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 body {

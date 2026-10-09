@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AnneMajuGame } from "@/games/anne-maju/game";
+import { HubClient } from "@/hub/hub-client";
 import { GAME } from "@/games/anne-maju/meta";
 import { site } from "@/shared/site";
 
@@ -16,7 +16,6 @@ export const metadata: Metadata = {
   appleWebApp: { title: GAME.name },
 };
 
-// Structured data so search engines know this page is a playable game
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "VideoGame",
@@ -33,16 +32,17 @@ const jsonLd = {
   isAccessibleForFree: true,
   offers: { "@type": "Offer", price: 0, priceCurrency: "MYR" },
   author: { "@type": "Organization", name: "Dotkod", url: "https://dotkod.com" },
+  isPartOf: { "@type": "WebSite", name: site.name, url: site.url },
 };
 
+/** Same city shell as `/` — opens Restoran Anne Maju as an overlay, not a separate game page. */
 export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
-      {/* Real text for crawlers; the game itself is canvas */}
       <h1 className="sr-only">{GAME.title}</h1>
       <p className="sr-only">{GAME.description}</p>
-      <AnneMajuGame />
+      <HubClient initialJob="anne-maju" />
     </>
   );
 }

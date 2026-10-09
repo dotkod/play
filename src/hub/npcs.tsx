@@ -24,17 +24,23 @@ const CAST: { kind: Townsfolk; speed: [number, number] }[] = [
 
 // Pedestrians pace up and down the sidewalks, turning around at the ends of the street
 export const Pedestrians = memo(function Pedestrians() {
-  const [walkers] = useState(() =>
-    CAST.map(
-      (c, i): Walker => ({
-        axis: i % 3 === 0 ? "z" : "x",
-        side: (i % 2 ? 1 : -1) * (SIDEWALK_MID - 0.8),
-        start: Math.random() * 1000,
+  const [walkers] = useState(() => {
+    // Spread starts so walkers don't clump; keep them on the outer sidewalk (away from lanes)
+    const byAxis = { x: 0, z: 0 };
+    return CAST.map((c, i): Walker => {
+      const axis: "x" | "z" = i % 3 === 0 ? "z" : "x";
+      const slot = byAxis[axis]++;
+      const side = (i % 2 ? 1 : -1) * (SIDEWALK_MID + 0.15 + (slot % 2) * 0.45);
+      const start = (slot / Math.max(1, CAST.length / 2)) * (BOUNDS * 4) + i * 7.5;
+      return {
+        axis,
+        side,
+        start,
         speed: c.speed[0] + Math.random() * (c.speed[1] - c.speed[0]),
         look: townsfolk(c.kind),
-      }),
-    ),
-  );
+      };
+    });
+  });
   return (
     <>
       {walkers.map((w, i) => (
@@ -64,17 +70,16 @@ function Walking({ index, w }: { index: number; w: Walker }) {
 
 // People waiting at the bus stop and buying nasi lemak; they stand still (their spots are static colliders)
 function StandingCrowd() {
+  // Makcik Kiah / Pakcik Osman are named NPCs; keep only ambient crowd here
   const [folk] = useState(() => [
     { look: townsfolk("office"), x: BUS_STOP.x - 1.2, z: BUS_STOP.z - 0.6, rotY: Math.PI },
     { look: townsfolk("student"), x: BUS_STOP.x + 0.1, z: BUS_STOP.z - 0.7, rotY: Math.PI + 0.3 },
-    { look: townsfolk("elder"), x: BUS_STOP.x + 1.2, z: BUS_STOP.z + 0.2, rotY: Math.PI, seated: true },
-    { look: { ...townsfolk("auntie"), apron: "#ffffff" }, x: STALL.x, z: STALL.z - 0.9, rotY: 0 },
     { look: townsfolk("office"), x: STALL.x + 1.5, z: STALL.z + 0.3, rotY: -Math.PI / 2 },
   ]);
   return (
     <>
       {folk.map((f, i) => (
-        <Standing key={i} look={f.look} pose={{ x: f.x, z: f.z, rotY: f.rotY, walking: false, seated: !!f.seated }} />
+        <Standing key={i} look={f.look} pose={{ x: f.x, z: f.z, rotY: f.rotY, walking: false, seated: false }} />
       ))}
     </>
   );

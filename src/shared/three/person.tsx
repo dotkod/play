@@ -16,6 +16,9 @@ export type Pose = {
   carrying?: boolean;
   // Bent down (e.g. petting a cat)
   crouch?: boolean;
+  // Taking phone from pocket (0→1) or holding it up to look at the screen
+  phone?: "draw" | "hold";
+  phoneProgress?: number;
 };
 
 const HIP_STAND = 0.78;
@@ -32,6 +35,7 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
   const armR = useRef<THREE.Group>(null);
   const brows = useRef<THREE.Group>(null);
   const tray = useRef<THREE.Group>(null);
+  const phone = useRef<THREE.Group>(null);
 
   useFrame(({ clock }) => {
     const p = getPose();
@@ -47,6 +51,7 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
       hips.current.position.y = HIP_SEAT + Math.sin(t * 2 + p.x) * 0.008;
       legL.current.rotation.x = legR.current.rotation.x = -Math.PI / 2;
       armL.current.rotation.x = armR.current.rotation.x = -0.75;
+      armL.current.rotation.z = armR.current.rotation.z = 0;
       // Impatient customers drum the table
       if (p.angry) armR.current.rotation.x = -0.75 + Math.sin(t * 18) * 0.15;
     } else if (p.crouch) {
@@ -55,16 +60,47 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
       legL.current.rotation.x = legR.current.rotation.x = -1.1;
       armL.current.rotation.x = -0.3;
       armR.current.rotation.x = -1.2 + Math.sin(t * 8) * 0.15;
+      armL.current.rotation.z = 0;
+      armR.current.rotation.z = 0;
+    } else if (p.phone === "draw" || p.phone === "hold") {
+      hips.current.position.y = HIP_STAND;
+      legL.current.rotation.x = legR.current.rotation.x = 0;
+      armL.current.rotation.x = -0.15;
+      armL.current.rotation.z = 0.12;
+      const u = p.phone === "hold" ? 1 : Math.min(1, Math.max(0, p.phoneProgress ?? 0));
+      if (u < 0.42) {
+        // Reach into the pocket
+        const k = u / 0.42;
+        armR.current.rotation.x = 0.35 + k * 0.55;
+        armR.current.rotation.z = 0.15 + k * 0.75;
+      } else {
+        // Lift phone up to look at the screen
+        const k = (u - 0.42) / 0.58;
+        const e = 1 - (1 - k) * (1 - k);
+        armR.current.rotation.x = 0.9 + e * (-2.2);
+        armR.current.rotation.z = 0.9 + e * (-1.15);
+      }
     } else {
       hips.current.position.y = HIP_STAND + (p.walking ? Math.abs(Math.sin(t * 11)) * 0.04 : 0);
       legL.current.rotation.x = swing;
       legR.current.rotation.x = -swing;
       armL.current.rotation.x = p.carrying ? -1.3 : -swing * 0.8;
+      armL.current.rotation.z = 0;
       // Umbrellas are held up steadily; other carried things swing with the walk
       armR.current.rotation.x = p.carrying ? -1.3 : look.carry === "umbrella" ? -0.5 : swing * 0.8;
+      armR.current.rotation.z = 0;
     }
     if (brows.current) brows.current.visible = !!p.angry;
     if (tray.current) tray.current.visible = !!p.carrying;
+    if (phone.current) {
+      const show = p.phone === "hold" || (p.phone === "draw" && (p.phoneProgress ?? 0) > 0.38);
+      phone.current.visible = show;
+      if (show) {
+        // Slight screen tilt while holding
+        phone.current.rotation.x = p.phone === "hold" ? -0.35 : -0.15;
+        phone.current.rotation.z = 0.1;
+      }
+    }
   });
 
   return (
@@ -90,6 +126,11 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
           <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
           <Box size={[0.12, 0.1, 0.13]} position={[0, -0.53, 0]} color={look.skin} />
           {look.carry && <Carried kind={look.carry} />}
+          {/* Tiny handset pulled from the pocket */}
+          <group ref={phone} position={[0.02, -0.58, 0.08]} visible={false}>
+            <Box size={[0.14, 0.26, 0.04]} color="#1a1a1c" outline={false} />
+            <Box size={[0.11, 0.2, 0.01]} position={[0, 0.01, 0.025]} color="#64d2ff" outline={false} />
+          </group>
         </group>
 
         <group ref={tray} position={[0, 0.62, 0.55]} visible={false}>

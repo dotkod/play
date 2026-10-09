@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { getWalkRoute } from "@/core/walk-path";
+import { getWaypoint } from "@/core/waypoint";
+import { pathAlongRoads } from "@/world/walk-spine";
 import { catStates } from "./cats";
 import { dynamicColliders } from "./colliders";
-import { input } from "./controls";
+import {
+  MAP_ORIGIN_X,
+  MAP_ORIGIN_Z,
+  MAP_SPAN_X,
+  MAP_SPAN_Z,
+  paintCityBase,
+} from "./map-draw";
 import { player } from "./traffic";
-import { BOUNDS, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
 
-const SPAN = EXTENT * 2; // metres in the full city plan
-const VIEW = 46; // metres shown edge to edge, centred on the player
+const VIEW = 52;
 
-// North-up plan that follows the player. The city is drawn once to an offscreen canvas;
-// each frame we blit the window around the player and add traffic and the player arrow.
-export function Minimap({ size }: { size: number }) {
+export function Minimap({ size, onOpen }: { size: number; onOpen: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const view = useRef({ ox: 0, oz: 0, k: 1 });
 
@@ -24,45 +29,13 @@ export function Minimap({ size }: { size: number }) {
     c.height = size * dpr;
     const g = c.getContext("2d")!;
     const k = (size * dpr) / VIEW;
-    const X = (x: number) => (x + EXTENT) * k;
-    const Z = (z: number) => (z + EXTENT) * k;
+    const X = (x: number) => (x - MAP_ORIGIN_X) * k;
+    const Z = (z: number) => (z - MAP_ORIGIN_Z) * k;
 
-    // Static layer: grass, sidewalks, roads, buildings
     const base = document.createElement("canvas");
-    base.width = Math.ceil(SPAN * k);
-    base.height = Math.ceil(SPAN * k);
-    const b = base.getContext("2d")!;
-    b.fillStyle = "#86c27a";
-    b.fillRect(0, 0, base.width, base.height);
-    b.fillStyle = "#d9d5cc";
-    b.fillRect(0, Z(-WALK_HALF), base.width, WALK_HALF * 2 * k);
-    b.fillRect(X(-WALK_HALF), 0, WALK_HALF * 2 * k, base.height);
-    b.fillStyle = "#4f545a";
-    b.fillRect(0, Z(-ROAD_HALF), base.width, ROAD_HALF * 2 * k);
-    b.fillRect(X(-ROAD_HALF), 0, ROAD_HALF * 2 * k, base.height);
-    for (const bd of BUILDINGS) {
-      const f = footprint(bd);
-      b.fillStyle = bd.game ? "#fcd34d" : bd.soon ? "#fbf3e4" : bd.color;
-      b.strokeStyle = "#1f1a17";
-      b.lineWidth = 1.5 * dpr;
-      b.fillRect(X(f.minX), Z(f.minZ), bd.w * k, bd.d * k);
-      b.strokeRect(X(f.minX), Z(f.minZ), bd.w * k, bd.d * k);
-      if (bd.game || bd.soon) {
-        const info = (bd.game ?? bd.soon)!;
-        b.font = `${Math.round(14 * dpr)}px system-ui, sans-serif`;
-        b.textAlign = "center";
-        b.textBaseline = "middle";
-        b.fillText(info.emoji, X(f.cx), Z(f.cz));
-      }
-    }
-    // Door marker for the playable building
-    for (const bd of BUILDINGS.filter((x) => x.game)) {
-      const d = doorSpot(bd);
-      b.fillStyle = "#d8352a";
-      b.beginPath();
-      b.arc(X(d.x), Z(d.z), 3 * dpr, 0, Math.PI * 2);
-      b.fill();
-    }
+    base.width = Math.ceil(MAP_SPAN_X * k);
+    base.height = Math.ceil(MAP_SPAN_Z * k);
+    paintCityBase(base.getContext("2d")!, X, Z, k, dpr);
 
     let raf = 0;
     let last = 0;
@@ -70,24 +43,47 @@ export function Minimap({ size }: { size: number }) {
       raf = requestAnimationFrame(draw);
       if (t - last < 33) return;
       last = t;
-      // Window origin in base-canvas pixels, centred on the player
       const ox = X(player.x) - c.width / 2;
       const oz = Z(player.z) - c.height / 2;
       view.current = { ox, oz, k };
       g.fillStyle = "#86c27a";
       g.fillRect(0, 0, c.width, c.height);
       g.drawImage(base, -ox, -oz);
-      // Traffic as small dots
       g.fillStyle = "#ffffff";
       for (const v of dynamicColliders.vehicles) g.fillRect(X(v.x) - ox - 1.5 * dpr, Z(v.z) - oz - 1.5 * dpr, 3 * dpr, 3 * dpr);
-      // Cats as little orange dots
       g.fillStyle = "#f28c28";
       for (const cat of catStates()) {
         g.beginPath();
         g.arc(X(cat.x) - ox, Z(cat.z) - oz, 2.6 * dpr, 0, Math.PI * 2);
         g.fill();
       }
-      // Player arrow in the middle, pointing the way they're facing
+      const wp = getWaypoint();
+      const route =
+        getWalkRoute().length > 1
+          ? getWalkRoute()
+          : wp
+            ? pathAlongRoads(player.x, player.z, wp.x, wp.z)
+            : [];
+      if (route.length > 1) {
+        g.strokeStyle = "#c62f25";
+        g.lineWidth = 2 * dpr;
+        g.setLineDash([5 * dpr, 4 * dpr]);
+        g.beginPath();
+        route.forEach((p, i) => {
+          const px = X(p.x) - ox;
+          const pz = Z(p.z) - oz;
+          if (i === 0) g.moveTo(px, pz);
+          else g.lineTo(px, pz);
+        });
+        g.stroke();
+        g.setLineDash([]);
+      }
+      if (wp) {
+        g.fillStyle = "#fcd34d";
+        g.beginPath();
+        g.arc(X(wp.x) - ox, Z(wp.z) - oz, 4 * dpr, 0, Math.PI * 2);
+        g.fill();
+      }
       g.save();
       g.translate(c.width / 2, c.height / 2);
       g.rotate(-player.rot + Math.PI);
@@ -109,20 +105,15 @@ export function Minimap({ size }: { size: number }) {
   }, [size]);
 
   return (
-    <canvas
-      ref={canvas}
-      style={{ width: size, height: size }}
-      className="cursor-crosshair rounded-2xl border-4 border-ink bg-[#86c27a] shadow-[0_4px_0_#1f1a17]"
-      aria-label="Minimap"
-      onClick={(e) => {
-        // Tap the map to walk there (undo the player-centred window and the scale)
-        const rect = e.currentTarget.getBoundingClientRect();
-        const { ox, oz, k } = view.current;
-        const scale = e.currentTarget.width / rect.width;
-        const x = ((e.clientX - rect.left) * scale + ox) / k - EXTENT;
-        const z = ((e.clientY - rect.top) * scale + oz) / k - EXTENT;
-        input.target = { x: Math.max(-BOUNDS, Math.min(BOUNDS, x)), z: Math.max(-BOUNDS, Math.min(BOUNDS, z)) };
-      }}
-    />
+    <button type="button" className="relative block" onClick={onOpen} aria-label="Map">
+      <canvas
+        ref={canvas}
+        style={{ width: size, height: size }}
+        className="rounded-2xl border-4 border-ink bg-[#86c27a] shadow-[0_4px_0_#1f1a17]"
+      />
+      <span className="absolute right-1 bottom-1 rounded bg-ink/80 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-cream uppercase">
+        +
+      </span>
+    </button>
   );
 }
