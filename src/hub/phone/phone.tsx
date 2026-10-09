@@ -582,7 +582,7 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="@username"
+              placeholder="username"
               className="w-full rounded-[10px] bg-[#e5e5ea] px-3 py-2.5 text-[16px] text-black outline-none placeholder:text-[#8e8e93]"
               autoComplete="username"
             />

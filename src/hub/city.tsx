@@ -7,7 +7,7 @@ import { etaLabel, nextArrivals } from "@/content/transit/bus-routes";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, RBox, ToonMaterial, toonGradient } from "@/shared/three/toon";
-import { ROAD_STRIPS } from "@/world/walk-spine";
+import { ROAD_STRIPS, SPINE_EDGES, SPINE_NODES, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
 import { BUS_STOP, STALL, streetSpots } from "./colliders";
 import { view } from "./controls";
 import { type Building, BUILDINGS, doorSpot, EXTENT, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
@@ -52,6 +52,7 @@ function Ground() {
 
 const ROAD = "#4f545a";
 const WALK = "#d9d5cc";
+const PATH = "#cfc8bb";
 const CURB = "#b9b4a8";
 const LEN = EXTENT * 2 + 20;
 
@@ -87,6 +88,48 @@ function Strip({
   );
 }
 
+/** Pedestrian alleys (narrow, under sidewalks). */
+function CityWalkPaths() {
+  return (
+    <>
+      {WALK_PATHS.map((s, i) => {
+        if (s.axis === "x") {
+          const w = Math.abs(s.x1 - s.x0);
+          const cx = (s.x0 + s.x1) / 2;
+          return <Strip key={`p${i}`} w={w} d={WALK_PATH_HALF * 2} x={cx} z={s.z} y={0.003} color={PATH} />;
+        }
+        const d = Math.abs(s.z1 - s.z0);
+        const cz = (s.z0 + s.z1) / 2;
+        return <Strip key={`p${i}`} w={WALK_PATH_HALF * 2} d={d} x={s.x} z={cz} y={0.003} color={PATH} />;
+      })}
+    </>
+  );
+}
+
+/** Soft pads at L / T junctions so 3D corners aren’t raw rectangle mitres. */
+function junctionPads(): { x: number; z: number }[] {
+  const adj: Record<string, string[]> = {};
+  for (const id of Object.keys(SPINE_NODES)) adj[id] = [];
+  for (const e of SPINE_EDGES) {
+    adj[e.a].push(e.b);
+    adj[e.b].push(e.a);
+  }
+  const out: { x: number; z: number }[] = [];
+  for (const [id, nbrs] of Object.entries(adj)) {
+    if (nbrs.length < 2) continue;
+    const n = SPINE_NODES[id];
+    let hasX = false;
+    let hasZ = false;
+    for (const nid of nbrs) {
+      const o = SPINE_NODES[nid];
+      if (Math.abs(o.z - n.z) < 0.05) hasX = true;
+      if (Math.abs(o.x - n.x) < 0.05) hasZ = true;
+    }
+    if (hasX && hasZ) out.push({ x: n.x, z: n.z });
+  }
+  return out;
+}
+
 /** Full-city asphalt + sidewalks from ROAD_STRIPS. Walks under roads; Z-axis asphalt slightly above X (clean junctions). */
 function CityRoadStrips() {
   const walks: ReactNode[] = [];
@@ -106,13 +149,36 @@ function CityRoadStrips() {
     const d = z1 - z0;
     const cz = (z0 + z1) / 2;
     walks.push(<Strip key={`w${i}`} w={WALK_HALF * 2} d={d} x={s.x} z={cz} y={0.004} color={WALK} />);
-    // Slightly higher than X roads so the cross reads as one surface without z-fight
     roads.push(<Strip key={`r${i}`} w={ROAD_HALF * 2} d={d} x={s.x} z={cz} y={0.028} color={ROAD} offset={-2} />);
   });
+  const pads = junctionPads();
   return (
     <>
+      <CityWalkPaths />
       {walks}
+      {pads.map((p, i) => (
+        <Cyl
+          key={`jw${i}`}
+          top={WALK_HALF}
+          bottom={WALK_HALF}
+          height={0.01}
+          position={[p.x, 0.006, p.z]}
+          color={WALK}
+          outline={false}
+        />
+      ))}
       {roads}
+      {pads.map((p, i) => (
+        <Cyl
+          key={`jr${i}`}
+          top={ROAD_HALF}
+          bottom={ROAD_HALF}
+          height={0.01}
+          position={[p.x, 0.032, p.z]}
+          color={ROAD}
+          outline={false}
+        />
+      ))}
     </>
   );
 }

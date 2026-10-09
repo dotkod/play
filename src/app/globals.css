@@ -32,6 +32,12 @@
     from { transform: translateY(28px) scale(0.88); opacity: 0; }
     to { transform: translateY(0) scale(1); opacity: 1; }
   }
+  /* Portrait phone tilting toward landscape */
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    40% { transform: rotate(90deg); }
+    60% { transform: rotate(90deg); }
+  }
 }
 
 .phone-rise {

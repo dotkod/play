@@ -5,28 +5,6 @@ import { useT } from "./i18n";
 import type { Board } from "./leaderboard";
 import { rm } from "./result";
 
-const ID_KEY = "anne-maju:player-id";
-const NAME_KEY = "anne-maju:player-name";
-
-function store(key: string, value?: string) {
-  try {
-    if (value === undefined) return localStorage.getItem(key);
-    localStorage.setItem(key, value);
-  } catch {}
-  return null;
-}
-
-export function playerId() {
-  let id = store(ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    store(ID_KEY, id);
-  }
-  return id;
-}
-
-export const savedName = () => store(NAME_KEY) ?? "";
-
 export function useBoard() {
   const [board, setBoard] = useState<Board | null>(null);
   const refresh = useCallback(async () => {
@@ -65,6 +43,7 @@ export function LeaderboardPanel({
   const [tab, setTab] = useState<Tab>(initialTab);
   const rows = board?.[tab] ?? [];
   const limit = compact ? 5 : 10;
+  const hi = highlight?.replace(/^@/, "").toLowerCase();
 
   return (
     <div className="flex flex-col gap-1.5 rounded-2xl bg-ink/70 p-3 text-cream shadow-[0_5px_0_#1f1a17] backdrop-blur">
@@ -89,10 +68,12 @@ export function LeaderboardPanel({
         {rows.slice(0, limit).map((r, i) => (
           <li
             key={`${r.name}-${i}`}
-            className={`flex items-center gap-2 rounded-lg px-2 py-0.5 text-sm ${r.name === highlight ? "bg-amber-300 font-extrabold text-ink" : ""}`}
+            className={`flex items-center gap-2 rounded-lg px-2 py-0.5 text-sm ${
+              hi && r.name.toLowerCase() === hi ? "bg-amber-300 font-extrabold text-ink" : ""
+            }`}
           >
             <span className="w-5 text-center text-xs font-extrabold">{["🥇", "🥈", "🥉"][i] ?? i + 1}</span>
-            <span className="min-w-0 flex-1 truncate font-bold">{r.name}</span>
+            <span className="min-w-0 flex-1 truncate font-bold">@{r.name}</span>
             <span className="font-extrabold tabular-nums">{rm(r.earned)}</span>
           </li>
         ))}

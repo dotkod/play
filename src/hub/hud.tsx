@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/core/auth-client";
 import { XP_PER_LEVEL, unreadInboxCount, useProfile } from "@/core/profile";
 import { activeTaskSummary } from "@/core/tasks/engine";
 import { gameClockLabel, presetForFrac, type LightPresetId } from "@/world/lighting";
@@ -27,6 +28,7 @@ export function WalletHud({ started }: { started: boolean }) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
   const p = useProfile();
+  const auth = useAuth();
   const [clock, setClock] = useState(() => gameClockLabel());
   const [period, setPeriod] = useState(() => presetForFrac().id);
   useEffect(() => {
@@ -49,6 +51,11 @@ export function WalletHud({ started }: { started: boolean }) {
           className={`-rotate-3 drop-shadow-[0_3px_0_rgba(31,26,23,0.35)] transition-opacity duration-500 ${started ? "" : "opacity-0"}`}
         >
           <Logo size="hud" />
+          {started && auth.username && (
+            <p className={`mt-0.5 max-w-[9rem] truncate text-center text-[11px] sm:max-w-[11rem] sm:text-xs ${statSub}`}>
+              @{auth.username}
+            </p>
+          )}
         </div>
 
         {started && (

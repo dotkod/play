@@ -4,8 +4,8 @@ export type Board = { today: Entry[]; week: Entry[]; all: Entry[] };
 import { getRedis } from "@/shared/server/redis";
 export { getRedis };
 
-// Payload checks: names stay short and printable, scores stay inside what one 90s shift can earn
-export const NAME_RE = /^[\p{L}\p{N} ._'-]{2,16}$/u;
+// Board names are signed-in @usernames (auth USER_RE), or legacy guest rows
+export const NAME_RE = /^(?:[a-z0-9_]{5,20}|[\p{L}\p{N} ._'-]{2,16})$/u;
 const MAX_SERVED = 60;
 const MAX_SEN_PER_DRINK = 650;
 

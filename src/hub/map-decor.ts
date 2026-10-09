@@ -1,8 +1,10 @@
 import { hashString } from "@/shared/rng";
 import { PLAYGROUND } from "@/world/districts/taman-ceria/layout";
-import { BUILDINGS, EXTENT, footprint, WALK_HALF } from "./world-data";
+import { ROAD_STRIPS, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
+import { BUILDINGS, footprint, WALK_HALF } from "./world-data";
 
 export type MapTree = { x: number; z: number; r: number };
+export type MapBlock = { x: number; z: number; w: number; d: number; color: string };
 
 /** Deterministic pseudo-random in [0,1) from world grid. */
 function cellRand(ix: number, iz: number) {
@@ -10,13 +12,22 @@ function cellRand(ix: number, iz: number) {
   return (h % 10000) / 10000;
 }
 
-function nearRoad(x: number, z: number) {
-  if (Math.abs(x) <= EXTENT + 2 && Math.abs(z) <= WALK_HALF + 1.2) return true;
-  if (Math.abs(z) <= EXTENT + 2 && Math.abs(x) <= WALK_HALF + 1.2) return true;
-  if (x >= 36 && x <= 145 && Math.abs(z) <= WALK_HALF + 1.2) return true;
-  if (x <= -40 && x >= -110 && Math.abs(z) <= WALK_HALF + 1.2) return true;
-  if (z <= -40 && z >= -125 && Math.abs(x) <= WALK_HALF + 1.2) return true;
+function nearStrip(x: number, z: number, pad: number) {
+  for (const s of ROAD_STRIPS) {
+    if (s.axis === "x") {
+      if (Math.abs(z - s.z) <= WALK_HALF + pad && x >= s.x0 - pad && x <= s.x1 + pad) return true;
+    } else if (Math.abs(x - s.x) <= WALK_HALF + pad && z >= s.z0 - pad && z <= s.z1 + pad) return true;
+  }
+  for (const s of WALK_PATHS) {
+    if (s.axis === "x") {
+      if (Math.abs(z - s.z) <= WALK_PATH_HALF + pad && x >= s.x0 - pad && x <= s.x1 + pad) return true;
+    } else if (Math.abs(x - s.x) <= WALK_PATH_HALF + pad && z >= s.z0 - pad && z <= s.z1 + pad) return true;
+  }
   return false;
+}
+
+function nearRoad(x: number, z: number) {
+  return nearStrip(x, z, 1.4);
 }
 
 function inBuilding(x: number, z: number) {
@@ -29,10 +40,40 @@ function inBuilding(x: number, z: number) {
   return false;
 }
 
-/** Shared tree positions for 2D map + optional 3D scatter. */
+/** Mid-rise / tower footprints along arterials — fill empty map green. */
+export const MAP_BLOCKS: MapBlock[] = [
+  // East toward Taman
+  { x: 58, z: -9, w: 10, d: 8, color: "#c5ced8" },
+  { x: 72, z: 9, w: 8, d: 12, color: "#b8c4d0" },
+  { x: 88, z: -8, w: 12, d: 7, color: "#d0d8e0" },
+  { x: 98, z: 10, w: 7, d: 9, color: "#aeb8c4" },
+  // West toward Menara
+  { x: -58, z: 9, w: 9, d: 8, color: "#c8d0da" },
+  { x: -72, z: -9, w: 11, d: 7, color: "#b4bec8" },
+  { x: -82, z: 8, w: 8, d: 11, color: "#d4dde6" },
+  // North toward KLCC
+  { x: -10, z: -58, w: 8, d: 10, color: "#c5ced8" },
+  { x: 11, z: -62, w: 7, d: 9, color: "#a8b4c0" },
+  { x: -9, z: -78, w: 9, d: 8, color: "#d0d8e0" },
+  { x: 12, z: -82, w: 8, d: 12, color: "#b8c4d0" },
+  // South toward Pasar / stadium
+  { x: -10, z: 50, w: 8, d: 7, color: "#c4b8a0" },
+  { x: 11, z: 52, w: 7, d: 8, color: "#d0c4a8" },
+  { x: 22, z: 68, w: 9, d: 8, color: "#b8b0a0" },
+  // Petaling / Sentral / Bintik / Kampung pockets
+  { x: 22, z: -36, w: 6, d: 8, color: "#e8a87c" },
+  { x: -28, z: -56, w: 10, d: 8, color: "#c5ced8" },
+  { x: 56, z: 14, w: 7, d: 6, color: "#3a3f46" },
+  { x: -52, z: 44, w: 8, d: 6, color: "#8fbc6e" },
+  // TLX corridor (north of the bus-stop arterial at z=-68)
+  { x: 28, z: -78, w: 8, d: 9, color: "#a8c4d8" },
+  { x: 48, z: -78, w: 10, d: 7, color: "#9eb4c8" },
+];
+
+/** Shared tree positions for 2D map + optional 3D scatter. Sparser near roads. */
 export const MAP_TREES: MapTree[] = (() => {
   const out: MapTree[] = [];
-  const step = 7;
+  const step = 9;
   for (let x = -108; x <= 142; x += step) {
     for (let z = -124; z <= 88; z += step) {
       const jx = (cellRand(x, z) - 0.5) * 3;
@@ -40,7 +81,9 @@ export const MAP_TREES: MapTree[] = (() => {
       const wx = x + jx;
       const wz = z + jz;
       if (nearRoad(wx, wz) || inBuilding(wx, wz)) continue;
-      if (cellRand(wx * 3, wz * 7) < 0.38) continue;
+      if (MAP_BLOCKS.some((bl) => Math.abs(wx - bl.x) < bl.w / 2 + 2 && Math.abs(wz - bl.z) < bl.d / 2 + 2)) continue;
+      // Keep more open space — only ~35% of far cells get a tree
+      if (cellRand(wx * 3, wz * 7) < 0.65) continue;
       out.push({ x: wx, z: wz, r: 0.35 + cellRand(wx, wz) * 0.45 });
     }
   }
@@ -119,6 +162,15 @@ export function paintMapLandmarks(
   b.font = `${Math.round(11 * dpr)}px system-ui, sans-serif`;
   b.textAlign = "center";
   b.fillText("🛝", X(pg.x), Z(pg.z));
+
+  // Mid-rise fill blocks (towers / offices along arterials)
+  for (const bl of MAP_BLOCKS) {
+    b.fillStyle = bl.color;
+    b.strokeStyle = "#1f1a17";
+    b.lineWidth = 1 * dpr;
+    b.fillRect(X(bl.x - bl.w / 2), Z(bl.z - bl.d / 2), bl.w * k, bl.d * k);
+    b.strokeRect(X(bl.x - bl.w / 2), Z(bl.z - bl.d / 2), bl.w * k, bl.d * k);
+  }
 }
 
 /** District labels — call last so markers don't cover the text. */
@@ -142,7 +194,7 @@ export function paintMapLabels(
   label("Taman Ceria", 110, 12);
   label("KLCC", 0, -100);
   label("Menara Lepak", -90, 12);
-  label("TLX", 70, -68);
+  label("TLX", 70, -74);
   label("Bukit Bintik", 50, 26);
   label("Bukit Jalan", 12, 82);
   label("Kampung", -65, 54);

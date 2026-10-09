@@ -5,6 +5,18 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.19
+- Login required on boot — one gamey username + PIN-pad screen (auto signup / login); Anne Maju highscores save under your account
+- Portrait phones get a shared “turn to landscape” gate (city, login, Anne Maju)
+- City HUD shows your @username under the logo
+
+### 0.10.18
+- TLX road no longer buried under the park (cars stay on asphalt); map roads use round corners; Kampung spur reaches the village
+- Map / minimap no longer show moving traffic (only you, cats, pins)
+
+### 0.10.17
+- Roads connect every district (spine → continuous asphalt); map towers + pedestrian alleys; less empty green forest
+
 ### 0.10.16
 - Full map pan stays inside the city bounds (no dragging into empty grass)
 

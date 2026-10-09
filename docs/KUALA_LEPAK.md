@@ -622,7 +622,7 @@ portrait viewport, OG art regenerated if visuals changed, CHANGELOG updated, dep
 - [x] Spawn named NPCs in Pusat Lepak: Uncle Raju, Makcik Kiah, Pakcik Osman, Uncle Ah Seng.
 - [x] Storyline "Hari Pertama" steps 1–5 (step 6 needs Taman Ceria: stub with a "coming soon" bus).
 - [x] Daily tasks (3 rotating).
-- [x] Optional cloud account (`@username` + 8-digit PIN) with guest local save + merge on register.
+- [x] Required cloud account on boot (`@username` + 8-digit PIN); no guest mode; Anne Maju highscores use the account name.
 - **Done when:** a new player can complete Hari Pertama in ~10 minutes, entirely guided by the phone.
 
 ### Phase 2: World architecture for a big city

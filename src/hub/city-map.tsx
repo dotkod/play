@@ -5,7 +5,6 @@ import { getWalkRoute, setWalkRoute } from "@/core/walk-path";
 import { getUserWaypoint, getWaypoint, onWaypoint, setUserWaypoint } from "@/core/waypoint";
 import { pathAlongRoads } from "@/world/walk-spine";
 import { catStates } from "./cats";
-import { dynamicColliders } from "./colliders";
 import { input } from "./controls";
 import {
   MAP_ORIGIN_X,
@@ -97,10 +96,6 @@ export function CityMap({ open, onClose }: { open: boolean; onClose: () => void 
       g.fillRect(0, 0, c.width, c.height);
       g.drawImage(base, -ox, -oz);
 
-      g.fillStyle = "#ffffff";
-      for (const v of dynamicColliders.vehicles) {
-        g.fillRect(X(v.x) - ox - 2 * dpr, Z(v.z) - oz - 2 * dpr, 4 * dpr, 4 * dpr);
-      }
       g.fillStyle = "#f28c28";
       for (const cat of catStates()) {
         g.beginPath();

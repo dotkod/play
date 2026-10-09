@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { type Board, dayKey, type Entry, getRedis, isPlausible, KEYS, NAME_RE, weekKey } from "@/games/anne-maju/leaderboard";
+import { getSessionUsername } from "@/shared/server/auth";
 
 const TOP = 10;
 
@@ -31,22 +32,23 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const username = await getSessionUsername();
+  if (!username) return NextResponse.json({ error: "Belum log masuk" }, { status: 401 });
+
   const redis = getRedis();
   if (!redis) return NextResponse.json({ error: "Leaderboard belum dibuka" }, { status: 503 });
 
   const body = (await req.json().catch(() => null)) as {
-    playerId?: unknown;
-    name?: unknown;
     earned?: unknown;
     served?: unknown;
     mode?: unknown;
     day?: unknown;
   } | null;
-  const playerId = typeof body?.playerId === "string" && /^[a-f0-9-]{36}$/.test(body.playerId) ? body.playerId : null;
-  const name = typeof body?.name === "string" ? body.name.trim().replace(/\s+/g, " ") : "";
+  const name = username;
+  const playerId = username;
   const earned = Number(body?.earned);
   const served = Number(body?.served);
-  if (!playerId || !NAME_RE.test(name) || !isPlausible(earned, served)) {
+  if (!NAME_RE.test(name) || !isPlausible(earned, served)) {
     return NextResponse.json({ error: "Skor tak sah" }, { status: 400 });
   }
   // Daily scores only count for today's board (allow a few minutes either side of midnight)
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
   const wk = KEYS.week(weekKey());
   const [previous, existing] = await Promise.all([redis.zscore(KEYS.all, playerId), redis.hget<Player>(KEYS.players, playerId)]);
   const isBest = previous === null || earned > Number(previous);
-  // GT keeps each player's best score; the name always updates to the latest one typed
+  // GT keeps each player's best score; name is the signed-in @username
   const writes: Promise<unknown>[] = [
     redis.zadd(KEYS.all, { gt: true }, { score: earned, member: playerId }),
     redis.zadd(wk, { gt: true }, { score: earned, member: playerId }),

@@ -45,7 +45,11 @@ export async function registerAccount(username: string, pin: string) {
     body: JSON.stringify({ username, pin, profile: getProfile() }),
   });
   const data = (await res.json().catch(() => ({}))) as { error?: string; username?: string };
-  if (!res.ok) throw new Error(data.error || "Daftar gagal");
+  if (!res.ok) {
+    const err = new Error(data.error || "Daftar gagal") as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
   state = { username: data.username ?? username, ready: true };
   setSignedIn(true);
   notify();
@@ -71,6 +75,17 @@ export async function loginAccount(username: string, pin: string) {
     }
   }
   return data.username;
+}
+
+/** New @username → register; taken → login with same PIN. */
+export async function enterAccount(username: string, pin: string) {
+  try {
+    return await registerAccount(username, pin);
+  } catch (e) {
+    const status = (e as Error & { status?: number }).status;
+    if (status === 409) return loginAccount(username, pin);
+    throw e;
+  }
 }
 
 export async function logoutAccount() {

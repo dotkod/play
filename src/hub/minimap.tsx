@@ -5,7 +5,6 @@ import { getWalkRoute } from "@/core/walk-path";
 import { getWaypoint } from "@/core/waypoint";
 import { pathAlongRoads } from "@/world/walk-spine";
 import { catStates } from "./cats";
-import { dynamicColliders } from "./colliders";
 import {
   MAP_ORIGIN_X,
   MAP_ORIGIN_Z,
@@ -49,8 +48,6 @@ export function Minimap({ size, onOpen }: { size: number; onOpen: () => void }) 
       g.fillStyle = "#86c27a";
       g.fillRect(0, 0, c.width, c.height);
       g.drawImage(base, -ox, -oz);
-      g.fillStyle = "#ffffff";
-      for (const v of dynamicColliders.vehicles) g.fillRect(X(v.x) - ox - 1.5 * dpr, Z(v.z) - oz - 1.5 * dpr, 3 * dpr, 3 * dpr);
       g.fillStyle = "#f28c28";
       for (const cat of catStates()) {
         g.beginPath();

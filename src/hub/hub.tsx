@@ -2,7 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { refreshAuth } from "@/core/auth-client";
+import { refreshAuth, useAuth } from "@/core/auth-client";
+import { LandscapeGate } from "@/shared/landscape-gate";
+import { AuthGate, AuthSplash } from "./auth-gate";
 import { emit } from "@/core/events";
 import { type JobResult, JOB_RESULT_KEY, settleJobResults } from "@/core/job-handoff";
 import { addItem, getProfile, removeItem, savePosition, spendMoney } from "@/core/profile";
@@ -138,6 +140,7 @@ function bootKerja(initialJob?: string): string | null {
 export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
+  const auth = useAuth();
   const [{ spawn, returning, payout }] = useState(bootCity);
   const [jobOpen, setJobOpen] = useState(() => bootKerja(initialJob));
   const [started, setStarted] = useState(() => returning || !!bootKerja(initialJob));
@@ -192,9 +195,6 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     const stop = startTaskEngine();
     if (payout) {
       emit({ type: "jobFinished", job: payout.job, earned: payout.earned, served: payout.served, mode: payout.mode });
-      if (payout.earned > 0 && !getProfile().flags.authPromptDismissed && !getProfile().username) {
-        setTimeout(() => flash(HUB_STRINGS[getLang()].authPrompt), 3500);
-      }
     }
     return stop;
   }, [payout]);
@@ -551,8 +551,12 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const showHint =
     started && !zone && !nearNpc && nearCat === null && !dialogue && !phoneOpen && !phoneBusy && !blocked;
 
+  if (!auth.ready) return <AuthSplash />;
+  if (!auth.username) return <AuthGate />;
+
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
+      <LandscapeGate />
       <World spawn={spawn} onZone={setZone} onNearCat={setNearCat} active={started && !blocked} />
 
       <WalletHud started={started} />

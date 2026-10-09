@@ -3,15 +3,17 @@
 import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useAuth } from "@/core/auth-client";
 import { queueJobResult } from "@/core/job-handoff";
 import { music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
+import { LandscapeGate, requestLandscape } from "@/shared/landscape-gate";
 import { hashString, rand, seedRandom, unseedRandom } from "@/shared/rng";
 import { shareResult, type ShareOutcome } from "@/shared/share";
 import { ANNE_LOOK, type Look, randomParty } from "@/shared/three/look";
 import { useBestScore } from "@/shared/use-best-score";
 import { type Cup, type Drink, drinkName, FULL_MENU, isCupComplete, type Menu, randomDrink, randomLine, sameDrink } from "./drinks";
 import { getLang, type Lang, setLang, t, useLang, useT } from "./i18n";
-import { LeaderboardPanel, playerId, savedName, useBoard } from "./leaderboard-panel";
+import { LeaderboardPanel, useBoard } from "./leaderboard-panel";
 import { GAME } from "./meta";
 import { addCareer, career, currentOutfit, dailyKey, markTutorialDone, menuFor, newUnlocks, nextUnlock, OUTFITS, setOutfit, tutorialDone, type Unlock } from "./progress";
 import { encodeResult, nextRank, rankFor, rm } from "./result";
@@ -169,7 +171,7 @@ export function AnneMajuGame({
   }, []);
 
   const startShift = (mode: Mode) => {
-    goLandscape();
+    requestLandscape();
     unlockAudio();
     // Daily shifts replay the same customers for everyone today
     if (mode === "daily") seedRandom(hashString(`anne-maju:${dailyKey()}`));
@@ -182,7 +184,7 @@ export function AnneMajuGame({
   };
 
   const startTutorial = () => {
-    goLandscape();
+    requestLandscape();
     unlockAudio();
     unseedRandom();
     sfx.start();
@@ -231,7 +233,7 @@ export function AnneMajuGame({
           <LangToggle />
           <MuteButton />
         </div>
-        <RotateHint />
+        <LandscapeGate />
       </div>
     );
   }
@@ -368,7 +370,7 @@ export function AnneMajuGame({
           </button>
         </Modal>
       )}
-      <RotateHint />
+      <LandscapeGate />
     </div>
   );
 }
@@ -642,26 +644,6 @@ function Version({ className = "" }: { className?: string }) {
   );
 }
 
-function RotateHint() {
-  const tr = useT();
-  return (
-    <div className="fixed inset-0 z-50 hidden flex-col items-center justify-center gap-3 bg-ink text-center text-cream portrait:flex">
-      <span className="animate-bounce text-6xl">📱↻</span>
-      <p className="text-xl font-extrabold">{tr.rotate}</p>
-      <p className="text-sm opacity-70">{tr.rotateSub}</p>
-    </div>
-  );
-}
-
-// Best effort: Android Chrome can lock orientation once fullscreen; iOS ignores this and shows RotateHint
-function goLandscape() {
-  const el = document.documentElement;
-  if (!el.requestFullscreen || !matchMedia("(pointer: coarse)").matches) return;
-  el.requestFullscreen()
-    .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape"))
-    .catch(() => {});
-}
-
 const titleStroke = "[-webkit-text-stroke:7px_#1f1a17] [paint-order:stroke_fill]";
 
 function Intro({
@@ -681,6 +663,7 @@ function Intro({
 }) {
   const tr = useT();
   const lang = useLang();
+  const auth = useAuth();
   const { best } = useBestScore(GAME.storageKey);
   const { board } = useBoard();
   const upcoming = nextUnlock(careerSen);
@@ -732,7 +715,7 @@ function Intro({
         <Version className="text-cream/50" />
       </div>
       <div className="mt-auto hidden w-64 shrink-0 sm:block lg:w-72">
-        <LeaderboardPanel board={board} highlight={savedName()} compact />
+        <LeaderboardPanel board={board} highlight={auth.username ?? undefined} compact />
       </div>
     </div>
   );
@@ -778,14 +761,15 @@ function GameOver({
 }) {
   const tr = useT();
   const lang = useLang();
+  const auth = useAuth();
   const { best, submit } = useBestScore(GAME.storageKey);
   const [prevBest] = useState(best);
   const [shareState, setShareState] = useState<ShareOutcome | null>(null);
   const { board, refresh } = useBoard();
-  const [name, setName] = useState(savedName);
   const [saved, setSaved] = useState<{ rank: number | null; daily: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const posted = useRef(false);
   const rank = rankFor(s.earned, lang);
   const next = nextRank(s.earned, lang);
   const isRecord = s.earned > prevBest;
@@ -795,6 +779,36 @@ function GameOver({
     submit(s.earned);
     if (s.earned > prevBest && prevBest > 0) sfx.record();
   }, [s.earned, submit, prevBest]);
+
+  useEffect(() => {
+    if (posted.current || s.earned === 0 || !auth.username) return;
+    let cancelled = false;
+    setSaving(true);
+    setError(null);
+    void (async () => {
+      try {
+        const res = await fetch("/api/scores", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ earned: s.earned, served: s.served, mode: s.mode, day: dailyKey() }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? tr.saveFailed);
+        if (cancelled) return;
+        posted.current = true;
+        setSaved({ rank: data.rank, daily: !!data.daily });
+        sfx.correct();
+        await refresh();
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      } finally {
+        if (!cancelled) setSaving(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [s.earned, s.served, s.mode, auth.username, refresh, tr.saveFailed]);
 
   const onShare = async () => {
     sfx.tap();
@@ -807,33 +821,6 @@ function GameOver({
         image: `${path}/opengraph-image`,
       }),
     );
-  };
-
-  const onSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = name.trim();
-    if (clean.length < 2) return setError(tr.nameTooShort);
-    setSaving(true);
-    setError(null);
-    try {
-      localStorage.setItem("anne-maju:player-name", clean);
-    } catch {}
-    try {
-      const res = await fetch("/api/scores", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ playerId: playerId(), name: clean, earned: s.earned, served: s.served, mode: s.mode, day: dailyKey() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? tr.saveFailed);
-      setSaved({ rank: data.rank, daily: !!data.daily });
-      sfx.correct();
-      await refresh();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (
@@ -896,27 +883,18 @@ function GameOver({
           ) : saved ? (
             <p className="rounded-2xl bg-leaf px-3 py-2 text-center text-sm font-extrabold text-white shadow-[0_4px_0_#1f1a17]">
               {saved.rank ? (saved.daily ? tr.savedRankToday(saved.rank) : tr.savedRank(saved.rank)) : tr.saved}
+              {auth.username ? ` · @${auth.username}` : ""}
             </p>
-          ) : (
-            <form onSubmit={onSave} className="flex gap-1.5">
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 16))}
-                placeholder={tr.namePlaceholder}
-                maxLength={16}
-                className="min-w-0 flex-1 rounded-xl border-2 border-ink bg-cream px-3 py-2 font-bold text-ink outline-none focus:border-amber-400"
-              />
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-amber-300 px-3 font-extrabold text-ink shadow-[0_4px_0_#1f1a17] active:translate-y-0.5 disabled:opacity-60"
-              >
-                {saving ? "..." : tr.save}
-              </button>
-            </form>
-          )}
+          ) : saving ? (
+            <p className="rounded-2xl bg-cream/15 px-3 py-2 text-center text-sm font-bold text-cream">…</p>
+          ) : null}
           {error && <p className="text-center text-xs font-bold text-amber-300">{error}</p>}
-          <LeaderboardPanel board={board} highlight={saved ? name.trim() : undefined} compact initialTab={s.mode === "daily" ? "today" : "week"} />
+          <LeaderboardPanel
+            board={board}
+            highlight={auth.username ?? undefined}
+            compact
+            initialTab={s.mode === "daily" ? "today" : "week"}
+          />
           <div className="flex gap-2">
             <button
               type="button"

@@ -7,5 +7,7 @@ export const TLX = {
 };
 
 export const MENARA_106 = { x: 72, z: -82 };
+/** On the east arterial — cars stay on asphalt, not in the park. */
 export const TLX_BUS_STOP = { x: 62, z: -68 };
-export const TLX_PARK = { x: 70, z: -72, w: 20, d: 14 };
+/** North of the road so map/3D asphalt stays visible through TLX. */
+export const TLX_PARK = { x: 70, z: -80, w: 18, d: 12 };
