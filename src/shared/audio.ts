@@ -199,18 +199,47 @@ export const sfx = {
     src.stop(t + seconds + 0.05);
     lfo.stop(t + seconds + 0.05);
   },
+  // Malaysian-ish car horn: dual-tone beep-beep (not a square buzz)
   horn: () => {
-    tone(420, 0.22, { type: "square", vol: 0.07 });
-    tone(525, 0.22, { type: "square", vol: 0.06 });
-    tone(420, 0.3, { type: "square", vol: 0.07, at: 0.28 });
-    tone(525, 0.3, { type: "square", vol: 0.06, at: 0.28 });
+    if (!ctx || !sfxBus) return;
+    const blast = (at: number, dur: number) => {
+      const t = ctx!.currentTime + at;
+      for (const [freq, vol] of [
+        [380, 0.2],
+        [460, 0.16],
+        [760, 0.05],
+      ] as const) {
+        const osc = ctx!.createOscillator();
+        const g = ctx!.createGain();
+        const f = ctx!.createBiquadFilter();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq, t);
+        f.type = "bandpass";
+        f.frequency.setValueAtTime(freq * 1.1, t);
+        f.Q.value = 1.2;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+        g.gain.setValueAtTime(vol * 0.85, t + dur * 0.55);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(f).connect(g).connect(sfxBus!);
+        osc.start(t);
+        osc.stop(t + dur + 0.02);
+      }
+    };
+    blast(0, 0.18);
+    blast(0.22, 0.28);
   },
 };
 
 // ---------- Background music ----------
-// Two loops: the mamak shop (tabla-ish drums, Phrygian-dominant pluck) and the city (laid-back pentatonic keys).
+// Mamak shop = one loop. City = playlist of synth tunes that rotate; login avoids the last song.
 
 type Track = "mamak" | "city";
+type CityTuneId = "lepak" | "highway" | "pasar" | "senja";
+
+const LAST_CITY_KEY = "kuala-lepak:last-city-bgm";
+/** ~40–55s per song depending on bpm, then rotate. */
+const STEPS_PER_SONG = 256;
 
 const note = (root: number, scale: number[], deg: number, oct = 0) =>
   root * Math.pow(2, (scale[((deg % scale.length) + scale.length) % scale.length] + 12 * oct) / 12);
@@ -226,21 +255,111 @@ const MAMAK = {
 const DHA = [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0];
 const TIN = [0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1];
 
-const CITY = {
-  root: 220, // A3
-  scale: [0, 2, 4, 7, 9, 12, 14, 16],
-  bpm: 92,
-  melody: [4, -1, -1, 3, 2, -1, 3, -1, 4, -1, 5, -1, 4, -1, -1, -1, 2, -1, -1, 1, 0, -1, 1, -1, 2, -1, 3, 2, 1, -1, -1, -1],
-  bass: [0, -1, -1, -1, 0, -1, 3, -1, 4, -1, -1, -1, 3, -1, 1, -1],
-  chords: [
-    [0, 2, 4],
-    [3, 5, 7],
-    [4, 6, 1],
-    [3, 5, 0],
-  ],
+type CityTune = {
+  id: CityTuneId;
+  root: number;
+  scale: number[];
+  bpm: number;
+  melody: number[];
+  bass: number[];
+  chords: number[][];
+  /** lepak = soft EP; highway = brighter; pasar = perkussif; senja = mellow dusk */
+  vibe: "lepak" | "highway" | "pasar" | "senja";
 };
 
+const CITY_TUNES: CityTune[] = [
+  {
+    id: "lepak",
+    root: 220,
+    scale: [0, 2, 4, 7, 9, 12, 14, 16],
+    bpm: 92,
+    melody: [4, -1, -1, 3, 2, -1, 3, -1, 4, -1, 5, -1, 4, -1, -1, -1, 2, -1, -1, 1, 0, -1, 1, -1, 2, -1, 3, 2, 1, -1, -1, -1],
+    bass: [0, -1, -1, -1, 0, -1, 3, -1, 4, -1, -1, -1, 3, -1, 1, -1],
+    chords: [
+      [0, 2, 4],
+      [3, 5, 7],
+      [4, 6, 1],
+      [3, 5, 0],
+    ],
+    vibe: "lepak",
+  },
+  {
+    id: "highway",
+    root: 196,
+    scale: [0, 2, 3, 5, 7, 9, 10, 12],
+    bpm: 108,
+    melody: [5, -1, 4, -1, 2, 4, -1, 5, 7, -1, 5, -1, 4, 2, -1, -1, 5, 4, 2, -1, 0, -1, 2, -1, 4, -1, 5, 7, 5, 4, -1, -1],
+    bass: [0, -1, -1, 0, 3, -1, -1, 3, 5, -1, -1, 5, 3, -1, 0, -1],
+    chords: [
+      [0, 2, 4],
+      [3, 5, 0],
+      [5, 0, 2],
+      [3, 5, 7],
+    ],
+    vibe: "highway",
+  },
+  {
+    id: "pasar",
+    root: 233,
+    scale: [0, 1, 4, 5, 7, 8, 11, 12],
+    bpm: 100,
+    melody: [4, 5, -1, 4, -1, 2, 1, -1, 4, -1, -1, 6, 5, -1, 4, -1, 7, -1, 5, 4, 2, -1, 1, 2, 4, -1, 2, 0, -1, -1, -1, -1],
+    bass: [0, -1, 0, -1, 4, -1, -1, 4, 0, -1, 5, -1, 4, -1, 0, -1],
+    chords: [
+      [0, 2, 4],
+      [4, 6, 1],
+      [1, 3, 5],
+      [0, 4, 6],
+    ],
+    vibe: "pasar",
+  },
+  {
+    id: "senja",
+    root: 185,
+    scale: [0, 2, 4, 5, 7, 9, 11, 12],
+    bpm: 78,
+    melody: [2, -1, -1, -1, 4, -1, -1, 3, 2, -1, -1, 0, -1, -1, -1, -1, 4, -1, -1, 5, 4, -1, 2, -1, 0, -1, -1, 2, -1, -1, -1, -1],
+    bass: [0, -1, -1, -1, -1, -1, 4, -1, 5, -1, -1, -1, -1, -1, 3, -1],
+    chords: [
+      [0, 2, 4],
+      [5, 0, 2],
+      [3, 5, 0],
+      [4, 6, 1],
+    ],
+    vibe: "senja",
+  },
+];
+
+const CITY_IDS = CITY_TUNES.map((t) => t.id);
+
+function readLastCity(): CityTuneId | null {
+  try {
+    const v = localStorage.getItem(LAST_CITY_KEY);
+    return CITY_IDS.includes(v as CityTuneId) ? (v as CityTuneId) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastCity(id: CityTuneId) {
+  try {
+    localStorage.setItem(LAST_CITY_KEY, id);
+  } catch {
+    /* */
+  }
+}
+
+function pickCityTune(avoid: CityTuneId | null): CityTuneId {
+  const opts = CITY_IDS.filter((id) => id !== avoid);
+  return opts[Math.floor(Math.random() * opts.length)] ?? CITY_IDS[0];
+}
+
+function tuneById(id: CityTuneId) {
+  return CITY_TUNES.find((t) => t.id === id) ?? CITY_TUNES[0];
+}
+
 let track: Track = "mamak";
+let cityTune: CityTuneId = "lepak";
 let timer: ReturnType<typeof setInterval> | null = null;
 let step = 0;
 let nextTime = 0;
@@ -261,41 +380,91 @@ function scheduleMamak(i: number, at: number) {
 }
 
 function scheduleCity(i: number, at: number) {
+  const tune = tuneById(cityTune);
   const s16 = i % 16;
-  // Soft shaker on the off-beats and a gentle kick on 1 and 3
-  if (s16 % 2 === 1) hiss(0.04, { freq: 7000, type: "highpass", vol: 0.05, at, bus: musicBus });
-  if (s16 === 0 || s16 === 8) tone(90, 0.25, { type: "sine", vol: 0.35, slideTo: 50, at, bus: musicBus });
-  if (CITY.bass[s16] >= 0) tone(note(CITY.root, CITY.scale, CITY.bass[s16], -1), 0.4, { type: "triangle", vol: 0.28, at, bus: musicBus });
-  // Electric-piano style chord stabs each bar
-  if (s16 === 0 || s16 === 10) {
-    const chord = CITY.chords[Math.floor(i / 16) % CITY.chords.length];
-    chord.forEach((d) => tone(note(CITY.root, CITY.scale, d), 0.9, { type: "sine", vol: 0.06, at, bus: musicBus }));
+  const vibe = tune.vibe;
+
+  if (vibe === "pasar") {
+    if (s16 % 4 === 0) tone(100, 0.12, { type: "sine", vol: 0.28, slideTo: 55, at, bus: musicBus });
+    if (s16 % 4 === 2) hiss(0.05, { freq: 4500, q: 3, vol: 0.12, at, bus: musicBus });
+    if (s16 % 2 === 1) hiss(0.03, { freq: 9000, type: "highpass", vol: 0.06, at, bus: musicBus });
+  } else if (vibe === "highway") {
+    if (s16 === 0 || s16 === 8) tone(85, 0.2, { type: "sine", vol: 0.4, slideTo: 48, at, bus: musicBus });
+    if (s16 === 4 || s16 === 12) hiss(0.06, { freq: 2000, q: 1.5, vol: 0.1, at, bus: musicBus });
+    if (s16 % 2 === 1) hiss(0.03, { freq: 8000, type: "highpass", vol: 0.04, at, bus: musicBus });
+  } else if (vibe === "senja") {
+    if (s16 === 0) tone(70, 0.45, { type: "sine", vol: 0.28, slideTo: 45, at, bus: musicBus });
+    if (s16 === 8) hiss(0.08, { freq: 4000, type: "highpass", vol: 0.04, at, bus: musicBus });
+  } else {
+    if (s16 % 2 === 1) hiss(0.04, { freq: 7000, type: "highpass", vol: 0.05, at, bus: musicBus });
+    if (s16 === 0 || s16 === 8) tone(90, 0.25, { type: "sine", vol: 0.35, slideTo: 50, at, bus: musicBus });
   }
-  const m = CITY.melody[i % 32];
+
+  const bassDeg = tune.bass[s16 % tune.bass.length];
+  if (bassDeg >= 0) {
+    tone(note(tune.root, tune.scale, bassDeg, -1), vibe === "senja" ? 0.55 : 0.4, {
+      type: "triangle",
+      vol: vibe === "highway" ? 0.32 : 0.26,
+      at,
+      bus: musicBus,
+    });
+  }
+
+  if (s16 === 0 || (vibe !== "senja" && s16 === 10) || (vibe === "senja" && s16 === 8)) {
+    const chord = tune.chords[Math.floor(i / 16) % tune.chords.length];
+    const dur = vibe === "senja" ? 1.2 : vibe === "highway" ? 0.7 : 0.9;
+    const vol = vibe === "senja" ? 0.075 : 0.055;
+    chord.forEach((d) => tone(note(tune.root, tune.scale, d), dur, { type: "sine", vol, at, bus: musicBus }));
+  }
+
+  const m = tune.melody[i % tune.melody.length];
   if (m >= 0) {
-    const f = note(CITY.root, CITY.scale, m, 1);
-    tone(f, 0.35, { type: "triangle", vol: 0.08, at, bus: musicBus });
-    tone(f * 3, 0.12, { type: "sine", vol: 0.015, at, bus: musicBus });
+    const f = note(tune.root, tune.scale, m, 1);
+    if (vibe === "highway") {
+      tone(f, 0.22, { type: "sawtooth", vol: 0.055, at, bus: musicBus });
+      tone(f * 2, 0.1, { type: "sine", vol: 0.02, at, bus: musicBus });
+    } else if (vibe === "pasar") {
+      tone(f, 0.18, { type: "square", vol: 0.045, at, bus: musicBus });
+    } else if (vibe === "senja") {
+      tone(f, 0.5, { type: "sine", vol: 0.09, at, bus: musicBus });
+      tone(f * 1.5, 0.35, { type: "triangle", vol: 0.02, at, bus: musicBus });
+    } else {
+      tone(f, 0.35, { type: "triangle", vol: 0.08, at, bus: musicBus });
+      tone(f * 3, 0.12, { type: "sine", vol: 0.015, at, bus: musicBus });
+    }
   }
 }
 
+function applyCityTune(id: CityTuneId) {
+  cityTune = id;
+  bpm = tuneById(id).bpm;
+  writeLastCity(id);
+}
+
 export const music = {
-  // Switching tracks restarts the loop; starting the same track again is a no-op
+  // Switching mamak↔city restarts; city playlist rotates in-session and avoids last song on login.
   start(next: Track = "mamak") {
+    unlockAudio();
     if (!ctx) return;
     if (timer && track === next) return;
     music.stop();
     track = next;
-    bpm = next === "city" ? CITY.bpm : MAMAK.bpm;
     step = 0;
+    if (next === "city") {
+      applyCityTune(pickCityTune(readLastCity()));
+    } else {
+      bpm = MAMAK.bpm;
+    }
     nextTime = ctx.currentTime + 0.05;
-    // Lookahead scheduler keeps timing tight even when the main thread is busy rendering 3D
     timer = setInterval(() => {
       if (!ctx || !musicBus) return;
+      if (nextTime < ctx.currentTime - 0.5) nextTime = ctx.currentTime;
       while (nextTime < ctx.currentTime + 0.12) {
-        const at = nextTime - ctx.currentTime;
-        if (track === "city") scheduleCity(step, at);
-        else scheduleMamak(step, at);
+        const at = Math.max(0, nextTime - ctx.currentTime);
+        if (track === "city") {
+          if (step > 0 && step % STEPS_PER_SONG === 0) applyCityTune(pickCityTune(cityTune));
+          scheduleCity(step, at);
+        } else scheduleMamak(step, at);
         nextTime += 60 / bpm / 4;
         step++;
       }

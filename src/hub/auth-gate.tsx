@@ -7,7 +7,7 @@ import { Logo } from "@/shared/logo";
 import { setLang, useLang } from "@/shared/lang";
 import { HUB_STRINGS } from "./strings";
 
-const PIN_LEN = 8;
+const PIN_LEN = 6;
 
 /** Full-screen enter — landscape layout: name left, PIN pad right. */
 export function AuthGate() {

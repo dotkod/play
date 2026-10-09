@@ -1,6 +1,6 @@
 /**
- * City-wide vehicle lanes built from ROAD_STRIPS (same corridors as the map / 3D asphalt).
- * Each strip yields two directed left-hand lanes; cars ping-pong or continue at ends.
+ * City-wide vehicle lanes from ROAD_STRIPS.
+ * Strip ends link to other strips at junctions so traffic can turn — not only U-turn.
  */
 
 import { ROAD_STRIPS, type RoadStrip } from "./walk-spine";
@@ -21,6 +21,8 @@ export type VehicleLane = {
 };
 
 const LANE = 1.5;
+/** How close two lane endpoints must be to count as a junction hop. */
+const JOIN_R = 5.5;
 
 function stripSpan(s: RoadStrip) {
   if (s.axis === "x") return Math.abs(s.x1 - s.x0);
@@ -49,8 +51,8 @@ function buildLanes(): VehicleLane[] {
   const out: VehicleLane[] = [];
   ROAD_STRIPS.forEach((s, i) => {
     const span = stripSpan(s);
-    // More cars on long arterials, fewer on short branches
-    const perDir = span > 80 ? 5 : span > 40 ? 3 : span > 20 ? 2 : 1;
+    // Keep arterials busy but not packed — overcrowding causes stacking at ends
+    const perDir = span > 100 ? 3 : span > 50 ? 2 : span > 25 ? 1 : 1;
     for (const dir of [1, -1] as const) {
       const { a, b } = laneEnds(s, dir);
       const length = Math.hypot(b.x - a.x, b.z - a.z);
@@ -71,6 +73,31 @@ function buildLanes(): VehicleLane[] {
 
 export const VEHICLE_LANES = buildLanes();
 
+/** Outbound hops from the end of a lane (other lanes whose start is near this end). */
+export type LaneHop = { laneId: string; entryS: number };
+
+function buildHops(): Record<string, LaneHop[]> {
+  const hops: Record<string, LaneHop[]> = {};
+  for (const from of VEHICLE_LANES) {
+    const list: LaneHop[] = [];
+    for (const to of VEHICLE_LANES) {
+      if (to.id === from.id) continue;
+      // Same strip reverse is always available (U-turn)
+      if (to.strip === from.strip && to.dir === -from.dir) {
+        list.push({ laneId: to.id, entryS: 3 });
+        continue;
+      }
+      // Junction: end of `from` near start of `to`
+      const d = Math.hypot(from.b.x - to.a.x, from.b.z - to.a.z);
+      if (d < JOIN_R) list.push({ laneId: to.id, entryS: 2 + d * 0.15 });
+    }
+    hops[from.id] = list;
+  }
+  return hops;
+}
+
+const LANE_HOPS = buildHops();
+
 /** Point + heading at distance `s` along a lane (0 .. length). */
 export function pointOnLane(lane: VehicleLane, s: number) {
   const t = lane.length < 1e-6 ? 0 : Math.max(0, Math.min(1, s / lane.length));
@@ -80,8 +107,31 @@ export function pointOnLane(lane: VehicleLane, s: number) {
   return { x, z, rotY };
 }
 
-/** Opposite direction on the same strip (for ping-pong at ends). */
+/** Opposite direction on the same strip (fallback). */
 export function reverseLane(lane: VehicleLane): VehicleLane {
   const twin = VEHICLE_LANES.find((l) => l.strip === lane.strip && l.dir === -lane.dir);
   return twin ?? lane;
+}
+
+/**
+ * Pick next lane at strip end: prefer turns onto other strips (70%), else U-turn.
+ * Keeps traffic circulating through the city instead of bouncing forever on one road.
+ */
+export function pickNextLane(lane: VehicleLane): LaneHop {
+  const hops = LANE_HOPS[lane.id] ?? [];
+  const turns = hops.filter((h) => {
+    const t = VEHICLE_LANES.find((l) => l.id === h.laneId);
+    return t && t.strip !== lane.strip;
+  });
+  const uturn = hops.find((h) => {
+    const t = VEHICLE_LANES.find((l) => l.id === h.laneId);
+    return t && t.strip === lane.strip;
+  });
+  if (turns.length && Math.random() < 0.72) {
+    return turns[Math.floor(Math.random() * turns.length)];
+  }
+  if (uturn) return uturn;
+  if (turns.length) return turns[Math.floor(Math.random() * turns.length)];
+  const back = reverseLane(lane);
+  return { laneId: back.id, entryS: 3 };
 }

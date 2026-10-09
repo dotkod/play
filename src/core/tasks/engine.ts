@@ -35,7 +35,7 @@ function meetsRequires(task: Task) {
 function applyRewards(task: Task) {
   const r = task.rewards;
   if (!r) return;
-  if (r.money) addMoney(r.money, `Tugasan: ${task.title.ms}`, `Task: ${task.title.en}`);
+  if (r.money) addMoney(r.money, `GIG: ${task.title.ms}`, `GIG: ${task.title.en}`);
   if (r.xp) addXp(r.xp);
   if (r.outfit) unlockOutfit(r.outfit);
   if (r.reputation) {

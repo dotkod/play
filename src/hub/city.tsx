@@ -157,27 +157,17 @@ function CityRoadStrips() {
       <CityWalkPaths />
       {walks}
       {pads.map((p, i) => (
-        <Cyl
-          key={`jw${i}`}
-          top={WALK_HALF}
-          bottom={WALK_HALF}
-          height={0.01}
-          position={[p.x, 0.006, p.z]}
-          color={WALK}
-          outline={false}
-        />
+        <mesh key={`jw${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.006, p.z]} receiveShadow>
+          <circleGeometry args={[WALK_HALF, 28]} />
+          <meshToonMaterial color={WALK} gradientMap={toonGradient()} />
+        </mesh>
       ))}
       {roads}
       {pads.map((p, i) => (
-        <Cyl
-          key={`jr${i}`}
-          top={ROAD_HALF}
-          bottom={ROAD_HALF}
-          height={0.01}
-          position={[p.x, 0.032, p.z]}
-          color={ROAD}
-          outline={false}
-        />
+        <mesh key={`jr${i}`} rotation={[-Math.PI / 2, 0, 0]} position={[p.x, 0.032, p.z]} receiveShadow>
+          <circleGeometry args={[ROAD_HALF, 28]} />
+          <meshToonMaterial color={ROAD} gradientMap={toonGradient()} />
+        </mesh>
       ))}
     </>
   );
@@ -367,11 +357,14 @@ function BuildingMesh({ b, onTap }: { b: Building; onTap: () => void }) {
     if (!group.current) return;
     if (!view.cutaway) {
       group.current.visible = true;
+      view.cutawayIds.delete(b.id);
       return;
     }
     const near = Math.abs(camera.position.x - b.x) < b.w / 2 + 5;
     const between = near && (b.side === "south" ? camera.position.z > f.minZ - 1.5 : camera.position.z < f.maxZ + 1.5);
     group.current.visible = !between;
+    if (between) view.cutawayIds.add(b.id);
+    else view.cutawayIds.delete(b.id);
   });
   return (
     <group

@@ -1,7 +1,10 @@
 "use client";
 
 import { memo } from "react";
+import { mrtStationById } from "@/content/transit/mrt-hijau";
+import { monoStationById } from "@/content/transit/monorel";
 import { Box, RBox } from "@/shared/three/toon";
+import { RailStationMesh } from "@/world/rail-station-mesh";
 import { BINTIK_BUS_STOP, BINTIK_STRIP } from "./meta";
 
 const NEON = ["#ff5a7a", "#64d2ff", "#ffd60a", "#bf5af2", "#30d158"];
@@ -22,6 +25,8 @@ export const BintikScene = memo(function BintikScene() {
         <Box size={[0.12, 2.4, 0.12]} position={[-1.8, 1.2, 0]} color="#4b5563" outline={false} />
         <Box size={[0.12, 2.4, 0.12]} position={[1.8, 1.2, 0]} color="#4b5563" outline={false} />
       </group>
+      <RailStationMesh x={mrtStationById("bukit-bintik").x} z={mrtStationById("bukit-bintik").z} color="#1f8a4c" />
+      <RailStationMesh x={monoStationById("bukit-bintik").x} z={monoStationById("bukit-bintik").z} color="#a3e635" />
     </group>
   );
 });

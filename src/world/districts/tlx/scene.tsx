@@ -1,7 +1,9 @@
 "use client";
 
 import { memo } from "react";
+import { mrtStationById } from "@/content/transit/mrt-hijau";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
+import { RailStationMesh } from "@/world/rail-station-mesh";
 import { MENARA_106, TLX_BUS_STOP, TLX_PARK } from "./meta";
 
 const GLASS = "#9ec8e0";
@@ -33,6 +35,7 @@ export const TlxScene = memo(function TlxScene() {
         <Box size={[0.12, 2.4, 0.12]} position={[1.8, 1.2, 0]} color="#4b5563" outline={false} />
       </group>
       <Cyl top={0.9} bottom={1.1} height={1.2} position={[64, 1.9, -74]} color="#2f8f4e" />
+      <RailStationMesh x={mrtStationById("tlx").x} z={mrtStationById("tlx").z} color="#1f8a4c" />
     </group>
   );
 });

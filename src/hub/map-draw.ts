@@ -1,4 +1,4 @@
-import { LRT_STATIONS } from "@/content/transit/lrt-kelana";
+import { RAIL_LINES } from "@/content/transit";
 import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/bounds";
 import { BINTIK_STRIP } from "@/world/districts/bukit-bintik/meta";
 import { STADIUM } from "@/world/districts/bukit-jalan/meta";
@@ -175,16 +175,18 @@ export function paintCityBase(
 
   paintMapTrees(b, X, Z, k, dpr);
 
-  // LRT: markers only (no diagonal station-to-station dashes)
-  for (const s of LRT_STATIONS) {
-    b.fillStyle = "#c62f25";
-    b.beginPath();
-    b.arc(X(s.x), Z(s.z), 5 * dpr, 0, Math.PI * 2);
-    b.fill();
-    b.font = `${Math.round(9 * dpr)}px system-ui, sans-serif`;
-    b.textAlign = "center";
-    b.textBaseline = "middle";
-    b.fillText("🚇", X(s.x), Z(s.z));
+  // Rail stations (LRT / MRT / Monorel) — coloured dots, no route dashes
+  for (const line of RAIL_LINES) {
+    for (const s of line.stations) {
+      b.fillStyle = line.color;
+      b.beginPath();
+      b.arc(X(s.x), Z(s.z), 5 * dpr, 0, Math.PI * 2);
+      b.fill();
+      b.font = `${Math.round(9 * dpr)}px system-ui, sans-serif`;
+      b.textAlign = "center";
+      b.textBaseline = "middle";
+      b.fillText(line.emoji, X(s.x), Z(s.z));
+    }
   }
 
   const stops = [BUS_STOP, ...OUTER_BUS_PLACES.map((id) => placeById(id)).filter(Boolean)];

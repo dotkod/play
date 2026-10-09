@@ -15,6 +15,8 @@ export const view = {
   cutaway: false,
   yaw: 0,
   talk: null as null | { npcId: string; x: number; z: number },
+  /** Building ids currently hidden by cutaway — collision skips these so you don’t hit an invisible wall. */
+  cutawayIds: new Set<string>(),
 };
 
 const MOVE_KEYS = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];

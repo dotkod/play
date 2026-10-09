@@ -2,12 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { refreshAuth, useAuth } from "@/core/auth-client";
+import { logoutAccount, refreshAuth, takeAuthHello, useAuth } from "@/core/auth-client";
 import { LandscapeGate } from "@/shared/landscape-gate";
 import { AuthGate, AuthSplash } from "./auth-gate";
+import { CityTutorial, CITY_TUTORIAL_FLAG } from "./city-tutorial";
 import { emit } from "@/core/events";
 import { type JobResult, JOB_RESULT_KEY, settleJobResults } from "@/core/job-handoff";
-import { addItem, getProfile, removeItem, savePosition, spendMoney } from "@/core/profile";
+import { addItem, getProfile, removeItem, savePosition, setFlag, spendMoney } from "@/core/profile";
 import {
   BUS_FARE_SEN,
   BUS_ROUTES,
@@ -15,7 +16,8 @@ import {
   etaMinutes,
   routeForDest,
 } from "@/content/transit/bus-routes";
-import { LRT_FARE_SEN, lrtStationNear, type LrtStationId } from "@/content/transit/lrt-kelana";
+import { anyRailNear, type RailLine, type RailStation } from "@/content/transit";
+import { TAXI_FARE_SEN, TAXI_UNLOCK_FLAG, type TaxiDest } from "@/content/transit/taxi";
 import { TAMAN_SOFA } from "@/world/districts/taman-ceria/meta";
 import { BusBoard } from "./bus-board";
 import { BusRideOverlay, busDestLabel, type BusDest } from "./bus-ride";
@@ -24,8 +26,9 @@ import { startTaskEngine } from "@/core/tasks/engine";
 import { npcById, type NamedNpc } from "@/content/npcs";
 import { OUTER_BUS_PLACES, placeById } from "@/content/places";
 import { InteriorOverlay } from "./interior";
-import { LrtBoard } from "./lrt-board";
-import { LrtRideOverlay } from "./lrt-ride";
+import { RailBoard } from "./rail-board";
+import { RailRideOverlay } from "./rail-ride";
+import { TaxiRideOverlay } from "./taxi-ride";
 import { PHONE_DRAW_MS, player as playerShared } from "./traffic";
 import { ambience, audioReady, music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { getLang, setLang, useLang } from "@/shared/lang";
@@ -123,6 +126,10 @@ function dialogueFor(npc: NamedNpc) {
     return "osman-idle";
   }
   if (npc.id === "ah-seng") return "ahseng-hello";
+  if (npc.id === "kumar") {
+    if (!p.flags.taxiUnlocked) return "kumar-taxi";
+    return "kumar-idle";
+  }
   return null;
 }
 
@@ -153,15 +160,17 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [busRide, setBusRide] = useState<BusDest | null>(null);
   const [busBoardOpen, setBusBoardOpen] = useState(false);
-  const [lrtRide, setLrtRide] = useState<LrtStationId | null>(null);
-  const [lrtBoardFrom, setLrtBoardFrom] = useState<LrtStationId | null>(null);
-  const [nearLrt, setNearLrt] = useState<LrtStationId | null>(null);
+  const [railRide, setRailRide] = useState<{ line: RailLine; to: RailStation } | null>(null);
+  const [railBoard, setRailBoard] = useState<{ line: RailLine; from: string } | null>(null);
+  const [nearRail, setNearRail] = useState<{ line: RailLine; station: RailStation } | null>(null);
+  const [taxiRide, setTaxiRide] = useState<TaxiDest | null>(null);
   const [nearStop, setNearStop] = useState<"pusat" | BusDest | null>(null);
   const [inside, setInside] = useState<Building | null>(null);
   const [nearSofa, setNearSofa] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dialogue, setDialogue] = useState<{ npcId: string; dialogueId: string } | null>(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(() => {
     if (!payout || payout.earned <= 0) return null;
     const job = BUILDINGS.find((b) => b.game?.slug === payout.job)?.game?.title ?? payout.job;
@@ -169,6 +178,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   });
   const [touch, setTouch] = useState(false);
   const toastSeq = useRef(1);
+  const helloDone = useRef(false);
 
   const flash = (text: string) => {
     toastSeq.current += 1;
@@ -181,6 +191,33 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   useEffect(() => {
     void refreshAuth();
   }, []);
+
+  // After login/signup: drop into the city (can move) + welcome toast / first-run tutorial
+  useEffect(() => {
+    if (!auth.username || helloDone.current) return;
+    const hello = takeAuthHello();
+    if (!hello) return;
+    helloDone.current = true;
+    const name = auth.username;
+    // Defer so we don’t sync-setState inside the effect (React Compiler lint)
+    const id = window.setTimeout(() => {
+      if (hello === "new" && !getProfile().flags[CITY_TUTORIAL_FLAG]) {
+        setTutorialOpen(true);
+        return;
+      }
+      // Returning login: skip start screen so you can walk immediately
+      unlockAudio();
+      music.start("city");
+      ambience.start();
+      setStarted(true);
+      flash(HUB_STRINGS[getLang()].welcomeBack(name));
+    }, 50);
+    // Do not clearTimeout on cleanup — Strict Mode would cancel the welcome toast
+    return () => {
+      void id;
+    };
+  }, [auth.username]);
+
   // Prefetch mamak job so entering the door never waits on a chunk
   useEffect(() => {
     void import("@/games/anne-maju/game");
@@ -199,21 +236,22 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     return stop;
   }, [payout]);
 
+  // City BGM + ambience while exploring; stop only for jobs / leave. Must restart whenever
+  // `started` flips — an older cleanup used to kill music after login and never bring it back.
   useEffect(() => {
-    if (jobOpen) {
+    if (jobOpen || !started) {
       ambience.stop();
       music.stop();
       return;
     }
-    if (returning && audioReady()) {
-      music.start("city");
-      ambience.start();
-    }
+    if (!audioReady()) unlockAudio();
+    music.start("city");
+    ambience.start();
     return () => {
       music.stop();
       ambience.stop();
     };
-  }, [returning, jobOpen]);
+  }, [started, jobOpen]);
 
   useEffect(() => {
     if (!toast || toast.id !== 1) return;
@@ -281,8 +319,12 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         setNearStop(outer);
       }
 
-      const lrt = lrtStationNear(px, pz);
-      setNearLrt(lrt?.id ?? null);
+      const rail = anyRailNear(px, pz);
+      setNearRail(rail);
+      if (rail) {
+        const key = `discovered:${rail.station.place}`;
+        if (!getProfile().flags[key]) setFlag(key, true);
+      }
 
       setNearSofa(Math.hypot(TAMAN_SOFA.x - px, TAMAN_SOFA.z - pz) < 2.2);
     }, 200);
@@ -481,22 +523,51 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     savePosition("taman-ceria", TAMAN_SOFA.x, TAMAN_SOFA.z);
   };
 
-  const openLrtBoard = (from: LrtStationId) => {
+  const openRailBoard = (line: RailLine, from: string) => {
     unlockAudio();
     sfx.chime();
-    setLrtBoardFrom(from);
+    setRailBoard({ line, from });
   };
 
-  const pickLrt = (dest: LrtStationId) => {
-    const ok = spendMoney(LRT_FARE_SEN, "Tiket LRT", "LRT ticket");
+  const pickRail = (line: RailLine, dest: RailStation) => {
+    const ok = spendMoney(line.fareSen, line.fareLabel.ms, line.fareLabel.en);
     if (!ok) {
       flash(tr.needMoney);
       return;
     }
-    setLrtBoardFrom(null);
+    setRailBoard(null);
     unlockAudio();
     sfx.chime();
-    setLrtRide(dest);
+    setRailRide({ line, to: dest });
+  };
+
+  const pickTaxi = (dest: TaxiDest) => {
+    if (!getProfile().flags[TAXI_UNLOCK_FLAG]) {
+      flash(tr.taxiLocked);
+      return;
+    }
+    const ok = spendMoney(TAXI_FARE_SEN, "Teksi Kumar", "Kumar taxi");
+    if (!ok) {
+      flash(tr.needMoney);
+      return;
+    }
+    closePhone();
+    setMapOpen(false);
+    unlockAudio();
+    sfx.chime();
+    setTaxiRide(dest);
+  };
+
+  const pickPetaRail = (line: RailLine, dest: RailStation) => {
+    const ok = spendMoney(line.fareSen, line.fareLabel.ms, line.fareLabel.en);
+    if (!ok) {
+      flash(tr.needMoney);
+      return;
+    }
+    closePhone();
+    unlockAudio();
+    sfx.chime();
+    setRailRide({ line, to: dest });
   };
 
   const pickBus = (dest: BusDest) => {
@@ -532,9 +603,9 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     const id = setInterval(() => {
       if (!input.enter) return;
       input.enter = false;
-      if (!started || dialogue || phoneOpen || phoneBusy || busRide || busBoardOpen || lrtRide || lrtBoardFrom || jobOpen || inside) return;
+      if (!started || dialogue || phoneOpen || phoneBusy || busRide || busBoardOpen || railRide || railBoard || taxiRide || jobOpen || inside) return;
       if (nearSofa) sitHome();
-      else if (nearLrt) openLrtBoard(nearLrt);
+      else if (nearRail) openRailBoard(nearRail.line, nearRail.station.id);
       else if (nearStop && nearStop !== "pusat") rideBusHome();
       else if (nearStop === "pusat") {
         unlockAudio();
@@ -547,7 +618,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     return () => clearInterval(id);
   });
 
-  const blocked = !!(busRide || busBoardOpen || lrtRide || lrtBoardFrom || jobOpen || inside || doorVeil);
+  const blocked = !!(busRide || busBoardOpen || railRide || railBoard || taxiRide || jobOpen || inside || doorVeil);
   const showHint =
     started && !zone && !nearNpc && nearCat === null && !dialogue && !phoneOpen && !phoneBusy && !blocked;
 
@@ -572,6 +643,17 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
               </button>
             ))}
           </div>
+          {auth.username && (
+            <button
+              type="button"
+              aria-label={tr.logout}
+              title={tr.logout}
+              onClick={() => void logoutAccount()}
+              className="grid h-9 place-items-center rounded-xl bg-ink/80 px-2.5 text-xs font-extrabold text-cream shadow-lg active:scale-95"
+            >
+              {tr.logout}
+            </button>
+          )}
         </div>
         {started && (
           <div className="pointer-events-auto">
@@ -580,13 +662,23 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         )}
       </div>
 
-      {!started && <StartScreen tr={tr} touch={touch} onStart={start} />}
+      {!started && !tutorialOpen && <StartScreen tr={tr} touch={touch} onStart={start} />}
+
+      {tutorialOpen && auth.username && (
+        <CityTutorial
+          username={auth.username}
+          onDone={() => {
+            setTutorialOpen(false);
+            if (!started) start();
+          }}
+        />
+      )}
 
       {toast && (
         <div
           key={toast.id}
           className={`pointer-events-none absolute inset-x-0 z-[60] flex justify-center px-4 ${
-            busBoardOpen || lrtBoardFrom || busRide || lrtRide || phoneOpen || inside || jobOpen
+            busBoardOpen || railBoard || busRide || railRide || taxiRide || phoneOpen || inside || jobOpen
               ? "top-[16%] sm:top-1/4"
               : "bottom-28"
           }`}
@@ -606,10 +698,17 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
 
       {busRide && <BusRideOverlay dest={busRide} onDone={() => setBusRide(null)} />}
       <BusBoard open={busBoardOpen} onClose={() => setBusBoardOpen(false)} onPick={pickBus} />
-      {lrtRide && <LrtRideOverlay to={lrtRide} onDone={() => setLrtRide(null)} />}
-      {lrtBoardFrom && (
-        <LrtBoard open from={lrtBoardFrom} onClose={() => setLrtBoardFrom(null)} onPick={pickLrt} />
+      {railRide && <RailRideOverlay line={railRide.line} to={railRide.to} onDone={() => setRailRide(null)} />}
+      {railBoard && (
+        <RailBoard
+          open
+          line={railBoard.line}
+          from={railBoard.from}
+          onClose={() => setRailBoard(null)}
+          onPick={(dest) => pickRail(railBoard.line, dest)}
+        />
       )}
+      {taxiRide && <TaxiRideOverlay dest={taxiRide} onDone={() => setTaxiRide(null)} />}
       <CityMap open={mapOpen} onClose={() => setMapOpen(false)} />
 
       {jobOpen === "anne-maju" && (
@@ -630,18 +729,18 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
           {nearSofa && (
             <ActionButton icon="🛋" label={tr.sitSofa} keyHint={!touch ? "E" : undefined} tone="cream" size="lg" onClick={sitHome} />
           )}
-          {nearLrt && (
+          {nearRail && (
             <ActionButton
-              icon="🚇"
-              label={tr.lrtEnter}
-              caption={tr.lrtFare}
+              icon={nearRail.line.emoji}
+              label={tr.railEnter}
+              caption={rm(nearRail.line.fareSen)}
               keyHint={!touch && !nearSofa ? "E" : undefined}
               tone="amber"
               size="lg"
-              onClick={() => openLrtBoard(nearLrt)}
+              onClick={() => openRailBoard(nearRail.line, nearRail.station.id)}
             />
           )}
-          {nearStop === "pusat" && !nearLrt && (
+          {nearStop === "pusat" && !nearRail && (
             <ActionButton
               icon="🚌"
               label={tr.busOpenBoard}
@@ -740,7 +839,13 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       )}
 
       {dialogue && <DialogueBox dialogueId={dialogue.dialogueId} npcId={dialogue.npcId} onClose={closeTalk} />}
-      <Phone open={phoneOpen} onClose={closePhone} />
+      <Phone
+        open={phoneOpen}
+        onClose={closePhone}
+        onOpenMap={() => setMapOpen(true)}
+        onRailTravel={pickPetaRail}
+        onTaxiTravel={pickTaxi}
+      />
 
       {started && touch && !phoneBusy && !dialogue && (
         <>

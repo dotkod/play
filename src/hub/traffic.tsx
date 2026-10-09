@@ -10,7 +10,7 @@ import { Box, Cyl, RBox } from "@/shared/three/toon";
 import { dynamicColliders } from "./colliders";
 import { type Axis, signalFor } from "@/world/road-graph";
 import { PHONE_DRAW_MS, player } from "@/world/player-bridge";
-import { pointOnLane, reverseLane, VEHICLE_LANES, type VehicleLane } from "@/world/vehicle-routes";
+import { pickNextLane, pointOnLane, VEHICLE_LANES, type VehicleLane } from "@/world/vehicle-routes";
 import { BUILDINGS, ROAD_HALF, WALK_HALF, buildingBlocksCrossRoad, footprint } from "./world-data";
 
 export type { Axis };
@@ -107,7 +107,9 @@ const SPECS: Record<Kind, { len: number; width: number; speed: [number, number];
 const lengthOf = (v: Vehicle) => SPECS[v.kind].len;
 
 const STOP_AT = WALK_HALF + 0.6;
-const FOLLOW_GAP = 2.4;
+const FOLLOW_GAP = 3.2;
+/** World-space bumper radius — stops cars stacking across lanes at junctions. */
+const WORLD_SEP = 4.2;
 const CAR_COLORS = ["#d8352a", "#2f6fd6", "#f2f2ee", "#1f1f24", "#f2b33d", "#9aa3ab", "#2f8f86", "#7a4a2e", "#c7b2e6"];
 
 const LANE_BY_ID = Object.fromEntries(VEHICLE_LANES.map((l) => [l.id, l])) as Record<string, VehicleLane>;
@@ -214,6 +216,24 @@ export const Traffic = memo(function Traffic() {
         if (gap < need + 8) target = Math.min(target, Math.max(0, gap - need) * 2.2);
       }
 
+      // World-space slowdown for nearby vehicles (junctions / parallel strips)
+      for (const o of all) {
+        if (o === v) continue;
+        const otherLane = LANE_BY_ID[o.laneId];
+        if (!otherLane) continue;
+        const there = pointOnLane(otherLane, o.s);
+        const dx = there.x - here.x;
+        const dz = there.z - here.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > WORLD_SEP + 6) continue;
+        const fx = Math.sin(here.rotY);
+        const fz = Math.cos(here.rotY);
+        const ahead = dx * fx + dz * fz;
+        if (ahead < 0.4) continue;
+        const need = (lengthOf(v) + lengthOf(o)) / 2 + 1.6;
+        if (dist < need + 5) target = Math.min(target, Math.max(0, dist - need) * 2.4);
+      }
+
       // Brake for player ahead in this lane
       {
         const pAlong =
@@ -256,12 +276,12 @@ export const Traffic = memo(function Traffic() {
         nextS = v.s;
       }
 
-      // End of strip → turn around onto the opposite lane
+      // End of strip → turn onto a linked lane (junction hop) or U-turn
       if (nextS >= lane.length - 1) {
-        const back = reverseLane(lane);
-        v.laneId = back.id;
-        v.s = 2 + Math.random();
-        v.speed *= 0.4;
+        const hop = pickNextLane(lane);
+        v.laneId = hop.laneId;
+        v.s = hop.entryS + Math.random() * 1.5;
+        v.speed *= 0.45;
       } else {
         v.s = nextS;
       }
@@ -285,6 +305,36 @@ export const Traffic = memo(function Traffic() {
         if (leaderGap < need) {
           v.s = leader.s - need;
           v.speed = Math.min(v.speed, Math.min(leader.speed, 1));
+        }
+      }
+    }
+
+    // World-space push so cars don't occupy the same spot across lanes
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < all.length; i++) {
+        const a = all[i];
+        const la = LANE_BY_ID[a.laneId];
+        if (!la) continue;
+        const pa = pointOnLane(la, a.s);
+        for (let j = i + 1; j < all.length; j++) {
+          const b = all[j];
+          const lb = LANE_BY_ID[b.laneId];
+          if (!lb) continue;
+          const pb = pointOnLane(lb, b.s);
+          const dx = pb.x - pa.x;
+          const dz = pb.z - pa.z;
+          const dist = Math.hypot(dx, dz);
+          const need = (lengthOf(a) + lengthOf(b)) * 0.35 + 1.4;
+          if (dist >= need || dist < 1e-4) continue;
+          // Push the slower / trailing vehicle back along its lane
+          const push = (need - dist) * 0.55;
+          if (a.speed <= b.speed) {
+            a.s = Math.max(0.5, a.s - push);
+            a.speed = Math.min(a.speed, 1.2);
+          } else {
+            b.s = Math.max(0.5, b.s - push);
+            b.speed = Math.min(b.speed, 1.2);
+          }
         }
       }
     }

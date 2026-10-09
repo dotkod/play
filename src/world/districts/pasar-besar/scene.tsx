@@ -1,7 +1,9 @@
 "use client";
 
 import { memo } from "react";
+import { mrtStationById } from "@/content/transit/mrt-hijau";
 import { Box, RBox } from "@/shared/three/toon";
+import { RailStationMesh } from "@/world/rail-station-mesh";
 import { PASAR_BUS_STOP, PASAR_HALL } from "./meta";
 
 export const PasarScene = memo(function PasarScene() {
@@ -25,6 +27,7 @@ export const PasarScene = memo(function PasarScene() {
         <Box size={[0.12, 2.4, 0.12]} position={[-1.8, 1.2, 0]} color="#4b5563" outline={false} />
         <Box size={[0.12, 2.4, 0.12]} position={[1.8, 1.2, 0]} color="#4b5563" outline={false} />
       </group>
+      <RailStationMesh x={mrtStationById("pasar-besar").x} z={mrtStationById("pasar-besar").z} color="#1f8a4c" />
     </group>
   );
 });

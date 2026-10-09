@@ -407,7 +407,8 @@ sheet on mobile. Notifications slide in from the top with a buzz + sound.
 | **Kerja** (jobs) | Job board: available jobs, pay range, location, unlock level, personal best and leaderboard link per job. "Pergi" button sets a waypoint. |
 | **Peta** (map) | Full city map, districts, landmarks, stations, task markers; set waypoint; fast travel from stations once discovered. |
 | **Dompet** (wallet) | Balance, recent transactions ("Anne Maju shift +RM24.30"), transit card top-up. |
-| **Tugasan** (tasks) | Active and completed tasks with objective checklists; pin one to the HUD. |
+| **GIG** (was Tugasan) | Active and completed gigs with objective checklists; pin one to the HUD. |
+| **Profil** | Level, XP bar, wallet snapshot, GIG counts. |
 | **Kamera** | Photo mode: hide the HUD, pose, frame, save/share an image (viral loop). |
 | **Kenalan** (contacts) | NPCs you've met, reputation hearts, where to find them. |
 | **Tetapan** (settings) | Language, sound, graphics quality (auto/low/high), credits, version. |
@@ -622,7 +623,7 @@ portrait viewport, OG art regenerated if visuals changed, CHANGELOG updated, dep
 - [x] Spawn named NPCs in Pusat Lepak: Uncle Raju, Makcik Kiah, Pakcik Osman, Uncle Ah Seng.
 - [x] Storyline "Hari Pertama" steps 1–5 (step 6 needs Taman Ceria: stub with a "coming soon" bus).
 - [x] Daily tasks (3 rotating).
-- [x] Required cloud account on boot (`@username` + 8-digit PIN); no guest mode; Anne Maju highscores use the account name.
+- [x] Required cloud account on boot (`@username` + 6-digit PIN); no guest mode; Anne Maju highscores use the account name.
 - **Done when:** a new player can complete Hari Pertama in ~10 minutes, entirely guided by the phone.
 
 ### Phase 2: World architecture for a big city
@@ -647,8 +648,8 @@ portrait viewport, OG art regenerated if visuals changed, CHANGELOG updated, dep
 - [x] Bus routes + stops with arrival times (0.9.0 — B101/B202 + ETA + RM1)
 - [x] Anne Maju embedded in city + enterable Pusat shophouses (0.10.0)
 - [x] LRT Laluan Kelana stations + rides (fast travel) (0.8.0)
-- [ ] MRT Laluan Hijau, Monorel Lepak
-- [ ] Peta app fast travel; taxi via Kumar
+- [x] MRT Laluan Hijau, Monorel Lepak (0.10.20)
+- [x] Peta app fast travel; taxi via Kumar (0.10.20)
 
 ### Phase 5: More jobs
 - [ ] LRT Sardin → Rider Laju → Cari Parking → Boss Nak EOD → Pasar Malam (one at a time, each with leaderboard)

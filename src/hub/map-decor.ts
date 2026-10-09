@@ -27,16 +27,23 @@ function nearStrip(x: number, z: number, pad: number) {
 }
 
 function nearRoad(x: number, z: number) {
-  return nearStrip(x, z, 1.4);
+  // Keep canopy clear of carriageway + verge (trees in the road looked broken)
+  return nearStrip(x, z, 3.2);
 }
 
 function inBuilding(x: number, z: number) {
   for (const b of BUILDINGS) {
     const f = footprint(b);
-    if (x > f.minX - 2 && x < f.maxX + 2 && z > f.minZ - 2 && z < f.maxZ + 2) return true;
+    if (x > f.minX - 3 && x < f.maxX + 3 && z > f.minZ - 3 && z < f.maxZ + 3) return true;
   }
   const pg = PLAYGROUND;
-  if (x > pg.x - pg.w / 2 - 1 && x < pg.x + pg.w / 2 + 1 && z > pg.z - pg.d / 2 - 1 && z < pg.z + pg.d / 2 + 1) return true;
+  if (x > pg.x - pg.w / 2 - 2 && x < pg.x + pg.w / 2 + 2 && z > pg.z - pg.d / 2 - 2 && z < pg.z + pg.d / 2 + 2) {
+    return true;
+  }
+  // Soft landmark footprints (map-only props that look wrong with trees through them)
+  if (Math.hypot(x + 28, z - 22) < 12) return true; // Masjid Lepak
+  if (x > -40 && x < -24 && z > 4 && z < 60) return true; // Sungai Lepak
+  if (Math.hypot(x - 12, z - 76) < 14) return true; // stadium bowl
   return false;
 }
 
@@ -70,20 +77,22 @@ export const MAP_BLOCKS: MapBlock[] = [
   { x: 48, z: -78, w: 10, d: 7, color: "#9eb4c8" },
 ];
 
-/** Shared tree positions for 2D map + optional 3D scatter. Sparser near roads. */
+/** Shared tree positions for 2D map + optional 3D scatter. Never on roads / footprints. */
 export const MAP_TREES: MapTree[] = (() => {
   const out: MapTree[] = [];
-  const step = 9;
+  const step = 10;
   for (let x = -108; x <= 142; x += step) {
     for (let z = -124; z <= 88; z += step) {
-      const jx = (cellRand(x, z) - 0.5) * 3;
-      const jz = (cellRand(z, x) - 0.5) * 3;
+      const jx = (cellRand(x, z) - 0.5) * 2.2;
+      const jz = (cellRand(z, x) - 0.5) * 2.2;
       const wx = x + jx;
       const wz = z + jz;
       if (nearRoad(wx, wz) || inBuilding(wx, wz)) continue;
-      if (MAP_BLOCKS.some((bl) => Math.abs(wx - bl.x) < bl.w / 2 + 2 && Math.abs(wz - bl.z) < bl.d / 2 + 2)) continue;
-      // Keep more open space — only ~35% of far cells get a tree
-      if (cellRand(wx * 3, wz * 7) < 0.65) continue;
+      if (MAP_BLOCKS.some((bl) => Math.abs(wx - bl.x) < bl.w / 2 + 3.5 && Math.abs(wz - bl.z) < bl.d / 2 + 3.5)) {
+        continue;
+      }
+      // Keep parks open — only ~28% of far cells get a tree
+      if (cellRand(wx * 3, wz * 7) < 0.72) continue;
       out.push({ x: wx, z: wz, r: 0.35 + cellRand(wx, wz) * 0.45 });
     }
   }

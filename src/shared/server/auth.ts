@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { getRedis } from "./redis";
 
 export const USER_RE = /^[a-z0-9_]{5,20}$/;
-export const PIN_RE = /^\d{8}$/;
+export const PIN_RE = /^\d{6}$/;
 export const SESSION_COOKIE = "kl_session";
 const SESSION_DAYS = 30;
 

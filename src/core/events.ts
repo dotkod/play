@@ -7,6 +7,9 @@ export type GameEvent =
   | { type: "gave"; item: string; npc: string }
   | { type: "tookBus"; to: string }
   | { type: "tookLrt"; to: string }
+  | { type: "tookMrt"; to: string }
+  | { type: "tookMonorel"; to: string }
+  | { type: "tookTaxi"; to: string }
   | { type: "sat"; place: string };
 
 type Handler = (event: GameEvent) => void;

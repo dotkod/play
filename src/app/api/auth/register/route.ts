@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Username: @ + 5-20 huruf/nombor/_" }, { status: 400 });
   }
   if (!PIN_RE.test(pin)) {
-    return NextResponse.json({ error: "PIN mesti 8 digit" }, { status: 400 });
+    return NextResponse.json({ error: "PIN mesti 6 digit" }, { status: 400 });
   }
 
   const existing = await redis.get<UserRecord>(userKey(username));

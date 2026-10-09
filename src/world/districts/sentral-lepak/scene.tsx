@@ -2,8 +2,11 @@
 
 import { memo } from "react";
 import { Box, RBox } from "@/shared/three/toon";
-import { LrtStationMesh } from "@/world/lrt-station-mesh";
+import { mrtStationById } from "@/content/transit/mrt-hijau";
+import { monoStationById } from "@/content/transit/monorel";
 import { lrtStationById } from "@/content/transit/lrt-kelana";
+import { LrtStationMesh } from "@/world/lrt-station-mesh";
+import { RailStationMesh } from "@/world/rail-station-mesh";
 import { SENTRAL_BUS_STOP, SENTRAL_HALL } from "./meta";
 
 export const SentralScene = memo(function SentralScene() {
@@ -22,6 +25,8 @@ export const SentralScene = memo(function SentralScene() {
         <Box size={[22, 0.15, 1.2]} position={[0, 3.2, -4]} color="#1f8a4c" outline={false} />
       </group>
       <LrtStationMesh x={lrtStationById("sentral-lepak").x} z={lrtStationById("sentral-lepak").z} />
+      <RailStationMesh x={mrtStationById("sentral-lepak").x} z={mrtStationById("sentral-lepak").z} color="#1f8a4c" />
+      <RailStationMesh x={monoStationById("sentral-lepak").x} z={monoStationById("sentral-lepak").z} color="#a3e635" />
       <group position={[SENTRAL_BUS_STOP.x, 0, SENTRAL_BUS_STOP.z]}>
         <Box size={[4, 0.1, 1.2]} position={[0, 2.4, 0]} color="#1f5fa8" outline={false} />
         <Box size={[0.12, 2.4, 0.12]} position={[-1.8, 1.2, 0]} color="#4b5563" outline={false} />

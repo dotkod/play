@@ -5,6 +5,7 @@ import { getAuth, loginAccount, logoutAccount, registerAccount, useAuth } from "
 import { acceptTask } from "@/core/tasks/engine";
 import { taskById } from "@/core/tasks/catalog";
 import {
+  XP_PER_LEVEL,
   markInboxAccepted,
   markInboxRead,
   setPinnedTask,
@@ -14,23 +15,39 @@ import {
 import { setMuted, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
 import { npcById } from "@/content/npcs";
+import type { RailLine, RailStation } from "@/content/transit";
+import type { TaxiDest } from "@/content/transit/taxi";
 import { HUB } from "../meta";
 import { rm } from "../hud";
 import { HUB_STRINGS } from "../strings";
+import { Peta } from "./peta";
 
-type AppId = "home" | "mesej" | "tugasan" | "dompet" | "tetapan";
-type IconKind = "mesej" | "tugasan" | "dompet" | "tetapan" | "kerja" | "peta";
+type AppId = "home" | "mesej" | "tugasan" | "profil" | "dompet" | "tetapan" | "peta";
+type IconKind = "mesej" | "tugasan" | "profil" | "dompet" | "tetapan" | "kerja" | "peta";
 
 const APP_ICON: Record<IconKind, { bg: string }> = {
   mesej: { bg: "linear-gradient(160deg,#64d2ff 0%,#0a84ff 55%,#0071e3 100%)" },
   tugasan: { bg: "linear-gradient(160deg,#ffd60a 0%,#ff9f0a 45%,#ff453a 100%)" },
+  profil: { bg: "linear-gradient(160deg,#ff6b6b 0%,#ee5a24 45%,#c44569 100%)" },
   dompet: { bg: "linear-gradient(160deg,#30d158 0%,#34c759 40%,#248a3d 100%)" },
   tetapan: { bg: "linear-gradient(160deg,#d1d1d6 0%,#8e8e93 50%,#636366 100%)" },
   kerja: { bg: "linear-gradient(160deg,#bf5af2 0%,#5e5ce6 100%)" },
   peta: { bg: "linear-gradient(160deg,#64d2ff 0%,#30d158 55%,#ffd60a 100%)" },
 };
 
-export function Phone({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function Phone({
+  open,
+  onClose,
+  onOpenMap,
+  onRailTravel,
+  onTaxiTravel,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenMap?: () => void;
+  onRailTravel?: (line: RailLine, dest: RailStation) => void;
+  onTaxiTravel?: (dest: TaxiDest) => void;
+}) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
   const auth = useAuth();
@@ -58,7 +75,19 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
   };
 
   const title =
-    app === "home" ? null : app === "mesej" ? tr.appMesej : app === "tugasan" ? tr.appTugasan : app === "dompet" ? tr.appDompet : tr.appTetapan;
+    app === "home"
+      ? null
+      : app === "mesej"
+        ? tr.appMesej
+        : app === "tugasan"
+          ? tr.appTugasan
+          : app === "profil"
+            ? tr.appProfil
+            : app === "dompet"
+              ? tr.appDompet
+              : app === "peta"
+                ? tr.appPeta
+                : tr.appTetapan;
 
   return (
     <div
@@ -126,8 +155,19 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
                 )}
                 {app === "mesej" && <Mesej lang={lang} onAccepted={() => setApp("tugasan")} />}
                 {app === "tugasan" && <Tugasan lang={lang} />}
+                {app === "profil" && <Profil lang={lang} auth={auth} />}
                 {app === "dompet" && <Dompet lang={lang} />}
                 {app === "tetapan" && <Tetapan lang={lang} auth={auth} />}
+                {app === "peta" && (
+                  <Peta
+                    onOpenMap={() => {
+                      dismiss();
+                      onOpenMap?.();
+                    }}
+                    onRail={(line, dest) => onRailTravel?.(line, dest)}
+                    onTaxi={(dest) => onTaxiTravel?.(dest)}
+                  />
+                )}
               </div>
 
               {/* Home indicator — swipe hint; tap goes home or closes */}
@@ -169,10 +209,11 @@ function HomeScreen({
       <div className="grid grid-cols-4 gap-x-2 gap-y-6 px-1">
         <IosIcon kind="mesej" label={tr.appMesej} badge={unread} onClick={() => onOpen("mesej")} />
         <IosIcon kind="tugasan" label={tr.appTugasan} badge={activeTasks} onClick={() => onOpen("tugasan")} />
+        <IosIcon kind="profil" label={tr.appProfil} onClick={() => onOpen("profil")} />
         <IosIcon kind="dompet" label={tr.appDompet} onClick={() => onOpen("dompet")} />
         <IosIcon kind="tetapan" label={tr.appTetapan} onClick={() => onOpen("tetapan")} />
         <IosIcon kind="kerja" label={tr.appKerja} soon />
-        <IosIcon kind="peta" label={tr.appPeta} soon />
+        <IosIcon kind="peta" label={tr.appPeta} onClick={() => onOpen("peta")} />
       </div>
 
       <div className="mt-auto mb-1 rounded-[32px] border border-white/25 bg-white/20 p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
@@ -276,6 +317,14 @@ function AppGlyph({ kind, size = 32 }: { kind: IconKind; size?: number }) {
         <path d="M11.5 20.8h6" stroke="#ff9f0a" strokeWidth="2" strokeLinecap="round" />
         <circle cx="22.5" cy="9.5" r="4.2" fill="#ff453a" />
         <path d="M20.6 9.5l1.2 1.2 2.4-2.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (kind === "profil") {
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none" aria-hidden>
+        <circle cx="16" cy="12" r="5.2" fill="white" />
+        <path d="M6.5 26c1.8-5.2 5.2-7.8 9.5-7.8S25.2 20.8 27 26" stroke="white" strokeWidth="3.2" strokeLinecap="round" />
       </svg>
     );
   }
@@ -462,6 +511,55 @@ function Tugasan({ lang }: { lang: "ms" | "en" }) {
   );
 }
 
+function Profil({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof useAuth> }) {
+  const p = useProfile();
+  const tr = HUB_STRINGS[lang];
+  const into = p.xp % XP_PER_LEVEL;
+  const pct = Math.min(100, (into / XP_PER_LEVEL) * 100);
+  const handle = auth.username ? `@${auth.username}` : "—";
+
+  return (
+    <div className="bg-[#f2f2f7] px-3 pb-4">
+      <p className="px-2 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appProfil}</p>
+
+      <div className="mb-4 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#1c1c1e] via-[#2c2c2e] to-[#ee5a24] p-5 text-white shadow-lg">
+        <p className="text-[15px] font-semibold tracking-tight">{handle}</p>
+        <p className="mt-4 text-[40px] leading-none font-semibold tracking-tight tabular-nums">{tr.level(p.level)}</p>
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center justify-between text-[12px] text-white/65">
+            <span>{tr.profilXp}</span>
+            <span className="tabular-nums">
+              {into}/{XP_PER_LEVEL}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/15">
+            <div className="h-full rounded-full bg-amber-300" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">{tr.profilLevel}</p>
+      <div className="mb-5 overflow-hidden rounded-[14px] bg-white shadow-sm">
+        <SettingsRow label={tr.wallet} trailing={<span className="text-[15px] font-semibold tabular-nums text-black">{rm(p.wallet)}</span>} />
+        <SettingsRow
+          label={tr.profilGigs}
+          border
+          trailing={
+            <span className="text-[15px] text-[#8e8e93]">
+              {p.tasks.active.length} {tr.profilGigsActive} · {p.tasks.done.length} {tr.profilGigsDone}
+            </span>
+          }
+        />
+        <SettingsRow
+          label="XP"
+          border
+          trailing={<span className="text-[15px] font-semibold tabular-nums text-black">{p.xp}</span>}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Dompet({ lang }: { lang: "ms" | "en" }) {
   const p = useProfile();
   const tr = HUB_STRINGS[lang];
@@ -588,8 +686,8 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
             />
             <input
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
-              placeholder="PIN · 8 digits"
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="PIN · 6 digits"
               inputMode="numeric"
               className="w-full rounded-[10px] bg-[#e5e5ea] px-3 py-2.5 text-[16px] text-black outline-none placeholder:text-[#8e8e93]"
               autoComplete="current-password"

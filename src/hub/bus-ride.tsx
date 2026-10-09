@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { emit } from "@/core/events";
 import { savePosition } from "@/core/profile";
 import { BINTIK_BUS_STOP } from "@/world/districts/bukit-bintik/meta";
@@ -18,10 +18,12 @@ import type { BusDest } from "@/content/transit/bus-routes";
 import { BUS_STOP } from "./colliders";
 import { useLang } from "@/shared/lang";
 import { HUB_STRINGS } from "./strings";
+import { TransitCabinView } from "./transit-cabin";
 
 export type { BusDest };
 
-const RIDE_MS = 2400;
+const RIDE_MS = 2800;
+const BUS_ACCENT = "#ef4444";
 
 const DROPS: Record<
   Exclude<BusDest, "pusat-lepak">,
@@ -37,6 +39,20 @@ const DROPS: Record<
   "pasar-besar": { x: PASAR_BUS_STOP.x, z: PASAR_BUS_STOP.z - 1.2, rotY: Math.PI, place: "pasar-besar-bus", district: "pasar-besar" },
   "petaling-lane": { x: PETALING_BUS_STOP.x, z: PETALING_BUS_STOP.z + 1.2, rotY: 0, place: "petaling-lane-bus", district: "petaling-lane" },
   "sentral-lepak": { x: SENTRAL_BUS_STOP.x, z: SENTRAL_BUS_STOP.z - 1.2, rotY: Math.PI, place: "sentral-lepak-bus", district: "sentral-lepak" },
+};
+
+const DEST_NAME: Record<BusDest, { ms: string; en: string }> = {
+  "taman-ceria": { ms: "Taman Ceria", en: "Taman Ceria" },
+  "pusat-lepak": { ms: "Pusat Lepak", en: "Pusat Lepak" },
+  klcc: { ms: "KLCC", en: "KLCC" },
+  "menara-lepak": { ms: "Menara Lepak", en: "Menara Lepak" },
+  tlx: { ms: "TLX", en: "TLX" },
+  "bukit-bintik": { ms: "Bukit Bintik", en: "Bukit Bintik" },
+  "bukit-jalan": { ms: "Bukit Jalan", en: "Bukit Jalan" },
+  "kampung-lepak": { ms: "Kampung Lepak", en: "Kampung Lepak" },
+  "pasar-besar": { ms: "Pasar Besar", en: "Pasar Besar" },
+  "petaling-lane": { ms: "Petaling Lane", en: "Petaling Lane" },
+  "sentral-lepak": { ms: "Sentral Lepak", en: "Sentral Lepak" },
 };
 
 export function busDestLabel(dest: BusDest, tr: (typeof HUB_STRINGS)["ms"]) {
@@ -59,7 +75,6 @@ export function busDestLabel(dest: BusDest, tr: (typeof HUB_STRINGS)["ms"]) {
 export function BusRideOverlay({ dest, onDone }: { dest: BusDest; onDone: () => void }) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
-  const [phase, setPhase] = useState<"out" | "in">("out");
 
   useEffect(() => {
     const a = setTimeout(() => {
@@ -74,7 +89,6 @@ export function BusRideOverlay({ dest, onDone }: { dest: BusDest; onDone: () => 
         savePosition(d.district, d.x, d.z);
       }
       emit({ type: "tookBus", to: dest });
-      setPhase("in");
     }, RIDE_MS * 0.45);
     const b = setTimeout(() => onDone(), RIDE_MS);
     return () => {
@@ -85,12 +99,11 @@ export function BusRideOverlay({ dest, onDone }: { dest: BusDest; onDone: () => 
   }, [dest]);
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#1a2438] text-cream">
-      <div className={`transition-opacity duration-500 ${phase === "out" ? "opacity-100" : "opacity-80"}`}>
-        <p className="text-4xl">🚌</p>
-        <p className="mt-3 text-lg font-extrabold">{tr.busRiding}</p>
-        <p className="mt-1 text-sm font-bold text-cream/70">{busDestLabel(dest, tr)}</p>
-      </div>
-    </div>
+    <TransitCabinView
+      kind="bus"
+      accent={BUS_ACCENT}
+      title={tr.busRiding}
+      subtitle={`RapidLepak → ${DEST_NAME[dest][lang]}`}
+    />
   );
 }

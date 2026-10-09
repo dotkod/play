@@ -3,7 +3,9 @@
 import { useFrame } from "@react-three/fiber";
 import { memo, useRef } from "react";
 import type * as THREE from "three";
+import { monoStationById } from "@/content/transit/monorel";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
+import { RailStationMesh } from "@/world/rail-station-mesh";
 import { presetForFrac } from "../../lighting";
 import { MENARA_BUS_STOP, MENARA_HILL, TOWER_POS } from "./meta";
 
@@ -91,6 +93,7 @@ export const MenaraScene = memo(function MenaraScene() {
           <Cyl top={0.9} bottom={1.1} height={1.3} position={[0, 1.9, 0]} color="#2f8f4e" />
         </group>
       ))}
+      <RailStationMesh x={monoStationById("menara-lepak").x} z={monoStationById("menara-lepak").z} color="#a3e635" />
     </group>
   );
 });

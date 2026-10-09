@@ -5,6 +5,44 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.31
+- Welcome-back toast shows again after login (was racing the auth hello stash)
+
+### 0.10.30
+- Login PIN is 6 digits (was 8) — faster pad entry
+
+### 0.10.29
+- City BGM is a 4-track playlist (lepak / highway / pasar / senja) that rotates; each login starts a different song than last time
+
+### 0.10.28
+- City BGM keeps looping after login; car horn is a proper dual-tone beep
+
+### 0.10.27
+- Login drops you into the city (can walk) with a welcome-back toast; signup still opens the tutorial
+
+### 0.10.26
+- City HUD logout; welcome-back toast on login; first-signup city tutorial (walk / look / phone / world)
+
+### 0.10.25
+- Bus / LRT / taxi rides are 3D cabins now — seats, poles, window scenery rushing past, camera sway
+
+### 0.10.24
+- Phone: Tasks → GIGs; new Profil app (level, XP, wallet, GIG counts)
+- Bus / LRT / taxi “On the way…” screens share a cleaner ride card with a live progress bar
+
+### 0.10.23
+- Small @username tag floats above your character
+
+### 0.10.22
+- Shadows are not walls — softer sun shadows; building collision flush with the facade (no invisible block on the grass verge); cutaway shops don’t keep a solid while hidden
+
+### 0.10.21
+- Traffic turns at junctions (not only U-turns) and keeps world-space gaps so cars stop stacking
+- Trees stay off roads, buildings, river, masjid, and stadium
+
+### 0.10.20
+- MRT Laluan Hijau + Monorel Lepak (board like LRT); phone Peta fast-travel to discovered stations; taxi via Kumar at Sentral
+
 ### 0.10.19
 - Login required on boot — one gamey username + PIN-pad screen (auto signup / login); Anne Maju highscores save under your account
 - Portrait phones get a shared “turn to landscape” gate (city, login, Anne Maju)

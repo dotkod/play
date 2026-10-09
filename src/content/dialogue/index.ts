@@ -253,6 +253,83 @@ export const DIALOGUES: Record<string, Dialogue> = {
       },
     },
   },
+  "kumar-taxi": {
+    id: "kumar-taxi",
+    start: "start",
+    nodes: {
+      start: {
+        id: "start",
+        lines: [
+          {
+            speaker: "kumar",
+            text: {
+              ms: "Eh boss! Baru kat bandar? Saya Kumar — teksi Sentral.",
+              en: "Eh boss! New in town? I'm Kumar — Sentral taxi.",
+            },
+            mood: "happy",
+          },
+          {
+            speaker: "kumar",
+            text: {
+              ms: "Nak teksi cepat? Saya bagi nombor — buka Peta, tekan Teksi. Flat RM3.50.",
+              en: "Need a quick taxi? I'll hook you up — open Map, tap Taxi. Flat RM3.50.",
+            },
+            mood: "excited",
+          },
+        ],
+        choices: [
+          {
+            text: { ms: "Okay Kumar, thanks!", en: "Okay Kumar, thanks!" },
+            next: "done",
+            effects: [
+              { type: "setFlag", id: "taxiUnlocked", value: true },
+              { type: "setFlag", id: "talked:kumar-taxi", value: true },
+              { type: "addReputation", npc: "kumar", delta: 5 },
+            ],
+          },
+          { text: { ms: "Nanti dulu.", en: "Maybe later." }, next: "later" },
+        ],
+      },
+      done: {
+        id: "done",
+        lines: [
+          {
+            speaker: "kumar",
+            text: { ms: "Bagus! Jangan tip terlalu sikit weh.", en: "Bagus! Don't tip too little eh." },
+            mood: "happy",
+          },
+        ],
+      },
+      later: {
+        id: "later",
+        lines: [{ speaker: "kumar", text: { ms: "Okay boss, saya tunggu sini.", en: "Okay boss, I'll be here." }, mood: "neutral" }],
+      },
+    },
+  },
+  "kumar-idle": {
+    id: "kumar-idle",
+    start: "start",
+    nodes: {
+      start: {
+        id: "start",
+        lines: [
+          {
+            speaker: "kumar",
+            text: {
+              ms: "Teksi ready — buka Peta kalau nak pergi jauh.",
+              en: "Taxi ready — open Map if you need to go far.",
+            },
+            mood: "happy",
+          },
+        ],
+        choices: [{ text: { ms: "Okay!", en: "Okay!" }, next: "end" }],
+      },
+      end: {
+        id: "end",
+        lines: [{ speaker: "kumar", text: { ms: "Drive safe… eh, saya yang drive.", en: "Drive safe… wait, I'm the one driving." }, mood: "happy" }],
+      },
+    },
+  },
 };
 
 export function dialogueById(id: string) {

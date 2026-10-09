@@ -1,7 +1,9 @@
 "use client";
 
 import { memo } from "react";
+import { mrtStationById } from "@/content/transit/mrt-hijau";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
+import { RailStationMesh } from "@/world/rail-station-mesh";
 import { JALAN_BUS_STOP, STADIUM } from "./meta";
 
 export const JalanScene = memo(function JalanScene() {
@@ -28,6 +30,7 @@ export const JalanScene = memo(function JalanScene() {
         <Box size={[0.12, 2.4, 0.12]} position={[-1.8, 1.2, 0]} color="#4b5563" outline={false} />
         <Box size={[0.12, 2.4, 0.12]} position={[1.8, 1.2, 0]} color="#4b5563" outline={false} />
       </group>
+      <RailStationMesh x={mrtStationById("bukit-jalan").x} z={mrtStationById("bukit-jalan").z} color="#1f8a4c" />
     </group>
   );
 });

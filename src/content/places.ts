@@ -1,4 +1,4 @@
-import { LRT_STATIONS } from "@/content/transit/lrt-kelana";
+import { ALL_RAIL_STATIONS } from "@/content/transit";
 import { BUS_STOP, STALL } from "@/hub/colliders";
 import { BUILDINGS, doorSpot } from "@/hub/world-data";
 import { BINTIK_BUS_STOP, BINTIK_STRIP } from "@/world/districts/bukit-bintik/meta";
@@ -17,12 +17,15 @@ export type Place = { id: string; x: number; z: number; label: { ms: string; en:
 export const PLACES: Place[] = [
   { id: "bus-stop", x: BUS_STOP.x, z: BUS_STOP.z, label: { ms: "Perhentian bas", en: "Bus stop" } },
   { id: "nasi-lemak-stall", x: STALL.x, z: STALL.z - 1.2, label: { ms: "Gerai nasi lemak", en: "Nasi lemak stall" } },
-  ...LRT_STATIONS.map((s) => ({
-    id: s.place,
-    x: s.x,
-    z: s.z,
-    label: { ms: `Stesen LRT ${s.label.ms}`, en: `LRT ${s.label.en}` },
-  })),
+  ...ALL_RAIL_STATIONS.map((s) => {
+    const kind = s.place.startsWith("mrt") ? "MRT" : s.place.startsWith("mono") ? "Monorel" : "LRT";
+    return {
+      id: s.place,
+      x: s.x,
+      z: s.z,
+      label: { ms: `Stesen ${kind} ${s.label.ms}`, en: `${kind} ${s.label.en}` },
+    };
+  }),
   {
     id: "taman-ceria-bus",
     x: TAMAN_BUS_STOP.x,

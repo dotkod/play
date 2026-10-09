@@ -175,6 +175,9 @@ const LightingRig = memo(function LightingRig({ shadows }: { shadows: boolean })
         shadow-camera-top={22}
         shadow-camera-bottom={-22}
         shadow-camera-far={60}
+        shadow-bias={-0.0002}
+        shadow-normalBias={0.04}
+        shadow-intensity={0.55}
       />
     </>
   );

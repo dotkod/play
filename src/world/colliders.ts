@@ -41,8 +41,8 @@ export const staticColliders: Circle[] = [
   ...[-1.6, -0.5, 0.6, 1.6].map((dx) => ({ x: BUS_STOP.x + dx, z: BUS_STOP.z - 0.3, r: 0.7 })),
   { x: STALL.x, z: STALL.z, r: 1.2 },
   { x: STALL.x + 1.5, z: STALL.z + 0.3, r: 0.45 },
-  ...mamakTables().map((t) => ({ ...t, r: 1.25 })),
-  ...streetSpots().map((s) => ({ x: s.x, z: s.z, r: s.kind === "tree" ? 0.4 : 0.22 })),
+  ...mamakTables().map((t) => ({ ...t, r: 0.7 })),
+  ...streetSpots().map((s) => ({ x: s.x, z: s.z, r: s.kind === "tree" ? 0.35 : 0.2 })),
   ...TRAFFIC_POLES.map((p) => ({ ...p, r: 0.25 })),
 ];
 
