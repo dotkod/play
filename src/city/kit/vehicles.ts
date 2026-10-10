@@ -34,12 +34,37 @@ const GLASS = "#5d7f99";
 const LIGHT = "#fff2c4";
 const TAIL = "#c62f25";
 
-function wheels(len: number, width: number, r: number): Part[] {
+const WHEEL_R = 0.32;
+/** Wheel centres sit this far from the middle, front and back. */
+const axle = (len: number) => len * 0.32;
+
+function wheels(len: number, width: number, r = WHEEL_R): Part[] {
   const out: Part[] = [];
-  for (const z of [len * 0.32, -len * 0.32]) {
-    for (const x of [width / 2 - 0.12, -width / 2 + 0.12]) out.push(cyl(r, r, 0.24, [x, r, z], TYRE, { rotZ: Math.PI / 2, segments: 12 }));
+  for (const z of [axle(len), -axle(len)]) {
+    for (const x of [width / 2 - 0.15, -width / 2 + 0.15]) out.push(cyl(r, r, 0.26, [x, r, z], TYRE, { rotZ: Math.PI / 2, segments: 12 }));
   }
   return out;
+}
+
+/**
+ * Lower body with wheel wells: a deck above the tyres plus skirts between and beyond them,
+ * so no part of the body passes through a wheel (and outlines don't cut across tyres).
+ */
+function chassis(len: number, width: number, top: number, color: string, r = WHEEL_R): Part[] {
+  const deckBottom = r * 2 + 0.04;
+  const skirtBottom = 0.2;
+  const gap = r + 0.08;
+  const a = axle(len);
+  const parts: Part[] = [box([width, top - deckBottom, len], [0, (top + deckBottom) / 2, 0], color)];
+  const spans: [number, number][] = [
+    [-len / 2, -a - gap],
+    [-a + gap, a - gap],
+    [a + gap, len / 2],
+  ];
+  for (const [z0, z1] of spans) {
+    if (z1 - z0 > 0.05) parts.push(box([width, deckBottom - skirtBottom, z1 - z0], [0, (deckBottom + skirtBottom) / 2, (z0 + z1) / 2], color));
+  }
+  return parts;
 }
 
 export function carParts(kind: CarKind, paint: string): Part[] {
@@ -52,8 +77,8 @@ export function carParts(kind: CarKind, paint: string): Part[] {
   const cabinZ = kind === "hatch" ? -len * 0.08 : kind === "mpv" ? -len * 0.05 : -len * 0.04;
   const base = 0.32;
   const parts: Part[] = [
-    ...wheels(len, width, 0.32),
-    box([width, bodyH, len], [0, base + bodyH / 2, 0], body),
+    ...wheels(len, width),
+    ...chassis(len, width, base + bodyH, body),
     box([width - 0.12, cabinH, cabinLen], [0, base + bodyH + cabinH / 2, cabinZ], body),
     box([width - 0.08, cabinH * 0.7, cabinLen - 0.25], [0, base + bodyH + cabinH * 0.45, cabinZ], GLASS, { outline: false }),
     box([width - 0.28, cabinH * 0.68, cabinLen + 0.04], [0, base + bodyH + cabinH * 0.45, cabinZ], GLASS, { outline: false }),
@@ -64,7 +89,7 @@ export function carParts(kind: CarKind, paint: string): Part[] {
   ];
   if (kind === "taxi") {
     // White lower half and a roof sign
-    parts.push(box([width + 0.02, 0.25, len + 0.02], [0, base + 0.18, 0], "#f7f5ef", { outline: false }));
+    parts.push(box([width + 0.02, 0.18, len + 0.02], [0, 0.8, 0], "#f7f5ef", { outline: false }));
     parts.push(box([0.7, 0.22, 0.3], [0, base + bodyH + cabinH + 0.11, cabinZ], "#fcd34d"));
   }
   return parts;
@@ -74,8 +99,8 @@ export function vanParts(brand: Brand): Part[] {
   const { len, width } = VEHICLE_SIZE.van;
   const c = BRANDS[brand];
   return [
-    ...wheels(len, width, 0.34),
-    box([width, 0.7, len], [0, 0.7, 0], "#f7f5ef"),
+    ...wheels(len, width),
+    ...chassis(len, width, 1.05, "#f7f5ef"),
     box([width, 1.25, len * 0.68], [0, 1.65, -len * 0.14], "#f7f5ef"),
     box([width + 0.02, 0.5, len * 0.68], [0, 1.45, -len * 0.14], c.main, { outline: false }),
     box([width - 0.1, 0.7, len * 0.26], [0, 1.4, len * 0.33], c.main),

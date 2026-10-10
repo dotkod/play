@@ -15,6 +15,7 @@ const FRAME = "#f7f3ea";
 const ROOF = "#8c9096";
 const DARK = "#2a2a33";
 const LIT = "#ffd98a";
+const PARAPET_D = 0.32;
 
 export type BuildingParts = { parts: Part[]; glow: Part[] };
 
@@ -80,8 +81,9 @@ export function shophouseParts(b: CityBuilding): BuildingParts {
   parts.push(box(sz(w, 0.14, 0.5), at(w / 2, GROUND_H + 0.05, -0.2), b.trim));
   // Pilasters frame each unit; a parapet tops the facade
   for (const u of [0.12, w - 0.12]) parts.push(box(sz(0.24, upperH, 0.14), at(u, GROUND_H + upperH / 2, -0.06), b.trim));
-  parts.push(box(sz(w, 0.7, 0.32), at(w / 2, H + 0.35, 0.16), b.trim));
-  parts.push(box(sz(w, 0.18, d), at(w / 2, H + 0.09, d / 2), ROOF, { outline: false }));
+  parts.push(box(sz(w, 0.7, PARAPET_D), at(w / 2, H + 0.35, PARAPET_D / 2), b.trim));
+  // Roof deck starts behind the parapet so the two never share space
+  parts.push(box(sz(w, 0.18, d - PARAPET_D), at(w / 2, H + 0.09, PARAPET_D + (d - PARAPET_D) / 2), ROOF, { outline: false }));
   upperWindows(b, parts, glow, w > 6.8 ? 3 : 2, rnd);
 
   // Rooftop and back-lane clutter: water tank, AC units
@@ -116,8 +118,9 @@ export function mamakParts(b: CityBuilding): BuildingParts {
     parts.push(box(sz(w / stripes, 0.08, 1.4), at(u, GROUND_H - 0.25, -0.55), k % 2 ? "#f7f5ef" : b.trim, { rotX: 0, outline: k === 0 }));
   }
   parts.push(box(sz(w, 0.14, 0.5), at(w / 2, GROUND_H + 0.05, -0.2), b.trim));
-  parts.push(box(sz(w, 0.7, 0.32), at(w / 2, H + 0.35, 0.16), b.trim));
-  parts.push(box(sz(w, 0.18, d), at(w / 2, H + 0.09, d / 2), ROOF, { outline: false }));
+  parts.push(box(sz(w, 0.7, PARAPET_D), at(w / 2, H + 0.35, PARAPET_D / 2), b.trim));
+  // Roof deck starts behind the parapet so the two never share space
+  parts.push(box(sz(w, 0.18, d - PARAPET_D), at(w / 2, H + 0.09, PARAPET_D + (d - PARAPET_D) / 2), ROOF, { outline: false }));
   upperWindows(b, parts, glow, 4, seeded(hash(b.id)));
 
   // Two round tables with stools at the ends of the five-foot way (colliders: mamakTables)
