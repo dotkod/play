@@ -5,6 +5,14 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.62
+- Roads no longer drive into buildings: Sentral hall, Menara Lepak tower, Bukit Bintik strip and Stadium Bukit Jalan moved clear (the stadium road now ends at the gate)
+- Kampung Lepak road actually reaches the village (the last stretch was missing)
+- Petaling car park no longer sits inside Klinik 24 Jam
+- Footpaths to the KLCC and Sentral bus stops and to the LRT KLCC, LRT Taman Ceria, MRT Sentral and MRT Pasar Besar exits (you could arrive and be stuck on grass)
+- District buildings are solid now (no walking through Sentral, Bintik, kampung houses, Menara 106 or the KLCC podium)
+- City map draws every district building, so it matches what you see in 3D
+
 ### 0.10.61
 - Night is readable now: blue-hour lighting instead of near-black
 - Haze, cloud and rain tint the city but can no longer black it out (night + jerebu was ~15% light)

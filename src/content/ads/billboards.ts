@@ -36,7 +36,7 @@ export type BillboardSpot = { id: string; x: number; z: number; rotY: number };
  */
 export const BILLBOARD_SPOTS: BillboardSpot[] = [
   // NE grass (east of Klinik row, north of the E–W road)
-  { id: "grass-ne", x: 55, z: -22, rotY: (-Math.PI * 3) / 4 },
+  { id: "grass-ne", x: 58, z: -22, rotY: (-Math.PI * 3) / 4 },
   // NW grass (west of Mega Mall block, north of the road)
   { id: "grass-nw", x: -58, z: -26, rotY: (-Math.PI) / 4 },
   // SE grass (east of the Bintik spur, south of the road)

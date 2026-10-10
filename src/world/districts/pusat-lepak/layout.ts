@@ -13,7 +13,7 @@ export const BOUNDS = 38;
 export const WORLD_MIN_X = -110;
 export const WORLD_MAX_X = 145;
 export const WORLD_MIN_Z = -128;
-export const WORLD_MAX_Z = 95;
+export const WORLD_MAX_Z = 120;
 /** Where a new session starts: north sidewalk beside Anne Maju, facing east. */
 export const DEFAULT_SPAWN = { x: 7.5, z: -4.4, rotY: Math.PI / 2 };
 export const SIDEWALK_MID = (ROAD_HALF + WALK_HALF) / 2;

@@ -45,38 +45,7 @@ const EPS = 0.05;
  * Problems that already exist, with why each is allowed for now. New problems still fail the
  * check. Fixing one also fails it (the entry is stale), so delete its line when you fix it.
  */
-const KNOWN: Record<string, string> = {
-  "menara-lepak sits on road z=0 (x -90…140) by 2.0m": "west arterial ends inside the tower base; move TOWER_POS to z≈-8.5",
-  "sentral-hall sits on road z=-48 (x -40…0) by 6.0m": "Sentral spur drives into the hall; hall should sit north of the spur end",
-  "sentral-hall sits on road x=-40 (z -52…-48) by 5.8m": "same Sentral spur",
-  "bintik-1 sits on road x=48 (z 0…22) by 3.9m": "Bintik spur runs into a neon block; end the spur before z≈18",
-  "stadium sits on road z=76 (x 0…22) by 3.5m": "stadium bowl clips the L-junction spur",
-  "stadium sits on road x=22 (z 76…90) by 14.5m": "by design: gate approach into the bowl (player.tsx keeps it open)",
-  "park-petaling overlaps klinik by 2.0m": "Petaling car park sits in Klinik 24 Jam's back; shift the lot east",
-  "park-stadium overlaps stadium by 2.5m": "stadium car park cuts into the bowl edge",
-  "KLCC_BUS_STOP at (18.0, -86.0) is on grass": "stop has no paved path to the road",
-  "SENTRAL_BUS_STOP at (-32.0, -40.0) is on grass": "stop has no paved path to the road",
-  "lrt-klcc exit at (-14.0, -88.5) is on grass": "station exit off the paved network",
-  "lrt-taman exit at (94.0, 6.5) is on grass": "station exit off the paved network",
-  "mrt-sentral exit at (-42.5, -44.0) is on grass": "station exit off the paved network",
-  "mrt-pasar exit at (8.0, 49.5) is on grass": "station exit off the paved network",
-  "mono-bintik exit at (44.0, 24.5) is on grass": "station exit off the paved network",
-  "place lrt-klcc at (-14.0, -90.0) is on grass": "map marker off the paved network",
-  "place lrt-taman at (94.0, 8.0) is on grass": "map marker off the paved network",
-  "place mrt-sentral at (-44.0, -44.0) is on grass": "map marker off the paved network",
-  "place mrt-pasar at (8.0, 48.0) is on grass": "map marker off the paved network",
-  "place mono-bintik at (44.0, 26.0) is on grass": "map marker off the paved network",
-  "place klcc-bus at (18.0, -86.0) is on grass": "map marker off the paved network",
-  "place kampung-lepak at (-65.0, 50.0) is on grass": "village centre marker sits on grass",
-  "place pasar-besar at (-12.0, 60.0) is on grass": "marker at the hall centre",
-  "place sentral-lepak-bus at (-32.0, -40.0) is on grass": "map marker off the paved network",
-  "mrt-jalan exit at (20.5, 82.0) is inside stadium": "by design: inside the open gate approach",
-  "place mrt-jalan at (22.0, 82.0) is inside stadium": "by design: inside the open gate approach",
-  "place stadium-bukit-jalan at (22.0, 90.0) is inside stadium": "marker at the bowl centre",
-  "place pasar-besar at (-12.0, 60.0) is inside pasar-w": "marker at the hall centre",
-  "edge kampung-k–kampung is diagonal": "diagonal edges get no asphalt, so the Kampung spur stops at (-62, 38)",
-  stadium: "back half of the bowl is past WORLD_MAX_Z",
-};
+const KNOWN: Record<string, string> = {};
 
 const seen = new Set<string>();
 
@@ -245,6 +214,42 @@ describe("spots", () => {
   it("spawn, doors, stops, station exits, NPCs and places are walkable", () => {
     const errors = SPOTS.filter((p) => !isWalkable(p.x, p.z)).map((p) => `${p.id} at (${fmt(p.x)}, ${fmt(p.z)}) is on grass`);
     expectOnlyKnown(errors);
+  });
+
+  it("are all reachable on foot from the default spawn", () => {
+    // Flood fill over a 0.5m grid of walkable ground the player's body fits on
+    const STEP = 0.5;
+    const nx = Math.ceil((WORLD_MAX_X - WORLD_MIN_X) / STEP) + 1;
+    const nz = Math.ceil((WORLD_MAX_Z - WORLD_MIN_Z) / STEP) + 1;
+    const cell = (x: number, z: number) => Math.round((x - WORLD_MIN_X) / STEP) + Math.round((z - WORLD_MIN_Z) / STEP) * nx;
+    const blocking = SOLIDS.filter((s) => s.blocksPlayer);
+    const open = (i: number) => {
+      const x = WORLD_MIN_X + (i % nx) * STEP;
+      const z = WORLD_MIN_Z + Math.floor(i / nx) * STEP;
+      return isWalkable(x, z) && !blocking.some((b) => pointInSolid(x, z, b, 0.45));
+    };
+    const reached = new Uint8Array(nx * nz);
+    const start = cell(DEFAULT_SPAWN.x, DEFAULT_SPAWN.z);
+    reached[start] = 1;
+    const queue = [start];
+    while (queue.length) {
+      const i = queue.pop()!;
+      const ix = i % nx;
+      for (const j of [ix > 0 ? i - 1 : -1, ix < nx - 1 ? i + 1 : -1, i - nx, i + nx]) {
+        if (j < 0 || j >= reached.length || reached[j]) continue;
+        reached[j] = 1;
+        if (open(j)) queue.push(j);
+        else reached[j] = 2;
+      }
+    }
+    // A spot counts as reachable if any open cell within 1m was reached
+    const near = (p: Spot) => {
+      for (let dx = -1; dx <= 1; dx += STEP) {
+        for (let dz = -1; dz <= 1; dz += STEP) if (reached[cell(p.x + dx, p.z + dz)] === 1) return true;
+      }
+      return false;
+    };
+    expectOnlyKnown(SPOTS.filter((p) => !near(p)).map((p) => `${p.id} at (${fmt(p.x)}, ${fmt(p.z)}) can't be reached on foot`));
   });
 
   it("none of them are inside a building", () => {

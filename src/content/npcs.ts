@@ -1,7 +1,7 @@
 import type { Look } from "@/shared/three/look";
 import { BUS_STOP, STALL } from "@/hub/colliders";
 import { doorSpot, BUILDINGS } from "@/hub/world-data";
-import { SENTRAL_HALL } from "@/world/districts/sentral-lepak/meta";
+import { SENTRAL_HALL, SENTRAL_HALL_SIZE } from "@/world/districts/sentral-lepak/meta";
 
 export type NamedNpc = {
   id: string;
@@ -73,8 +73,8 @@ export const NAMED_NPCS: NamedNpc[] = [
     id: "kumar",
     name: { ms: "Kumar", en: "Kumar" },
     look: { skin: "#c98d60", shirt: "#f0d060", pants: "#1f1a17", headwear: "short", hair: "#1b1714" },
-    x: SENTRAL_HALL.x + 6,
-    z: SENTRAL_HALL.z + 4,
+    x: SENTRAL_HALL.x + 8,
+    z: SENTRAL_HALL.z + SENTRAL_HALL_SIZE.d / 2 + 2,
     rotY: Math.PI,
     barks: [
       { ms: "Teksi? Saya tahu shortcut semua.", en: "Taxi? I know every shortcut." },

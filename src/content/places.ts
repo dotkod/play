@@ -2,13 +2,13 @@ import { ALL_RAIL_STATIONS } from "@/content/transit";
 import { BUS_STOP, STALL } from "@/hub/colliders";
 import { BUILDINGS, doorSpot } from "@/hub/world-data";
 import { BINTIK_BUS_STOP, BINTIK_STRIP } from "@/world/districts/bukit-bintik/meta";
-import { JALAN_BUS_STOP, STADIUM } from "@/world/districts/bukit-jalan/meta";
-import { KAMPUNG_BUS_STOP, KAMPUNG_CENTRE } from "@/world/districts/kampung-lepak/meta";
+import { JALAN_BUS_STOP, STADIUM_GATE } from "@/world/districts/bukit-jalan/meta";
+import { KAMPUNG_BUS_STOP, KAMPUNG_ENTRANCE } from "@/world/districts/kampung-lepak/meta";
 import { KLCC_BUS_STOP, KLCC_FOUNTAIN } from "@/world/districts/klcc/meta";
 import { MENARA_BUS_STOP, TOWER_POS } from "@/world/districts/menara-lepak/meta";
 import { PASAR_BUS_STOP, PASAR_HALL } from "@/world/districts/pasar-besar/meta";
 import { PETALING_BUS_STOP, PETALING_STREET } from "@/world/districts/petaling-lane/meta";
-import { SENTRAL_BUS_STOP, SENTRAL_HALL } from "@/world/districts/sentral-lepak/meta";
+import { SENTRAL_BUS_STOP, SENTRAL_HALL, SENTRAL_HALL_SIZE } from "@/world/districts/sentral-lepak/meta";
 import { TAMAN_BUS_STOP, TAMAN_HOME_DOOR } from "@/world/districts/taman-ceria/meta";
 import { MENARA_106, TLX_BUS_STOP } from "@/world/districts/tlx/meta";
 
@@ -94,8 +94,8 @@ export const PLACES: Place[] = [
   },
   {
     id: "stadium-bukit-jalan",
-    x: STADIUM.x,
-    z: STADIUM.z,
+    x: STADIUM_GATE.x,
+    z: STADIUM_GATE.z,
     label: { ms: "Stadium Bukit Jalan", en: "Stadium Bukit Jalan" },
   },
   {
@@ -106,8 +106,8 @@ export const PLACES: Place[] = [
   },
   {
     id: "kampung-lepak",
-    x: KAMPUNG_CENTRE.x,
-    z: KAMPUNG_CENTRE.z,
+    x: KAMPUNG_ENTRANCE.x,
+    z: KAMPUNG_ENTRANCE.z,
     label: { ms: "Kampung Lepak", en: "Kampung Lepak" },
   },
   {
@@ -118,7 +118,7 @@ export const PLACES: Place[] = [
   },
   {
     id: "pasar-besar",
-    x: PASAR_HALL.x - 12,
+    x: PASAR_HALL.x - 6,
     z: PASAR_HALL.z,
     label: { ms: "Pasar Besar", en: "Pasar Besar" },
   },
@@ -142,8 +142,9 @@ export const PLACES: Place[] = [
   },
   {
     id: "sentral-lepak",
-    x: SENTRAL_HALL.x,
-    z: SENTRAL_HALL.z,
+    // Hall entrance at the end of the Sentral spur
+    x: -40,
+    z: SENTRAL_HALL.z + SENTRAL_HALL_SIZE.d / 2 + 1.5,
     label: { ms: "Sentral Lepak", en: "Sentral Lepak" },
   },
   ...BUILDINGS.map((b) => {

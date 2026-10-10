@@ -9,4 +9,5 @@ export const BUKIT_BINTIK = {
 export const BINTIK_BUS_STOP = { x: 48, z: 5.8 };
 export const BINTIK_STRIP = { x: 50, z: 22 };
 /** Neon blocks along the strip (centre, footprint). */
-export const BINTIK_BLOCKS = [-8, -2, 4, 10].map((dx) => ({ x: BINTIK_STRIP.x + dx, z: BINTIK_STRIP.z, w: 5.5, d: 6 }));
+/** Two each side of the spur so the road ends in a neon street, not inside a block. */
+export const BINTIK_BLOCKS = [-14.5, -9, 5, 10.5].map((dx) => ({ x: BINTIK_STRIP.x + dx, z: BINTIK_STRIP.z, w: 5.5, d: 6 }));

@@ -3,7 +3,6 @@ import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/boun
 import { BINTIK_STRIP } from "@/world/districts/bukit-bintik/meta";
 import { STADIUM } from "@/world/districts/bukit-jalan/meta";
 import { KAMPUNG_CENTRE } from "@/world/districts/kampung-lepak/meta";
-import { TOWER_L, TOWER_R } from "@/world/districts/klcc/meta";
 import { TOWER_POS } from "@/world/districts/menara-lepak/meta";
 import { PASAR_HALLS } from "@/world/districts/pasar-besar/buildings";
 import { PASAR_HALL } from "@/world/districts/pasar-besar/meta";
@@ -12,12 +11,15 @@ import { SENTRAL_HALL } from "@/world/districts/sentral-lepak/meta";
 import { TERRACES } from "@/world/districts/taman-ceria/layout";
 import { MENARA_106, TLX_PARK } from "@/world/districts/tlx/meta";
 import { PARKING_LOTS } from "@/world/parking-lots";
+import { SOLIDS } from "@/world/placements";
 import { ROAD_STRIPS, stripLength, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
 import { WALK_PLAZAS } from "@/world/walkability";
 import { paintMapGrass, paintMapLandmarks, paintMapLabels, paintMapTrees } from "./map-decor";
 import { BUS_STOP } from "./colliders";
 import { OUTER_BUS_PLACES, placeById } from "@/content/places";
 import { BUILDINGS, doorSpot, footprint, ROAD_HALF, WALK_HALF } from "./world-data";
+
+const OWN_PAINT = new Set([...BUILDINGS.map((b) => b.id), ...TERRACES.map((t) => t.id), ...PASAR_HALLS.map((h) => h.id)]);
 
 const PATH = "#cfc8bb";
 
@@ -152,18 +154,26 @@ export function paintCityBase(
   b.font = `${Math.round(12 * dpr)}px system-ui, sans-serif`;
   b.textAlign = "center";
   b.textBaseline = "middle";
-  b.fillStyle = "#c5ced8";
-  b.fillRect(X(TOWER_L.x) - 3 * dpr, Z(TOWER_L.z) - 3 * dpr, 6 * dpr, 6 * dpr);
-  b.fillRect(X(TOWER_R.x) - 3 * dpr, Z(TOWER_R.z) - 3 * dpr, 6 * dpr, 6 * dpr);
+  // District buildings straight from the layout registry, so the map matches the 3D world
+  // (Pusat shops, terraces and Pasar halls are painted in their own colours elsewhere)
+  b.fillStyle = "#d4dde6";
+  b.strokeStyle = "#1f1a17";
+  b.lineWidth = 1 * dpr;
+  for (const sd of SOLIDS) {
+    if (sd.kind !== "building" || OWN_PAINT.has(sd.id)) continue;
+    if (sd.r != null) {
+      b.beginPath();
+      b.arc(X((sd.box.minX + sd.box.maxX) / 2), Z((sd.box.minZ + sd.box.maxZ) / 2), sd.r * k, 0, Math.PI * 2);
+      b.fill();
+      b.stroke();
+    } else {
+      b.fillRect(X(sd.box.minX), Z(sd.box.minZ), (sd.box.maxX - sd.box.minX) * k, (sd.box.maxZ - sd.box.minZ) * k);
+      b.strokeRect(X(sd.box.minX), Z(sd.box.minZ), (sd.box.maxX - sd.box.minX) * k, (sd.box.maxZ - sd.box.minZ) * k);
+    }
+  }
   b.fillStyle = "#1f1a17";
   b.fillText("🏢", X(0), Z(-100));
-  b.fillStyle = "#d4dde6";
-  b.fillRect(X(TOWER_POS.x) - 2 * dpr, Z(TOWER_POS.z) - 8 * dpr, 4 * dpr, 16 * dpr);
-  b.fillStyle = "#1f1a17";
   b.fillText("📡", X(TOWER_POS.x), Z(TOWER_POS.z));
-  b.fillStyle = "#a8c4d8";
-  b.fillRect(X(MENARA_106.x) - 2.5 * dpr, Z(MENARA_106.z) - 10 * dpr, 5 * dpr, 20 * dpr);
-  b.fillStyle = "#1f1a17";
   b.fillText("🏙", X(MENARA_106.x), Z(MENARA_106.z));
   b.fillText("🛒", X(PASAR_HALL.x - 12), Z(PASAR_HALL.z));
   b.fillText("🏟", X(STADIUM.x), Z(STADIUM.z));

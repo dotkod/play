@@ -1,4 +1,4 @@
 export const HUB = {
   name: "Kuala Lepak",
-  version: "0.10.61",
+  version: "0.10.62",
 };

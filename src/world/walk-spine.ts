@@ -20,14 +20,14 @@ export const SPINE_NODES: Record<string, SpineNode> = {
   // Clean L: arterial → east spur → south into stadium (bowl off the carriageway)
   "stadium-j": { id: "stadium-j", x: 0, z: 76 },
   "stadium-k": { id: "stadium-k", x: 22, z: 76 },
-  stadium: { id: "stadium", x: 22, z: 90 },
+  stadium: { id: "stadium", x: 22, z: 84.5 },
   // Bukit Bintik — L off east arterial
   "bintik-j": { id: "bintik-j", x: 48, z: 0 },
-  bintik: { id: "bintik", x: 48, z: 22 },
+  bintik: { id: "bintik", x: 48, z: 26 },
   // Kampung — L off west arterial into the village centre
   "kampung-j": { id: "kampung-j", x: -42, z: 38 },
   "kampung-k": { id: "kampung-k", x: -62, z: 38 },
-  kampung: { id: "kampung", x: -65, z: 50 },
+  kampung: { id: "kampung", x: -62, z: 44 },
   // Petaling Lane — E spur off north arterial, then N–S street through the market
   "petaling-j": { id: "petaling-j", x: 0, z: -28 },
   petaling: { id: "petaling", x: 28, z: -28 },
@@ -43,8 +43,8 @@ export const SPINE_NODES: Record<string, SpineNode> = {
   // Parking driveway mouths (connected stubs — cars can peel in)
   "park-mega": { id: "park-mega", x: -48, z: -11 },
   "park-mega-j": { id: "park-mega-j", x: -48, z: 0 },
-  "park-petaling": { id: "park-petaling", x: 42, z: -12 },
-  "park-petaling-j": { id: "park-petaling-j", x: 42, z: -28 },
+  "park-petaling": { id: "park-petaling", x: 44.2, z: -12 },
+  "park-petaling-j": { id: "park-petaling-j", x: 44.2, z: -28 },
 };
 
 /** Undirected corridors (centreline). All edges are axis-aligned. */
@@ -189,6 +189,13 @@ export const WALK_PATHS: RoadStrip[] = [
   { axis: "x", z: -39, x0: 22.5, x1: 33.5 }, // mid market crossing
   { axis: "x", z: -44.5, x0: 22.5, x1: 33.5 },
   { axis: "x", z: -50.5, x0: 22.5, x1: 33.5 },
+  // Bus stops and station exits that sit off the carriageway verge
+  { axis: "x", z: -86, x0: 3, x1: 20 }, // KLCC bus stop
+  { axis: "x", z: -89, x0: -16, x1: -3 }, // LRT KLCC
+  { axis: "z", x: -32, z0: -43, z1: -39 }, // Sentral bus stop
+  { axis: "x", z: -44, x0: -46, x1: -38 }, // MRT Sentral
+  { axis: "z", x: 94, z0: 5, z1: 9.5 }, // LRT Taman Ceria
+  { axis: "x", z: 49, x0: 5, x1: 10 }, // MRT Pasar Besar
   // Taman Ceria — five-foot way along the terrace fronts (north verge)
   { axis: "x", z: -5.25, x0: 90, x1: 128 },
 ];

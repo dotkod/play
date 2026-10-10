@@ -8,6 +8,8 @@ export const KAMPUNG_LEPAK = {
 
 export const KAMPUNG_BUS_STOP = { x: -55, z: 38 };
 export const KAMPUNG_CENTRE = { x: -65, z: 50 };
+/** End of the village spur, between the houses (map marker, wayfinder target). */
+export const KAMPUNG_ENTRANCE = { x: -62, z: 44 };
 /** Stilt houses around the village centre (roof overhang included). */
 export const KAMPUNG_HOUSES = [
   [-8, -4],

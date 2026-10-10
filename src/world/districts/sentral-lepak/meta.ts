@@ -7,6 +7,7 @@ export const SENTRAL_LEPAK = {
 };
 
 export const SENTRAL_BUS_STOP = { x: -32, z: -40 };
-export const SENTRAL_HALL = { x: -42, z: -52 };
+/** Hall sits south of the spur end (asphalt stops at z≈-53), entrance facing the road. */
+export const SENTRAL_HALL = { x: -42, z: -63 };
 /** Station hall footprint, centred on SENTRAL_HALL. */
 export const SENTRAL_HALL_SIZE = { w: 28, d: 16 };

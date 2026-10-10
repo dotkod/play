@@ -6,7 +6,8 @@ export const MENARA_LEPAK = {
   neighbours: ["pusat-lepak"] as const,
 };
 
-export const TOWER_POS = { x: -92, z: -6 };
+/** North edge stays clear of the west arterial (asphalt reaches z=-3). */
+export const TOWER_POS = { x: -92, z: -8.5 };
 export const MENARA_BUS_STOP = { x: -68, z: 5.6 };
 export const MENARA_HILL = { x: -90, z: -4, r: 22 };
 /** Square base of the tower (world metres). */

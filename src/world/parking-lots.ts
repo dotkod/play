@@ -65,12 +65,12 @@ export const PARKING_LOTS: ParkingLot[] = [
   // East of Petaling T-junction — clear of spur walk band (|z+28|≲6) and N–S street (|x-28|≲6)
   {
     id: "park-petaling",
-    x: 42,
+    x: 44.2,
     z: -12,
     w: 11,
     d: 8,
     entrance: "n",
-    drive: { axis: "z", x0: 42, z0: -28, x1: 42, z1: -8 },
+    drive: { axis: "z", x0: 44.2, z0: -28, x1: 44.2, z1: -8 },
     stalls: gridStalls(3, 2, 3.2, 3.5, 0, 11),
   },
   // East of stadium approach, clear of the L-junction and bowl
