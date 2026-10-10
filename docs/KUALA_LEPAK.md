@@ -195,14 +195,16 @@ These were all learned the hard way. Breaking them causes crashes, leaks or jank
 14. Absolute timestamps vs offsets: "forever" must be `now + LARGE`, never a constant.
 15. Pausing shifts every stored timestamp by the paused duration (`shiftTimes` in `state.ts`).
 16. Leaderboard POSTs are range-checked server-side (`isPlausible`). Keep that for every new job.
-16a. **Layout registry:** every building, landmark, car park, playground and billboard footprint
-    is listed in `src/world/placements.ts` (`SOLIDS`). Export sizes from the district's
-    `meta.ts`/`layout.ts`, use them in the scene, and add the footprint to `SOLIDS`; never
-    hard-code a size only in a scene. Player collision and map tree culling read `SOLIDS`.
-16b. **Layout check:** `pnpm check:layout` (`src/world/layout.test.ts`) fails when buildings
-    overlap each other or the asphalt, props crowd buildings, or a spawn/door/stop/station exit
-    is on grass or inside a wall. It runs inside `pnpm build`, so a bad layout blocks the deploy.
-    Existing problems are listed in `KNOWN` with a reason; fix them by deleting their line.
+16a. **City plan (v2, since 0.11.0):** the city is generated from one grid in `src/city/plan`
+    (`grid.ts` → roads, junctions, sidewalks, blocks; `lots.ts` → buildings; `props.ts` →
+    lamps, trees, signals, markings; `lanes.ts` → traffic lanes; `colliders.ts` → collisions).
+    Never place anything by hand in a scene: add it to the plan so rendering, collisions,
+    the minimap and the tests all see it. Render code lives in `src/city/kit` (merged toon
+    geometry, instancing, textures) and `src/city/components`.
+16b. **Layout check:** `pnpm check:layout` runs `src/city/**.test.ts`: no overlaps between
+    roads, sidewalks, buildings and props; pedestrian paths clear; every door reachable from
+    spawn; 3-minute traffic runs with no collisions, red-light runs or gridlock. It runs in
+    `pnpm build`, so a bad layout blocks the deploy. Fix the plan; don't loosen the tests.
 
 ### Mobile UI
 17. Use `.edge-tl/.edge-tr/.edge-bl/.edge-br/.edge-top/.safe-px/.safe-pt/.safe-pr` for anything

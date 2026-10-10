@@ -2,27 +2,14 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getAuth, loginAccount, logoutAccount, registerAccount, useAuth } from "@/core/auth-client";
-import { acceptTask } from "@/core/tasks/engine";
-import { taskById } from "@/core/tasks/catalog";
-import {
-  XP_PER_LEVEL,
-  markInboxAccepted,
-  markInboxRead,
-  setPinnedTask,
-  unreadInboxCount,
-  useProfile,
-} from "@/core/profile";
+import { XP_PER_LEVEL, markInboxRead, unreadInboxCount, useProfile } from "@/core/profile";
 import { setMuted, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
-import { npcById } from "@/content/npcs";
-import type { RailLine, RailStation } from "@/content/transit";
-import type { TaxiDest } from "@/content/transit/taxi";
 import { HUB } from "../meta";
 import { rm } from "../hud";
 import { HUB_STRINGS } from "../strings";
-import { Peta } from "./peta";
 
-type AppId = "home" | "mesej" | "tugasan" | "profil" | "dompet" | "tetapan" | "peta";
+type AppId = "home" | "mesej" | "profil" | "dompet" | "tetapan";
 type IconKind = "mesej" | "tugasan" | "profil" | "dompet" | "tetapan" | "kerja" | "peta";
 
 const APP_ICON: Record<IconKind, { bg: string }> = {
@@ -35,23 +22,11 @@ const APP_ICON: Record<IconKind, { bg: string }> = {
   peta: { bg: "linear-gradient(160deg,#64d2ff 0%,#30d158 55%,#ffd60a 100%)" },
 };
 
-export function Phone({
-  open,
-  onClose,
-  onOpenMap,
-  onRailTravel,
-  onTaxiTravel,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onOpenMap?: () => void;
-  onRailTravel?: (line: RailLine, dest: RailStation) => void;
-  onTaxiTravel?: (dest: TaxiDest) => void;
-}) {
+export function Phone({ open, onClose }: { open: boolean; onClose: () => void }) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
   const auth = useAuth();
-  const profile = useProfile();
+  useProfile(); // re-render on inbox changes (unread badge)
   const [app, setApp] = useState<AppId>("home");
   const [clock, setClock] = useState("9:41");
 
@@ -79,15 +54,11 @@ export function Phone({
       ? null
       : app === "mesej"
         ? tr.appMesej
-        : app === "tugasan"
-          ? tr.appTugasan
-          : app === "profil"
-            ? tr.appProfil
-            : app === "dompet"
-              ? tr.appDompet
-              : app === "peta"
-                ? tr.appPeta
-                : tr.appTetapan;
+        : app === "profil"
+          ? tr.appProfil
+          : app === "dompet"
+            ? tr.appDompet
+            : tr.appTetapan;
 
   return (
     <div
@@ -158,26 +129,14 @@ export function Phone({
                   <HomeScreen
                     tr={tr}
                     unread={unreadInboxCount()}
-                    activeTasks={profile.tasks.active.length}
                     onOpen={setApp}
                     subtitle={getAuth().username ? `@${getAuth().username}` : `${HUB.name} · v${HUB.version}`}
                   />
                 )}
-                {app === "mesej" && <Mesej lang={lang} onAccepted={() => setApp("tugasan")} />}
-                {app === "tugasan" && <Tugasan lang={lang} />}
+                {app === "mesej" && <Mesej lang={lang} />}
                 {app === "profil" && <Profil lang={lang} auth={auth} />}
                 {app === "dompet" && <Dompet lang={lang} />}
                 {app === "tetapan" && <Tetapan lang={lang} auth={auth} />}
-                {app === "peta" && (
-                  <Peta
-                    onOpenMap={() => {
-                      dismiss();
-                      onOpenMap?.();
-                    }}
-                    onRail={(line, dest) => onRailTravel?.(line, dest)}
-                    onTaxi={(dest) => onTaxiTravel?.(dest)}
-                  />
-                )}
               </div>
 
               {/* Home indicator — swipe hint; tap goes home or closes */}
@@ -200,13 +159,11 @@ export function Phone({
 function HomeScreen({
   tr,
   unread,
-  activeTasks,
   onOpen,
   subtitle,
 }: {
   tr: (typeof HUB_STRINGS)["ms"];
   unread: number;
-  activeTasks: number;
   onOpen: (id: AppId) => void;
   subtitle: string;
 }) {
@@ -218,18 +175,16 @@ function HomeScreen({
 
       <div className="grid grid-cols-4 gap-x-1 gap-y-5 px-0.5 sm:gap-x-2 sm:gap-y-6 sm:px-1">
         <IosIcon kind="mesej" label={tr.appMesej} badge={unread} onClick={() => onOpen("mesej")} />
-        <IosIcon kind="tugasan" label={tr.appTugasan} badge={activeTasks} onClick={() => onOpen("tugasan")} />
         <IosIcon kind="profil" label={tr.appProfil} onClick={() => onOpen("profil")} />
         <IosIcon kind="dompet" label={tr.appDompet} onClick={() => onOpen("dompet")} />
         <IosIcon kind="tetapan" label={tr.appTetapan} onClick={() => onOpen("tetapan")} />
         <IosIcon kind="kerja" label={tr.appKerja} soon />
-        <IosIcon kind="peta" label={tr.appPeta} onClick={() => onOpen("peta")} />
       </div>
 
       <div className="mt-auto mb-1 rounded-[28px] border border-white/25 bg-white/20 p-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-2xl sm:rounded-[32px] sm:p-3.5">
         <div className="grid grid-cols-4 place-items-center gap-1">
           <DockIcon kind="mesej" onClick={() => onOpen("mesej")} badge={unread} />
-          <DockIcon kind="tugasan" onClick={() => onOpen("tugasan")} badge={activeTasks} />
+          <DockIcon kind="profil" onClick={() => onOpen("profil")} />
           <DockIcon kind="dompet" onClick={() => onOpen("dompet")} />
           <DockIcon kind="tetapan" onClick={() => onOpen("tetapan")} />
         </div>
@@ -378,10 +333,9 @@ function AppGlyph({ kind, size = 32 }: { kind: IconKind; size?: number }) {
   );
 }
 
-function Mesej({ lang, onAccepted }: { lang: "ms" | "en"; onAccepted: () => void }) {
+function Mesej({ lang }: { lang: "ms" | "en" }) {
   const p = useProfile();
   const tr = HUB_STRINGS[lang];
-  const [failId, setFailId] = useState<string | null>(null);
   if (!p.inbox.length) {
     return (
       <div className="flex flex-col items-center px-8 py-16 text-center">
@@ -398,14 +352,8 @@ function Mesej({ lang, onAccepted }: { lang: "ms" | "en"; onAccepted: () => void
       <p className="px-5 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appMesej}</p>
       <div className="mx-3 overflow-hidden rounded-[14px] bg-white shadow-sm">
         {p.inbox.map((m, i) => {
-          const who = m.from === "kak-yati" ? "Kak Yati" : npcById(m.from)?.name[lang] ?? m.from;
+          const who = m.from === "kak-yati" ? "Kak Yati" : m.from.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
           const initial = who.slice(0, 1).toUpperCase();
-          const task = m.taskId ? taskById(m.taskId) : null;
-          const active = m.taskId ? p.tasks.active.some((a) => a.id === m.taskId) : false;
-          const done = m.taskId ? p.tasks.done.includes(m.taskId) && !task?.repeat : false;
-          // Show Accept if we can still take it (also recovers stuck "accepted" with no active task)
-          // Recover stuck inbox rows where accepted was set but the task never activated
-          const showAccept = Boolean(m.taskId && task && !active && !done);
           return (
             <div key={m.id} className={`flex gap-3 px-3.5 py-3.5 ${i > 0 ? "border-t border-black/5" : ""}`}>
               <div className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#64d2ff] to-[#0a84ff] text-[17px] font-semibold text-white shadow-sm">
@@ -417,10 +365,6 @@ function Mesej({ lang, onAccepted }: { lang: "ms" | "en"; onAccepted: () => void
                   {!m.read && <span className="size-2.5 shrink-0 rounded-full bg-[#007aff]" />}
                 </div>
                 <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug text-[#8e8e93]">{lang === "ms" ? m.bodyMs : m.bodyEn}</p>
-                {(active || (m.accepted && done)) && (
-                  <p className="mt-1.5 text-[12px] font-semibold text-[#34c759]">{active ? tr.taskActive : tr.taskDone}</p>
-                )}
-                {failId === m.id && <p className="mt-1.5 text-[12px] font-semibold text-[#ff3b30]">{tr.acceptFailed}</p>}
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {!m.read && (
                     <button
@@ -431,91 +375,11 @@ function Mesej({ lang, onAccepted }: { lang: "ms" | "en"; onAccepted: () => void
                       {tr.markRead}
                     </button>
                   )}
-                  {showAccept && (
-                    <button
-                      type="button"
-                      className="rounded-full bg-[#007aff] px-3.5 py-1.5 text-[13px] font-semibold text-white active:opacity-70"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!m.taskId) return;
-                        if (acceptTask(m.taskId, { pin: true })) {
-                          markInboxAccepted(m.id);
-                          setFailId(null);
-                          onAccepted();
-                        } else {
-                          setFailId(m.id);
-                        }
-                      }}
-                    >
-                      {tr.acceptTask}
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function Tugasan({ lang }: { lang: "ms" | "en" }) {
-  const p = useProfile();
-  const tr = HUB_STRINGS[lang];
-  return (
-    <div className="bg-[#f2f2f7] px-3 pb-4">
-      <p className="px-2 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appTugasan}</p>
-
-      <p className="mb-1.5 px-4 text-[13px] font-normal tracking-wide text-[#8e8e93] uppercase">{tr.activeTasks}</p>
-      <div className="mb-4 overflow-hidden rounded-[14px] bg-white shadow-sm">
-        {!p.tasks.active.length && <p className="px-4 py-5 text-[15px] text-[#8e8e93]">{tr.noTasks}</p>}
-        {p.tasks.active.map((a, i) => {
-          const t = taskById(a.id);
-          if (!t) return null;
-          const obj = t.objectives[a.step];
-          const pinned = p.pinnedTask === a.id;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => setPinnedTask(a.id)}
-              className={`flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-black/5 ${i > 0 ? "border-t border-black/5" : ""}`}
-            >
-              <span
-                className={`grid size-7 place-items-center rounded-full border-2 text-[12px] font-bold ${
-                  pinned ? "border-[#007aff] bg-[#007aff] text-white" : "border-[#c7c7cc] text-transparent"
-                }`}
-              >
-                ✓
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[16px] font-medium text-black">{t.title[lang]}</span>
-                <span className="block text-[13px] text-[#8e8e93]">
-                  {a.step + 1}/{t.objectives.length}
-                  {obj ? ` · ${obj.type}` : ""}
-                  {pinned ? ` · ${tr.pinned}` : ""}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <p className="mb-1.5 px-4 text-[13px] font-normal tracking-wide text-[#8e8e93] uppercase">{tr.doneTasks}</p>
-      <div className="overflow-hidden rounded-[14px] bg-white shadow-sm">
-        {p.tasks.done
-          .slice(-8)
-          .reverse()
-          .map((id, i) => {
-            const t = taskById(id);
-            return (
-              <p key={id} className={`px-4 py-3.5 text-[15px] text-[#8e8e93] line-through ${i > 0 ? "border-t border-black/5" : ""}`}>
-                {t?.title[lang] ?? id}
-              </p>
-            );
-          })}
-        {!p.tasks.done.length && <p className="px-4 py-5 text-[15px] text-[#8e8e93]">—</p>}
       </div>
     </div>
   );
@@ -551,15 +415,6 @@ function Profil({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof use
       <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">{tr.profilLevel}</p>
       <div className="mb-5 overflow-hidden rounded-[14px] bg-white shadow-sm">
         <SettingsRow label={tr.wallet} trailing={<span className="text-[15px] font-semibold tabular-nums text-black">{rm(p.wallet)}</span>} />
-        <SettingsRow
-          label={tr.profilGigs}
-          border
-          trailing={
-            <span className="text-[15px] text-[#8e8e93]">
-              {p.tasks.active.length} {tr.profilGigsActive} · {p.tasks.done.length} {tr.profilGigsDone}
-            </span>
-          }
-        />
         <SettingsRow
           label="XP"
           border

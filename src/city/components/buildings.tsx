@@ -127,12 +127,41 @@ const BuildingGroup = memo(function BuildingGroup({ g }: { g: Group }) {
   );
 });
 
+/** Enterable doors get a glowing mat and a bobbing arrow so you can find the way in. */
+function DoorMarker({ b }: { b: CityBuilding }) {
+  const ring = useRef<THREE.Mesh>(null);
+  const arrow = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (ring.current) ring.current.scale.setScalar(1 + Math.sin(t * 3) * 0.08);
+    if (arrow.current) arrow.current.position.y = 2.6 + Math.sin(t * 2.4) * 0.18;
+  });
+  return (
+    <group position={[b.door.x, 0, b.door.z]}>
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+        <ringGeometry args={[0.85, 1.1, 40]} />
+        <meshBasicMaterial color="#fcd34d" toneMapped={false} transparent opacity={0.9} />
+      </mesh>
+      <group ref={arrow}>
+        <mesh rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.32, 0.6, 4]} />
+          <meshBasicMaterial color="#fcd34d" toneMapped={false} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 export const CityBuildings = memo(function CityBuildings() {
   const list = useMemo(() => groups(), []);
+  const doors = useMemo(() => BUILDINGS.filter((b) => b.game), []);
   return (
     <group>
       {list.map((g) => (
         <BuildingGroup key={g.id} g={g} />
+      ))}
+      {doors.map((b) => (
+        <DoorMarker key={b.id} b={b} />
       ))}
     </group>
   );

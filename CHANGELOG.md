@@ -5,6 +5,15 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.11.0
+- Brand-new Kuala Lepak: Pusat rebuilt from scratch as a proper 3×3-block town centre
+- Real streets: lane lines, zebra crossings, stop lines, working traffic lights, kerbs and tiled sidewalks, street lamps that light up at night, trees
+- Shophouse rows with five-foot ways and shop signs, office towers, Mega Mall and a park with a fountain and playground
+- Traffic drives on the left, stops at red lights, waits for people and never drives through other cars; GRAP, SHOPI, foodpandai and LALAMOOV riders and vans
+- Walk into Restoran Anne Maju through its door (look for the glowing mat)
+- New minimap; the phone keeps Mesej, Profil, Dompet and Tetapan
+- The old districts, transit rides, NPC story and tasks are retired until they're rebuilt for the new city
+
 ### 0.10.62
 - Roads no longer drive into buildings: Sentral hall, Menara Lepak tower, Bukit Bintik strip and Stadium Bukit Jalan moved clear (the stadium road now ends at the gate)
 - Kampung Lepak road actually reaches the village (the last stretch was missing)

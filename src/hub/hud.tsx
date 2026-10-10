@@ -3,7 +3,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/core/auth-client";
 import { XP_PER_LEVEL, unreadInboxCount, useProfile } from "@/core/profile";
-import { activeTaskSummary } from "@/core/tasks/engine";
 import { getAtmosphere, subscribeAtmosphere, type AtmosphereSnapshot } from "@/world/atmosphere";
 import { gameClockLabel, presetForFrac, type LightPresetId } from "@/world/lighting";
 import { Logo } from "@/shared/logo";
@@ -100,37 +99,6 @@ export function WalletHud({ started }: { started: boolean }) {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-/** Centered objective ribbon — sits below logo / minimap so it doesn’t crowd the corners. */
-export function TaskBanner({ started }: { started: boolean }) {
-  const lang = useLang();
-  const tr = HUB_STRINGS[lang];
-  useProfile();
-  if (!started) return null;
-  const pinned = activeTaskSummary();
-  if (!pinned) return null;
-  const step = pinned.step + 1;
-  const total = pinned.task.objectives.length;
-
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-0 z-20 flex justify-center px-[5.5rem] sm:px-36"
-      style={{ top: "max(5.75rem, calc(env(safe-area-inset-top) + 4.85rem))" }}
-    >
-      <div className="flex max-w-md min-w-0 items-stretch overflow-hidden rounded-2xl border-[3px] border-ink bg-cream/95 shadow-[0_4px_0_#1f1a17]">
-        <div className="flex shrink-0 flex-col items-center justify-center bg-amber-300 px-2.5 py-1.5 text-ink">
-          <span className="text-[9px] leading-none font-extrabold tracking-wider uppercase">{tr.appTugasan}</span>
-          <span className="mt-0.5 text-[12px] leading-none font-extrabold tabular-nums">
-            {step}/{total}
-          </span>
-        </div>
-        <p className="min-w-0 flex-1 truncate px-3 py-2 text-[13px] leading-snug font-extrabold text-ink sm:text-[14px]">
-          {pinned.task.title[lang]}
-        </p>
       </div>
     </div>
   );

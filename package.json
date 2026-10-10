@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "check:layout": "vitest run src/world/layout.test.ts"
+    "check:layout": "vitest run src/city"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

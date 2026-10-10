@@ -13,6 +13,7 @@ React Three Fiber). Before writing code, read `docs/KUALA_LEPAK.md`, especially 
 - Respect the strict React Compiler lint rules (no randomness/time in render, no setState in effects, no ref access in render).
 - All player-facing text in BM and EN string tables; parody names for real brands/landmarks; non-violent content.
 - Bump the game version in `meta.ts` and add a `CHANGELOG.md` entry for player-facing changes.
-- Place buildings, landmarks, car parks and billboards through `src/world/placements.ts` (sizes exported from the district meta/layout and used by the scene). Never add a footprint only inside a scene or a one-off collision list.
-- Run `pnpm check:layout` after moving anything in the world. Don't add entries to `KNOWN` in `src/world/layout.test.ts` to silence a new failure; fix the layout.
+- The city is generated from `src/city/plan` (grid → roads, lots, props, lanes, colliders). Add new buildings, props or roads to the plan, never by hand in a scene; render code is in `src/city/kit` and `src/city/components`.
+- Run `pnpm check:layout` after changing the plan (overlaps, reachability, traffic sim). Fix the plan; don't loosen the tests.
+- No religious buildings. Delivery and ride brands are parodies (GRAP, SHOPI, foodpandai, LALAMOOV), never real names.
 - Run `pnpm exec tsc --noEmit && pnpm lint && pnpm build` before pushing (build runs the tests).

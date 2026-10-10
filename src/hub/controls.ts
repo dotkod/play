@@ -1,5 +1,3 @@
-import { clearWalkRoute } from "@/core/walk-path";
-
 // Shared, mutable input state read every frame by the player (no React re-renders while moving)
 export const input = {
   keys: new Set<string>(),
@@ -34,10 +32,7 @@ export function bindKeyboard() {
     if ((e.target as HTMLElement)?.tagName === "INPUT") return;
     if (MOVE_KEYS.includes(k) || LOOK_LEFT.includes(k) || LOOK_RIGHT.includes(k)) {
       input.keys.add(k);
-      if (MOVE_KEYS.includes(k)) {
-        input.target = null;
-        clearWalkRoute();
-      }
+      if (MOVE_KEYS.includes(k)) input.target = null;
       e.preventDefault();
     }
     if (k === "enter" || k === "e") input.enter = true;

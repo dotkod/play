@@ -10,9 +10,9 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useRef, useState } from "react";
 import { RainFX } from "@/hub/rain-fx";
 import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
-import type { Building } from "@/world/districts/pusat-lepak/layout";
 import { clock, syncClockFromDevice } from "@/world/lighting";
-import { LightingRig } from "@/world/runtime";
+import { LightingRig } from "./lighting";
+import type { CityBuilding } from "../plan";
 import { CityBuildings } from "./buildings";
 import { CityGround } from "./ground";
 import { CityPedestrians } from "./pedestrians";
@@ -22,9 +22,20 @@ import { CityTraffic } from "./traffic";
 
 type Props = {
   spawn: { x: number; z: number; rotY: number };
-  onZone: (b: Building | null) => void;
+  onZone: (b: CityBuilding | null) => void;
   active?: boolean;
+  /** Fixed camera for the share image (no player). */
+  poster?: boolean;
 };
+
+/** Share-image camera: high over the Anne Maju junction, looking along the street. */
+function PosterCamera() {
+  useFrame(({ camera }) => {
+    camera.position.set(12, 26, -48);
+    camera.lookAt(40, 0, -18);
+  });
+  return null;
+}
 
 function Clock({ active }: { active: boolean }) {
   useFrame(() => {
@@ -34,7 +45,7 @@ function Clock({ active }: { active: boolean }) {
   return null;
 }
 
-export default function CityWorld({ spawn, onZone, active = true }: Props) {
+export default function CityWorld({ spawn, onZone, active = true, poster = false }: Props) {
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
   const wrap = useRef<HTMLDivElement>(null);
@@ -62,7 +73,7 @@ export default function CityWorld({ spawn, onZone, active = true }: Props) {
         <CityTraffic active={active} />
         <CityPedestrians />
         <RainFX />
-        <CityPlayer spawn={spawn} onZone={onZone} active={active} />
+        {poster ? <PosterCamera /> : <CityPlayer spawn={spawn} onZone={onZone} active={active} />}
       </Canvas>
     </div>
   );

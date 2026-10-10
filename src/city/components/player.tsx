@@ -14,33 +14,16 @@ import { lookAxis, moveVector, view } from "@/hub/controls";
 import { sfx } from "@/shared/audio";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
-import type { Building } from "@/world/districts/pusat-lepak/layout";
 import { PHONE_DRAW_MS, player as shared, takeTeleport } from "@/world/player-bridge";
-import { buildingHeight, BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
+import { BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
 import { cityDynamic } from "./dynamic";
 
 const SPEED = 6;
 const RADIUS = 0.45;
 const LOOK: Look = { skin: "#c98d60", shirt: "#fcd34d", pants: "#2a2a33", headwear: "short", hair: "#2b2018" };
 
-/** The hub's door prompts and overlays speak the old Building shape; adapt v2 buildings to it. */
-export function asHubBuilding(b: CityBuilding): Building {
-  return {
-    id: b.id,
-    kind: b.kind === "mamak" ? "mamak" : b.kind === "mall" ? "mall" : "shophouse",
-    sign: b.sign,
-    x: b.door.x,
-    side: b.facing === "s" ? "south" : "north",
-    w: b.rect.maxX - b.rect.minX,
-    d: b.rect.maxZ - b.rect.minZ,
-    h: buildingHeight(b),
-    color: b.color,
-    game: b.game,
-    interior: b.interior,
-  };
-}
-
-const DOORS = BUILDINGS.filter((b) => b.game || b.interior).map((b) => ({ b, hub: asHubBuilding(b) }));
+/** Enterable buildings (for now: the ones with a job inside). */
+const DOORS = BUILDINGS.filter((b) => b.game).map((b) => ({ b }));
 
 /** Push a circle out of every box and circle it overlaps. */
 function resolve(p: THREE.Vector3) {
@@ -85,7 +68,7 @@ export function CityPlayer({
   active,
 }: {
   spawn: { x: number; z: number; rotY: number };
-  onZone: (b: Building | null) => void;
+  onZone: (b: CityBuilding | null) => void;
   active: boolean;
 }) {
   const { camera, size } = useThree();
@@ -156,7 +139,7 @@ export function CityPlayer({
     const id = hit?.b.id ?? null;
     if (id !== zone.current) {
       zone.current = id;
-      onZone(hit?.hub ?? null);
+      onZone(hit?.b ?? null);
     }
   });
 
