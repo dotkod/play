@@ -41,6 +41,8 @@ const MamakScene = dynamic(() => import("./scene/mamak-scene"), {
 });
 const DrinkStation = dynamic(() => import("./scene/station"), { ssr: false });
 const DemoBackdrop = dynamic(() => import("./scene/demo-backdrop"), { ssr: false });
+// Seamless mode: the room renders inside the city canvas (see city/components/mamak-room.tsx)
+const SeamlessRoom = dynamic(() => import("./seamless").then((m) => m.SeamlessRoom), { ssr: false });
 
 // The tutorial customer: one teh ais at the front-middle table
 const TUTORIAL_ORDER: Drink = { temp: "ais", base: "teh", milk: "susu", sugar: "biasa" };
@@ -74,11 +76,17 @@ export function AnneMajuGame({
   challenge,
   onExit,
   embedded = false,
+  seamless = false,
+  onLiveChange,
 }: {
   challenge?: number;
   onExit?: () => void;
   /** Mounted inside the city hub — exit feels like leaving the shop, not a site. */
   embedded?: boolean;
+  /** Played inside the city's own 3D restaurant: no separate scene or backdrop. */
+  seamless?: boolean;
+  /** Told when a shift (or its results) has the screen, so the city can step back. */
+  onLiveChange?: (live: boolean) => void;
 }) {
   const [s, dispatch] = useReducer(reducer, initialState);
   const [serveEvent, setServeEvent] = useState<{ table: number; id: number } | null>(null);
@@ -95,6 +103,11 @@ export function AnneMajuGame({
     stateRef.current = s;
   });
 
+  const panel = useRef<HTMLDivElement>(null);
+  const shiftOn = s.phase !== "intro";
+  useEffect(() => {
+    onLiveChange?.(shiftOn);
+  }, [shiftOn, onLiveChange]);
   const menu: Menu = s.mode === "daily" ? FULL_MENU : menuFor(careerSen);
   const anneLook = useMemo<Look>(() => ({ ...ANNE_LOOK, ...outfit.look }), [outfit]);
 
@@ -209,10 +222,15 @@ export function AnneMajuGame({
 
   if (s.phase === "intro" || s.phase === "over") {
     return (
-      <div className="fixed inset-0 z-40 overflow-hidden select-none">
-        <DemoBackdrop anneLook={anneLook} />
+      <div className={`fixed inset-0 z-40 overflow-hidden select-none ${seamless ? "pointer-events-none [&>*]:pointer-events-auto" : ""}`}>
+        {seamless ? (
+          <SeamlessRoom s={s} serveEvent={serveEvent} onTable={() => {}} anneLook={anneLook} anchors={anchors} serving={s.phase === "over"} overlays={false} panel={panel} />
+        ) : (
+          <DemoBackdrop anneLook={anneLook} />
+        )}
         {s.phase === "intro" ? (
           <Intro
+            seamless={seamless}
             challenge={challenge}
             careerSen={careerSen}
             outfitId={outfit.id}
@@ -277,17 +295,34 @@ export function AnneMajuGame({
   const hintValue = tutorial && step && !offTrack ? TUTORIAL_ORDER[step] : null;
 
   return (
-    <div className="fixed inset-0 z-40 flex overflow-hidden select-none max-[520px]:flex-col [@media(max-height:420px)]:flex-col">
-      <div className="relative min-h-0 min-w-0 flex-1">
-        <MamakScene
+    <div
+      className={`fixed inset-0 z-40 flex overflow-hidden select-none max-[520px]:flex-col [@media(max-height:420px)]:flex-col ${seamless ? "pointer-events-none" : ""}`}
+    >
+      {seamless && (
+        <SeamlessRoom
           s={s}
-          cupReady={isCupComplete(s.cup)}
           serveEvent={serveEvent}
           onTable={onTable}
           anneLook={anneLook}
+          anchors={anchors}
+          serving
+          panel={panel}
+          cupReady={isCupComplete(s.cup)}
           pulseTable={tutorial && !step && !offTrack ? TUTORIAL_TABLE : null}
-          anchorsOut={anchors}
         />
+      )}
+      <div className={`relative min-h-0 min-w-0 flex-1 ${seamless ? "[&>*]:pointer-events-auto [&>.pointer-events-none]:pointer-events-none" : ""}`}>
+        {!seamless && (
+          <MamakScene
+            s={s}
+            cupReady={isCupComplete(s.cup)}
+            serveEvent={serveEvent}
+            onTable={onTable}
+            anneLook={anneLook}
+            pulseTable={tutorial && !step && !offTrack ? TUTORIAL_TABLE : null}
+            anchorsOut={anchors}
+          />
+        )}
         <div className="edge-bl absolute flex items-center gap-2">
           <Hud s={s} moneyRef={moneyEl} />
           {s.phase === "playing" && (
@@ -326,7 +361,9 @@ export function AnneMajuGame({
           </div>
         )}
       </div>
-      <div className="safe-pr flex h-full w-[min(380px,46vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)] max-[520px]:h-[min(42%,280px)] max-[520px]:w-full max-[520px]:shadow-[0_-4px_20px_rgba(0,0,0,0.15)] [@media(max-height:420px)]:h-[min(42%,260px)] [@media(max-height:420px)]:w-full">
+      <div
+        ref={panel}
+        className="safe-pr pointer-events-auto flex h-full w-[min(380px,46vw)] shrink-0 flex-col bg-[#2f8f86] shadow-[-4px_0_20px_rgba(0,0,0,0.15)] max-[520px]:h-[min(42%,280px)] max-[520px]:w-full max-[520px]:shadow-[0_-4px_20px_rgba(0,0,0,0.15)] [@media(max-height:420px)]:h-[min(42%,260px)] [@media(max-height:420px)]:w-full">
         <StepRail
           cup={s.cup}
           onRewind={(part) => {
@@ -466,7 +503,8 @@ function Slip({ s }: { s: GameState }) {
 
 function Modal({ children }: { children: ReactNode }) {
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-ink/60 p-4 backdrop-blur-[2px]">
+    // pointer-events-auto: in seamless mode the game root lets clicks through to the city
+    <div className="pointer-events-auto fixed inset-0 z-40 grid place-items-center bg-ink/60 p-4 backdrop-blur-[2px]">
       <div className="flex w-full max-w-sm animate-pop flex-col items-center gap-3 rounded-3xl bg-cream p-5 text-center text-ink shadow-[0_6px_0_#1f1a17]">{children}</div>
     </div>
   );
@@ -647,6 +685,7 @@ function Version({ className = "" }: { className?: string }) {
 const titleStroke = "[-webkit-text-stroke:7px_#1f1a17] [paint-order:stroke_fill]";
 
 function Intro({
+  seamless = false,
   challenge,
   careerSen,
   outfitId,
@@ -654,6 +693,7 @@ function Intro({
   onStart,
   onDaily,
 }: {
+  seamless?: boolean;
   challenge?: number;
   careerSen: number;
   outfitId: string;
@@ -668,7 +708,11 @@ function Intro({
   const { board } = useBoard();
   const upcoming = nextUnlock(careerSen);
   return (
-    <div className="absolute inset-0 safe-px flex items-start justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent safe-pt pb-4">
+    <div
+      className={`absolute inset-0 safe-px flex items-start justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent safe-pt pb-4 ${
+        seamless ? "pointer-events-none from-ink/70 via-ink/20 [&>*]:pointer-events-auto" : ""
+      }`}
+    >
       {/* my-auto centres when there's room but never pushes content up under the top buttons */}
       <div className="my-auto flex max-w-md flex-col gap-2.5 text-cream">
         <span className="w-fit rounded-full bg-chili px-3 py-1 text-xs font-extrabold tracking-wide uppercase">{tr.badge}</span>

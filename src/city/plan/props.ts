@@ -61,7 +61,7 @@ export function planStreets(grid: Grid, buildings: CityBuilding[], blockKinds: M
 
   // Bus stop on the south side of the road between the park and the block below it
   const busSeg = grid.segments.find((s) => s.axis === "x" && s.a.i === 1 && s.a.j === 2) ?? grid.segments[0];
-  const busStop = { x: (busSeg.a.x + busSeg.b.x) / 2, z: busSeg.a.z + ROAD_HALF + 0.65, rotY: Math.PI };
+  const busStop = { x: (busSeg.a.x + busSeg.b.x) / 2, z: busSeg.a.z + ROAD_HALF + 0.62, rotY: Math.PI };
   add("busStop", busStop.x, busStop.z, busStop.rotY);
 
   for (const s of grid.segments) {

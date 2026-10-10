@@ -6,7 +6,8 @@
  */
 
 import { ARCADE, buildingHeight, type CityBuilding, FLOOR_H, GROUND_H, seeded } from "../plan/lots";
-import { MAMAK_TABLE_U, pillarSpots } from "../plan/colliders";
+import { pillarSpots } from "../plan/colliders";
+import { ROOM_DEPTH, SIDE_WALL } from "../plan/mamak";
 import { ball, box, cyl, type Part } from "./merge";
 
 const GLASS = "#5f86a3";
@@ -95,6 +96,10 @@ export function shophouseParts(b: CityBuilding): BuildingParts {
   return { parts, glow };
 }
 
+/**
+ * Anne Maju: open-fronted ground floor you can walk into. The room inside (tables, counter,
+ * Anne) comes from the game itself; this is the shell around it.
+ */
 export function mamakParts(b: CityBuilding): BuildingParts {
   const { width: w, depth: d, at, sz } = frame(b);
   const H = buildingHeight(b);
@@ -102,37 +107,26 @@ export function mamakParts(b: CityBuilding): BuildingParts {
   const glow: Part[] = [];
   const upperH = H - GROUND_H;
 
-  // Open-fronted ground floor: dark interior, counter, menu board; upper floor overhangs
-  parts.push(box(sz(w, GROUND_H, d - ARCADE), at(w / 2, GROUND_H / 2, ARCADE + (d - ARCADE) / 2), "#ece5d6"));
-  parts.push(box(sz(w - 1.2, GROUND_H - 0.6, 0.06), at(w / 2, (GROUND_H - 0.6) / 2, ARCADE - 0.03), "#3b2f2a", { outline: false }));
-  parts.push(box(sz(3.2, 1.1, 0.7), at(w * 0.72, 0.55, ARCADE + 0.35), "#c62f25"));
-  parts.push(box(sz(2.2, 1.3, 0.08), at(w * 0.25, 2.3, ARCADE - 0.06), "#1f1a17"));
-  glow.push(box(sz(w - 1.4, GROUND_H - 0.8, 0.03), at(w / 2, (GROUND_H - 0.6) / 2, ARCADE - 0.07), "#ffe7b3"));
+  // Side walls of the dining room and the kitchen block behind its back wall
+  for (const u of [SIDE_WALL / 2, w - SIDE_WALL / 2]) parts.push(box(sz(SIDE_WALL, GROUND_H, ROOM_DEPTH), at(u, GROUND_H / 2, ROOM_DEPTH / 2), b.color));
+  parts.push(box(sz(w, GROUND_H, d - ROOM_DEPTH), at(w / 2, GROUND_H / 2, ROOM_DEPTH + (d - ROOM_DEPTH) / 2), shade(b.color, -0.06)));
+  // Ceiling under the upper floor, and the upper floors themselves
+  parts.push(box(sz(w, 0.12, d), at(w / 2, GROUND_H - 0.06, d / 2), "#f7f3ea", { outline: false }));
   parts.push(box(sz(w, upperH, d), at(w / 2, GROUND_H + upperH / 2, d / 2), b.color));
-  for (const p of pillarSpots(b)) parts.push(box([0.42, GROUND_H, 0.42], [p.x, GROUND_H / 2, p.z], b.trim));
+  // Corner columns at the open front
+  for (const u of [0.21, w - 0.21]) parts.push(box(sz(0.42, GROUND_H, 0.42), at(u, GROUND_H / 2, 0.21), b.trim));
 
-  // Striped awning over the five-foot way
+  // Striped awning over the shopfront
   const stripes = Math.round(w / 0.9);
   for (let k = 0; k < stripes; k++) {
     const u = (w * (k + 0.5)) / stripes;
-    parts.push(box(sz(w / stripes, 0.08, 1.4), at(u, GROUND_H - 0.25, -0.55), k % 2 ? "#f7f5ef" : b.trim, { rotX: 0, outline: k === 0 }));
+    parts.push(box(sz(w / stripes, 0.08, 1.4), at(u, GROUND_H - 0.25, -0.55), k % 2 ? "#f7f5ef" : b.trim, { outline: k === 0 }));
   }
   parts.push(box(sz(w, 0.14, 0.5), at(w / 2, GROUND_H + 0.05, -0.2), b.trim));
   parts.push(box(sz(w, 0.7, PARAPET_D), at(w / 2, H + 0.35, PARAPET_D / 2), b.trim));
   // Roof deck starts behind the parapet so the two never share space
   parts.push(box(sz(w, 0.18, d - PARAPET_D), at(w / 2, H + 0.09, PARAPET_D + (d - PARAPET_D) / 2), ROOF, { outline: false }));
   upperWindows(b, parts, glow, 4, seeded(hash(b.id)));
-
-  // Two round tables with stools at the ends of the five-foot way (colliders: mamakTables)
-  for (const u of [MAMAK_TABLE_U, w - MAMAK_TABLE_U]) {
-    parts.push(cyl(0.55, 0.55, 0.06, at(u, 0.78, 1.25), "#f4efe4"));
-    parts.push(cyl(0.06, 0.06, 0.75, at(u, 0.38, 1.25), DARK, { outline: false }));
-    for (const [du, dv] of [
-      [-0.85, 0],
-      [0.85, 0],
-    ])
-      parts.push(cyl(0.2, 0.2, 0.45, at(u + du, 0.23, 1.25 + dv), "#2f6fd6"));
-  }
   return { parts, glow };
 }
 

@@ -9,9 +9,9 @@ import { seeded } from "../plan/lots";
 import type { Townsfolk } from "@/shared/three/look";
 
 /** Path distance from the building line, out into the sidewalk. */
-export const PED_PATH = 2.4;
+export const PED_PATH = 2.5;
 /** Each walking direction keeps this far either side of the path. */
-export const PED_SIDE = 0.35;
+export const PED_SIDE = 0.45;
 export const PED_R = 0.3;
 
 export type Ped = {
@@ -95,18 +95,23 @@ export function stepPeds(peds: Ped[], dt: number, others: { x: number; z: number
   for (const p of peds) {
     const fx = Math.sin(p.rot);
     const fz = Math.cos(p.rot);
-    let blocked = false;
-    const check = (x: number, z: number, r: number) => {
+    const ahead = (x: number, z: number, r: number) => {
       const dx = x - p.x;
       const dz = z - p.z;
-      const ahead = dx * fx + dz * fz;
-      if (ahead <= 0 || ahead > 1.6 + r) return;
-      if (Math.abs(dx * fz - dz * fx) < PED_R + r + 0.1) blocked = true;
+      const along = dx * fx + dz * fz;
+      return along > 0 && along < 1.6 + r && Math.abs(dx * fz - dz * fx) < PED_R + r + 0.1 ? along : null;
     };
-    for (const o of peds) if (o !== p) check(o.x, o.z, PED_R);
-    for (const o of others) check(o.x, o.z, o.r);
-    p.walking = !blocked;
-    if (!blocked) p.s = (p.s + p.dir * p.speed * dt + p.perimeter) % p.perimeter;
+    // Someone slower in front, same way: fall in behind at their pace (no stop-start jitter)
+    let pace = p.speed;
+    for (const o of peds) {
+      if (o === p || o.dir !== p.dir || o.loop !== p.loop) continue;
+      const d = ahead(o.x, o.z, PED_R);
+      if (d !== null) pace = Math.min(pace, o.walking ? o.speed * (d < 0.9 ? 0.5 : 0.98) : 0);
+    }
+    // You (or anyone else) standing in the way: wait
+    if (others.some((o) => ahead(o.x, o.z, o.r) !== null)) pace = 0;
+    p.walking = pace > 0.05;
+    if (p.walking) p.s = (p.s + p.dir * pace * dt + p.perimeter) % p.perimeter;
     place(p);
   }
 }

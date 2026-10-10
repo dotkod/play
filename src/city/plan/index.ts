@@ -46,3 +46,4 @@ export * from "./lots";
 export * from "./props";
 export * from "./lanes";
 export * from "./colliders";
+export * from "./mamak";

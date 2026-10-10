@@ -10,6 +10,7 @@ import { useFrame } from "@react-three/fiber";
 import { memo, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { player } from "@/world/player-bridge";
+import { cityCamera } from "./camera-override";
 import { presetForFrac } from "@/world/lighting";
 import { BUILDINGS, buildingHeight, type CityBuilding, GROUND_H, type Rect } from "../plan";
 import { buildingParts, signStrip } from "../kit/buildings";
@@ -120,9 +121,13 @@ const BuildingGroup = memo(function BuildingGroup({ g }: { g: Group }) {
   const hull = useRef<THREE.Mesh>(null);
   const sign = useRef<THREE.Group>(null);
   const faded = useRef<THREE.MeshToonMaterial | null>(null);
+  const root = useRef<THREE.Group>(null);
+  const isMamak = g.members.some((m) => m.kind === "mamak");
   const opacity = useRef(1);
 
   useFrame(({ camera }, delta) => {
+    // Serving inside Anne Maju: its shell would sit between the camera and the room
+    if (root.current) root.current.visible = !(isMamak && cityCamera.shot);
     // See-through only when this group truly blocks the view of the player: the camera ray
     // is still below the roofline where it leaves the footprint (looking over a low roof is fine)
     const t = segmentExit(camera.position.x, camera.position.z, player.x, player.z, g.rect);
@@ -141,8 +146,8 @@ const BuildingGroup = memo(function BuildingGroup({ g }: { g: Group }) {
   });
 
   return (
-    <group>
-      <mesh ref={body} geometry={geo.body} material={kitMaterial()} castShadow receiveShadow />
+    <group ref={root}>
+      <mesh ref={body} geometry={geo.body} material={kitMaterial()} castShadow={!isMamak} receiveShadow />
       {geo.hull && <mesh ref={hull} geometry={geo.hull} material={hullMaterial()} />}
       {geo.glow && <mesh ref={glow} geometry={geo.glow} material={glowMaterial()} visible={false} />}
       <group ref={sign}>
@@ -156,13 +161,16 @@ const BuildingGroup = memo(function BuildingGroup({ g }: { g: Group }) {
 function DoorMarker({ b }: { b: CityBuilding }) {
   const ring = useRef<THREE.Mesh>(null);
   const arrow = useRef<THREE.Group>(null);
+  const root = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
+    // Hidden while a job has the camera (you're already inside)
+    if (root.current) root.current.visible = !cityCamera.shot;
     if (ring.current) ring.current.scale.setScalar(1 + Math.sin(t * 3) * 0.08);
     if (arrow.current) arrow.current.position.y = 2.6 + Math.sin(t * 2.4) * 0.18;
   });
   return (
-    <group position={[b.door.x, 0, b.door.z]}>
+    <group ref={root} position={[b.door.x, 0, b.door.z]}>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
         <ringGeometry args={[0.85, 1.1, 40]} />
         <meshBasicMaterial color="#fcd34d" toneMapped={false} transparent opacity={0.9} />

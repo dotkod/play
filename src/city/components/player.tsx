@@ -17,6 +17,7 @@ import { Person, type Pose } from "@/shared/three/person";
 import { atmosphere } from "@/world/atmosphere";
 import { PHONE_DRAW_MS, player as shared, takeTeleport } from "@/world/player-bridge";
 import { buildingHeight, BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
+import { cityCamera } from "./camera-override";
 import { cityDynamic } from "./dynamic";
 
 const SPEED = 6;
@@ -83,6 +84,8 @@ export function CityPlayer({
   active: boolean;
 }) {
   const { camera, size } = useThree();
+  const body = useRef<THREE.Group>(null);
+  const hadShot = useRef(false);
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const rot = useRef(spawn.rotY);
   const moving = useRef(false);
@@ -94,9 +97,42 @@ export function CityPlayer({
   const camHeight = useRef(11);
   const B = GRID.bounds;
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 20);
     const p = pos.current;
+    const persp = state.camera as THREE.PerspectiveCamera;
+
+    // A job has the camera (e.g. serving at Anne Maju): glide there, hide the walker
+    const shot = cityCamera.shot;
+    if (shot) {
+      hadShot.current = true;
+      if (body.current) body.current.visible = false;
+      if (ring.current) ring.current.visible = false;
+      const right = shot.panel.side === "right" ? shot.panel.px : 0;
+      const bottom = shot.panel.side === "bottom" ? shot.panel.px : 0;
+      const visW = Math.max(1, size.width - right);
+      const visH = Math.max(1, size.height - bottom);
+      // Fit the room's width in the visible part, then widen for any panel along the bottom
+      const halfH = Math.atan(shot.fitHalfWidth / shot.fitDistance / (visW / visH));
+      const fovVis = Math.max(42, (2 * halfH * 180) / Math.PI);
+      const fov = (2 * Math.atan(Math.tan((fovVis * Math.PI) / 360) * (size.height / visH)) * 180) / Math.PI;
+      if (Math.abs(persp.fov - fov) > 0.01) persp.fov += (fov - persp.fov) * Math.min(1, dt * 5);
+      persp.setViewOffset(size.width, size.height, right / 2, bottom / 2, size.width, size.height);
+      persp.updateProjectionMatrix();
+      camPos.set(shot.pos.x, shot.pos.y, shot.pos.z);
+      persp.position.lerp(camPos, 1 - Math.exp(-dt * 4));
+      camTarget.lerp(new THREE.Vector3(shot.look.x, shot.look.y, shot.look.z), 1 - Math.exp(-dt * 4));
+      persp.lookAt(camTarget);
+      return;
+    }
+    if (hadShot.current) {
+      hadShot.current = false;
+      if (body.current) body.current.visible = true;
+      if (ring.current) ring.current.visible = true;
+      persp.fov = 50;
+      persp.clearViewOffset();
+      persp.updateProjectionMatrix();
+    }
     const tp = takeTeleport();
     if (tp) {
       p.set(tp.x, 0, tp.z);
@@ -186,7 +222,9 @@ export function CityPlayer({
 
   return (
     <>
-      <Person look={look} getPose={getPose} />
+      <group ref={body}>
+        <Person look={look} getPose={getPose} />
+      </group>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.55, 0.72, 32]} />
         <meshBasicMaterial color="#fcd34d" toneMapped={false} />

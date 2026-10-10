@@ -84,10 +84,11 @@ export function busStopParts(): Part[] {
 export function fountainParts(): Part[] {
   return [
     cyl(2.4, 2.5, 0.5, [0, 0.25, 0], STONE),
-    cyl(2.1, 2.1, 0.06, [0, 0.47, 0], "#6ec4e8", { outline: false }),
+    // Water sits just above each rim, never level with it (coplanar faces shimmer)
+    cyl(2.1, 2.1, 0.04, [0, 0.53, 0], "#6ec4e8", { outline: false }),
     cyl(0.35, 0.45, 1.2, [0, 1.0, 0], STONE),
     cyl(0.9, 0.5, 0.25, [0, 1.65, 0], STONE),
-    cyl(0.75, 0.75, 0.05, [0, 1.78, 0], "#8fd4ef", { outline: false }),
+    cyl(0.75, 0.75, 0.04, [0, 1.81, 0], "#8fd4ef", { outline: false }),
   ];
 }
 

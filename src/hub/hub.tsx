@@ -6,8 +6,8 @@
  */
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
-import { type CityBuilding, SPAWN } from "@/city/plan";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BUILDINGS, inRect, roomRect, SPAWN } from "@/city/plan";
 import { CityMinimap } from "@/city/components/minimap";
 import { logoutAccount, refreshAuth, takeAuthHello, useAuth } from "@/core/auth-client";
 import { emit } from "@/core/events";
@@ -16,14 +16,14 @@ import { getProfile } from "@/core/profile";
 import { ambience, audioReady, music, sfx, unlockAudio } from "@/shared/audio";
 import { getLang, setLang, useLang } from "@/shared/lang";
 import { LandscapeGate } from "@/shared/landscape-gate";
-import { PHONE_DRAW_MS, player as playerShared } from "@/world/player-bridge";
+import { PHONE_DRAW_MS, player as playerShared, requestTeleport } from "@/world/player-bridge";
 import { AuthGate, AuthSplash } from "./auth-gate";
 import { CITY_TUTORIAL_FLAG, CityTutorial } from "./city-tutorial";
 import { bindKeyboard, input } from "./controls";
 import { PhoneButton, rm, WalletHud } from "./hud";
 import { Phone } from "./phone/phone";
 import { HUB_STRINGS } from "./strings";
-import { ActionButton, MuteButton } from "./ui/buttons";
+import { MuteButton } from "./ui/buttons";
 import { StartScreen } from "./ui/start-screen";
 import { Joystick, LookPad } from "./ui/sticks";
 
@@ -40,6 +40,11 @@ const AnneMajuGame = dynamic(() => import("@/games/anne-maju/game").then((m) => 
 
 const JOB_TITLES: Record<string, string> = { "anne-maju": "Anne Maju" };
 
+const MAMAK = BUILDINGS.find((b) => b.kind === "mamak")!;
+const MAMAK_ROOM = roomRect(MAMAK);
+/** Opening `/anne-maju` (or `?kerja=anne-maju`) starts you standing inside the restaurant. */
+const IN_SHOP_SPAWN = { x: MAMAK.door.x + 2.2, z: MAMAK_ROOM.minZ + 1.2, rotY: Math.PI };
+
 function softKerjaUrl(slug: string | null) {
   try {
     // Only tweak the home URL — `/anne-maju` is already the same city shell
@@ -47,6 +52,8 @@ function softKerjaUrl(slug: string | null) {
     window.history.replaceState({}, "", slug ? `/?kerja=${slug}` : "/");
   } catch {}
 }
+
+const noZone = () => {};
 
 // Survives React Strict Mode's double useState init (which would otherwise settle payouts twice)
 const BOOT_KEY = "kuala-lepak:city-boot";
@@ -83,9 +90,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const [payout] = useState(bootPayout);
   const [jobOpen, setJobOpen] = useState(() => bootKerja(initialJob));
   const [started, setStarted] = useState(() => !!bootKerja(initialJob));
-  const [doorVeil, setDoorVeil] = useState<"cover" | "unveil" | null>(null);
-  const doorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [zone, setZone] = useState<CityBuilding | null>(null);
+  const [shiftLive, setShiftLive] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phoneBusy, setPhoneBusy] = useState(false);
   const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -166,9 +171,9 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
 
   // Sole owner of city music + ambience while exploring
   useEffect(() => {
-    if (jobOpen || !started) {
+    if (shiftLive || !started) {
       ambience.stop();
-      music.stop();
+      if (!shiftLive) music.stop();
       return;
     }
     if (!audioReady()) unlockAudio();
@@ -178,7 +183,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       music.stop();
       ambience.stop();
     };
-  }, [started, jobOpen]);
+  }, [started, shiftLive]);
 
   useEffect(() => {
     if (!toast || toast.id !== 1) return;
@@ -186,13 +191,29 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     return () => clearTimeout(id);
   }, [toast]);
 
+  // Walking into Anne Maju opens the job right there (no screen change); walking out closes it
+  const jobRef = useRef(jobOpen);
+  useLayoutEffect(() => {
+    jobRef.current = jobOpen;
+  });
   useEffect(() => {
-    if (zone) sfx.chime();
-  }, [zone]);
+    if (!started) return;
+    const id = setInterval(() => {
+      const inside = inRect(playerShared.x, playerShared.z, MAMAK_ROOM);
+      if (inside && !jobRef.current) {
+        sfx.chime();
+        softKerjaUrl("anne-maju");
+        setJobOpen("anne-maju");
+      } else if (!inside && jobRef.current && !shiftLive) {
+        softKerjaUrl(null);
+        setJobOpen(null);
+      }
+    }, 150);
+    return () => clearInterval(id);
+  }, [started, shiftLive]);
 
   useEffect(
     () => () => {
-      if (doorTimer.current) clearTimeout(doorTimer.current);
       if (phoneTimer.current) clearTimeout(phoneTimer.current);
     },
     [],
@@ -231,45 +252,18 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     }, PHONE_DRAW_MS);
   };
 
-  const veil = (then: () => void, coverMs: number) => {
-    if (doorTimer.current) clearTimeout(doorTimer.current);
-    setDoorVeil("cover");
-    doorTimer.current = setTimeout(() => {
-      then();
-      setDoorVeil("unveil");
-      doorTimer.current = setTimeout(() => {
-        setDoorVeil(null);
-        doorTimer.current = null;
-      }, 380);
-    }, coverMs);
-  };
-
-  /** Walk through a door: the screen closes like a shutter and the job opens inside. */
-  const enter = (b: CityBuilding) => {
-    if (!b.game) return;
-    unlockAudio();
-    sfx.doorbell();
-    ambience.stop();
-    music.stop();
-    emit({ type: "entered", place: b.id });
-    const slug = b.game.slug;
-    veil(() => {
-      setJobOpen(slug);
-      softKerjaUrl(slug);
-    }, 320);
-  };
-
+  /** Leave the restaurant: back onto the mat outside, facing the street. */
   const exitJob = () => {
-    veil(() => {
-      const settled = settleJobResults();
-      setJobOpen(null);
-      softKerjaUrl(null);
-      unlockAudio();
-      for (const pay of settled.results) {
-        emit({ type: "jobFinished", job: pay.job, earned: pay.earned, served: pay.served, mode: pay.mode });
-        if (pay.earned > 0) flash(tr.paid(JOB_TITLES[pay.job] ?? pay.job, rm(pay.earned)));
-      }
-    }, 280);
+    const settled = settleJobResults();
+    for (const pay of settled.results) {
+      emit({ type: "jobFinished", job: pay.job, earned: pay.earned, served: pay.served, mode: pay.mode });
+      if (pay.earned > 0) flash(tr.paid(JOB_TITLES[pay.job] ?? pay.job, rm(pay.earned)));
+    }
+    setShiftLive(false);
+    setJobOpen(null);
+    softKerjaUrl(null);
+    unlockAudio();
+    requestTeleport(MAMAK.door.x, MAMAK.door.z - (MAMAK.facing === "s" ? -1.2 : 1.2), MAMAK.facing === "s" ? 0 : Math.PI);
   };
 
   // Keyboard: Enter starts / uses the door, T toggles the phone
@@ -293,16 +287,6 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   });
 
   useEffect(() => {
-    const id = setInterval(() => {
-      if (!input.enter) return;
-      input.enter = false;
-      if (!started || phoneOpen || phoneBusy || jobOpen || doorVeil) return;
-      if (zone?.game) enter(zone);
-    }, 50);
-    return () => clearInterval(id);
-  });
-
-  useEffect(() => {
     const mq = matchMedia("(pointer: coarse)");
     const sync = () => setTouch(mq.matches);
     sync();
@@ -310,8 +294,9 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const blocked = !!(jobOpen || doorVeil);
-  const showHint = started && !zone && !phoneOpen && !phoneBusy && !blocked;
+  // In the restaurant the job's own UI takes the corners; during a shift the city steps back
+  const blocked = shiftLive;
+  const showHint = started && !jobOpen && !phoneOpen && !phoneBusy;
 
   if (!auth.ready) return <AuthSplash />;
   if (!auth.username) return <AuthGate />;
@@ -319,11 +304,11 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
       <LandscapeGate />
-      <CityWorld spawn={SPAWN} onZone={setZone} active={started && !blocked} />
+      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked} />
 
-      <WalletHud started={started} />
+      {!jobOpen && <WalletHud started={started} />}
 
-      <div className="edge-tr pointer-events-none absolute z-20 flex flex-col items-end gap-2">
+      <div className={`edge-tr ${jobOpen ? "hidden" : ""} pointer-events-none absolute z-20 flex flex-col items-end gap-2`}>
         <div className="pointer-events-auto flex gap-2">
           <MuteButton />
           <div className="flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg">
@@ -370,26 +355,10 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         </div>
       )}
 
-      {jobOpen === "anne-maju" && (
-        <div className="job-settle fixed inset-0 z-40">
-          <AnneMajuGame onExit={exitJob} embedded />
-        </div>
-      )}
-      {doorVeil && <div className={`pointer-events-none fixed inset-0 z-[50] bg-[#1a1410] ${doorVeil === "cover" ? "door-veil" : "door-unveil"}`} aria-hidden />}
+      {jobOpen === "anne-maju" && <AnneMajuGame onExit={exitJob} embedded seamless onLiveChange={setShiftLive} />}
 
-      {started && !blocked && (
+      {started && !jobOpen && (
         <div className="edge-br absolute z-10 flex flex-col items-end gap-3">
-          {zone?.game && (
-            <ActionButton
-              icon="▶"
-              label={`${zone.game.emoji} ${zone.game.title}`}
-              caption={tr.enter}
-              keyHint={!touch ? "E" : undefined}
-              tone="amber"
-              size="lg"
-              onClick={() => enter(zone)}
-            />
-          )}
           <div className="flex items-center gap-2">
             <span className="rounded-xl bg-ink/80 px-2 py-1 text-[10px] font-extrabold tracking-wide text-cream uppercase">
               {tr.phone}
@@ -402,7 +371,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
 
       <Phone open={phoneOpen} onClose={closePhone} />
 
-      {started && touch && !phoneBusy && (
+      {started && touch && !phoneBusy && !shiftLive && (
         <>
           <Joystick />
           <LookPad />

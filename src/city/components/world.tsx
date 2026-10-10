@@ -14,6 +14,7 @@ import { clock, syncClockFromDevice } from "@/world/lighting";
 import { LightingRig } from "./lighting";
 import type { CityBuilding } from "../plan";
 import { CityBuildings } from "./buildings";
+import { MamakRoom } from "./mamak-room";
 import { CityGround } from "./ground";
 import { CityPedestrians } from "./pedestrians";
 import { CityPlayer } from "./player";
@@ -79,6 +80,7 @@ export default function CityWorld({ spawn, onZone, active = true, poster = false
         <LightingRig shadows={shadows} />
         <CityGround />
         <CityBuildings />
+        <MamakRoom />
         <StreetProps />
         <CityTraffic active={active} />
         <CityPedestrians />

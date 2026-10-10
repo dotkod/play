@@ -12,23 +12,9 @@ import { ANNE_LOOK, type Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { Ball, Box, Cyl, RBox, toonGradient } from "@/shared/three/toon";
 
-// Two rows of three tables, with aisles at x = ±1.55
-export const TABLES: [number, number][] = [
-  [-3.1, -1.0],
-  [0, -1.0],
-  [3.1, -1.0],
-  [-3.1, 1.7],
-  [0, 1.7],
-  [3.1, 1.7],
-];
-// Seat offsets from the table centre: back (faces camera), then left and right sides (face the table)
-const SEATS: { x: number; z: number; rotY: number }[] = [
-  { x: 0, z: -0.78, rotY: 0 },
-  { x: -0.82, z: 0.05, rotY: Math.PI / 2 },
-  { x: 0.82, z: 0.05, rotY: -Math.PI / 2 },
-];
-const ANNE_HOME: [number, number] = [0, -2.75];
-const BUBBLE_Y = 2.2;
+import { ANNE_HOME, BUBBLE_Y, SEATS, SHOP_W, TABLES } from "../layout";
+
+export { TABLES };
 
 type Props = {
   s: GameState;
@@ -53,12 +39,6 @@ export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = fa
   const frameloop = useVisibleFrameloop(wrap);
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
-  // Tables are memoised, so they get a stable callback that always calls the latest handler
-  const onTableRef = useRef(onTable);
-  useLayoutEffect(() => {
-    onTableRef.current = onTable;
-  });
-  const tapTable = useCallback((i: number) => onTableRef.current(i), []);
 
   return (
     <div ref={wrap} className="relative h-full w-full overflow-hidden">
@@ -70,30 +50,84 @@ export default function MamakScene({ s, cupReady, serveEvent, onTable, demo = fa
             else setShadows(false);
           }}
         />
-        <Projector els={anchors} />
         <color attach="background" args={["#8fd6cc"]} />
         <CameraRig demo={demo} poster={poster} />
         <Lights shadows={shadows} />
-        <Shop />
-        {TABLES.map((pos, i) => (
-          <Table key={i} index={i} pos={pos} onTap={tapTable} />
-        ))}
-        <Customers s={s} />
-        <Anne serveEvent={serveEvent} look={anneLook} />
+        <MamakContents s={s} serveEvent={serveEvent} onTable={onTable} anneLook={anneLook} anchors={demo ? undefined : anchors} outdoor />
       </Canvas>
-      {!demo &&
-        TABLES.map((_, i) => (
-          <div
-            key={i}
-            ref={(el) => {
-              anchors.current[i] = el;
-            }}
-            className="absolute top-0 left-0 will-change-transform"
-          >
-            <TableOverlay table={i} s={s} cupReady={cupReady} pulse={pulseTable === i} onTap={() => onTable(i)} />
-          </div>
-        ))}
+      {!demo && <TableOverlays s={s} cupReady={cupReady} onTable={onTable} pulseTable={pulseTable} anchors={anchors} />}
     </div>
+  );
+}
+
+/**
+ * Everything inside the restaurant, in the room's frame. Rendered in the game's own canvas,
+ * or inside the city building (the city places and lights it).
+ */
+export function MamakContents({
+  s,
+  serveEvent,
+  onTable,
+  anneLook = ANNE_LOOK,
+  anchors,
+  outdoor = false,
+}: {
+  s: GameState;
+  serveEvent: Props["serveEvent"];
+  onTable: (i: number) => void;
+  anneLook?: Look;
+  anchors?: RefObject<(HTMLDivElement | null)[]>;
+  /** Road and grass outside the shop (only when the room stands alone). */
+  outdoor?: boolean;
+}) {
+  const room = useRef<THREE.Group>(null);
+  // Tables are memoised, so they get a stable callback that always calls the latest handler
+  const onTableRef = useRef(onTable);
+  useLayoutEffect(() => {
+    onTableRef.current = onTable;
+  });
+  const tapTable = useCallback((i: number) => onTableRef.current(i), []);
+  return (
+    <group ref={room}>
+      {anchors && <Projector els={anchors} room={room} />}
+      <Shop outdoor={outdoor} />
+      {TABLES.map((pos, i) => (
+        <Table key={i} index={i} pos={pos} onTap={tapTable} />
+      ))}
+      <Customers s={s} />
+      <Anne serveEvent={serveEvent} look={anneLook} />
+    </group>
+  );
+}
+
+/** Order bubbles over each table, pinned to the 3D tables by the Projector. */
+export function TableOverlays({
+  s,
+  cupReady,
+  onTable,
+  pulseTable,
+  anchors,
+}: {
+  s: GameState;
+  cupReady: boolean;
+  onTable: (i: number) => void;
+  pulseTable: number | null;
+  anchors: RefObject<(HTMLDivElement | null)[]>;
+}) {
+  return (
+    <>
+      {TABLES.map((_, i) => (
+        <div
+          key={i}
+          ref={(el) => {
+            anchors.current[i] = el;
+          }}
+          className="absolute top-0 left-0 will-change-transform"
+        >
+          <TableOverlay table={i} s={s} cupReady={cupReady} pulse={pulseTable === i} onTap={() => onTable(i)} />
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -118,13 +152,16 @@ const Lights = memo(function Lights({ shadows }: { shadows: boolean }) {
 
 // Pins each table's DOM bubble above the back diner's head. Plain DOM instead of drei <Html>,
 // whose portal roots crash React 19 when the canvas unmounts between menu and game.
-function Projector({ els }: { els: RefObject<(HTMLDivElement | null)[]> }) {
+function Projector({ els, room }: { els: RefObject<(HTMLDivElement | null)[]>; room: RefObject<THREE.Group | null> }) {
   const v = useMemo(() => new THREE.Vector3(), []);
   useFrame(({ camera, size }) => {
     TABLES.forEach(([x, z], i) => {
       const el = els.current[i];
       if (!el) return;
-      v.set(x, BUBBLE_Y, z + SEATS[0].z).project(camera);
+      v.set(x, BUBBLE_Y, z + SEATS[0].z);
+      // Room may be placed inside the city: go room → world before projecting
+      if (room.current) v.applyMatrix4(room.current.matrixWorld);
+      v.project(camera);
       // Keep edge tables' bubbles fully on screen (up to 192px wide) and clear of curved glass
       const px = Math.min(size.width - 110, Math.max(110, ((v.x + 1) / 2) * size.width));
       const py = Math.max(8, ((1 - v.y) / 2) * size.height);
@@ -162,7 +199,8 @@ function Customers({ s }: { s: GameState }) {
     const gone: Actor[] = [];
     prev.forEach((p, i) => {
       if (p && s.tables[i]?.id !== p.id) {
-        p.guests.forEach((g, gi) => gone.push({ key: `${p.id}-${gi}`, party: p, table: i, guest: gi, look: g.look, leftAt: s.now }));
+        // Own key space: a new shift restarts party ids, so a leaver could clash with a new arrival
+        p.guests.forEach((g, gi) => gone.push({ key: `out:${p.id}-${gi}:${s.now}`, party: p, table: i, guest: gi, look: g.look, leftAt: s.now }));
       }
     });
     setPrev(s.tables);
@@ -397,17 +435,19 @@ function Stool({ color, ...props }: { color: string; position: [number, number, 
   );
 }
 
-const W = 13; // shop width
+const W = SHOP_W;
 
-const Shop = memo(function Shop() {
+const Shop = memo(function Shop({ outdoor }: { outdoor: boolean }) {
   const sign = useMemo(() => signTexture(), []);
   return (
     <group>
-      {/* Floor, road and grass */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -0.6]} receiveShadow>
-        <planeGeometry args={[W, 9.5]} />
+      {/* Tiled floor; road and grass only when the room stands alone */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, -0.65]} receiveShadow>
+        <planeGeometry args={[W, 9.3]} />
         <meshToonMaterial color="#e9e3d3" gradientMap={toonGradient()} />
       </mesh>
+      {outdoor && (
+        <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 6]} receiveShadow>
         <planeGeometry args={[40, 4]} />
         <meshToonMaterial color="#5b6066" gradientMap={toonGradient()} />
@@ -419,6 +459,8 @@ const Shop = memo(function Shop() {
         <planeGeometry args={[60, 40]} />
         <meshToonMaterial color="#86c27a" gradientMap={toonGradient()} />
       </mesh>
+        </>
+      )}
 
       {/* Back wall with green tiles and the signboard */}
       <Box size={[W, 3.4, 0.2]} position={[0, 1.7, -5.3]} color="#f4efe4" />

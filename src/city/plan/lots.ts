@@ -162,8 +162,10 @@ export function planLots(grid: Grid, kinds: LotPlan, mamakBlock: string): Lots {
           sign: "RESTORAN ANNE MAJU",
           signBg: "#c62f25",
           signFg: "#f6d13a",
-          arcade: ARCADE,
-          door: doorSpot(ur, facing, x + w / 2),
+          // Open-fronted: the whole ground floor is the restaurant (see plan/mamak.ts)
+          arcade: 0,
+          // Entrance mat just outside the open front (the room's tables start right inside)
+          door: { x: x + w / 2, z: facing === "n" ? ur.minZ - 0.8 : ur.maxZ + 0.8 },
           group,
           game: { slug: "anne-maju", title: "Anne Maju", emoji: "🍵" },
         });

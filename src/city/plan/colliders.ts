@@ -5,6 +5,7 @@
 
 import { ARCADE, type CityBuilding } from "./lots";
 import { rect, type Rect } from "./grid";
+import { backBlock, roomColliders } from "./mamak";
 import { type Prop, PROP_SIZE, type Signal } from "./props";
 
 export type BoxCollider = { id: string; rect: Rect };
@@ -42,18 +43,6 @@ export function pillarSpots(b: CityBuilding): { x: number; z: number }[] {
 
 export const PILLAR_R = 0.22;
 
-/** Mamak outdoor tables sit this far in from each end of the five-foot way. */
-export const MAMAK_TABLE_U = 1.7;
-
-export function mamakTables(b: CityBuilding): { x: number; z: number }[] {
-  if (b.kind !== "mamak") return [];
-  const r = b.rect;
-  const v = 1.25;
-  if (b.facing === "n") return [{ x: r.minX + MAMAK_TABLE_U, z: r.minZ + v }, { x: r.maxX - MAMAK_TABLE_U, z: r.minZ + v }];
-  if (b.facing === "s") return [{ x: r.maxX - MAMAK_TABLE_U, z: r.maxZ - v }, { x: r.minX + MAMAK_TABLE_U, z: r.maxZ - v }];
-  return [];
-}
-
 function propRect(p: Prop): Rect {
   const s = PROP_SIZE[p.kind];
   // Rotated by a quarter turn? swap the footprint
@@ -64,11 +53,18 @@ function propRect(p: Prop): Rect {
 }
 
 export function makeColliders(buildings: CityBuilding[], props: Prop[], signals: Signal[]): Colliders {
-  const boxes: BoxCollider[] = buildings.map((b) => ({ id: b.id, rect: buildingWalls(b) }));
+  const boxes: BoxCollider[] = [];
   const circles: CircleCollider[] = [];
   for (const b of buildings) {
+    if (b.kind === "mamak") {
+      // Walk-in restaurant: only the kitchen block, side walls and the furniture are solid
+      const room = roomColliders(b);
+      boxes.push({ id: b.id, rect: backBlock(b) }, ...room.boxes);
+      circles.push(...room.circles);
+      continue;
+    }
+    boxes.push({ id: b.id, rect: buildingWalls(b) });
     for (const [k, p] of pillarSpots(b).entries()) circles.push({ id: `${b.id}-pillar${k}`, x: p.x, z: p.z, r: PILLAR_R });
-    for (const [k, t] of mamakTables(b).entries()) circles.push({ id: `${b.id}-table${k}`, x: t.x, z: t.z, r: 1.05 });
   }
   for (const p of props) {
     const s = PROP_SIZE[p.kind];

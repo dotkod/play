@@ -5,6 +5,11 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.12.0
+- Walk straight into Restoran Anne Maju: the real restaurant is inside the building (tables, counter, Anne), no screen change
+- Step inside and the shift card pops up over the room; start and the camera glides to the serving view while the city keeps living outside
+- Fountain water no longer shimmers; people on the sidewalk pass each other cleanly and fall in behind slower walkers instead of stop-starting
+
 ### 0.11.2
 - New phone: a flip phone on bigger screens (pops up closed with the time on the cover, then flips open) and a fold phone on phones (opens like a book into a split screen: apps on the left, the open app on the right)
 - Cars and vans have proper wheel wells; shophouse rooftops no longer shimmer
@@ -305,6 +310,10 @@ next to the short commit of the deploy.
 - Finishing an Anne Maju shift adds the RM to your city wallet when you walk back
 
 ## Anne Maju
+
+### 1.6.0
+- Plays inside the city's own restaurant: walk in, start a shift from the card, serve, walk out
+- Fixed customers occasionally vanishing when a new shift started right after the tutorial
 
 ### 1.5.4
 - Embedded exit says “jalan keluar”; settles in with the city door veil
