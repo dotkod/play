@@ -7,14 +7,14 @@ import { monoStationById } from "@/content/transit/monorel";
 import { lrtStationById } from "@/content/transit/lrt-kelana";
 import { LrtStationMesh } from "@/world/lrt-station-mesh";
 import { RailStationMesh } from "@/world/rail-station-mesh";
-import { SENTRAL_BUS_STOP, SENTRAL_HALL } from "./meta";
+import { SENTRAL_BUS_STOP, SENTRAL_HALL, SENTRAL_HALL_SIZE } from "./meta";
 
 export const SentralScene = memo(function SentralScene() {
   return (
     <group>
       {/* Arterial asphalt from City ROAD_STRIPS */}
       <group position={[SENTRAL_HALL.x, 0, SENTRAL_HALL.z]}>
-        <RBox size={[28, 8, 16]} radius={0.25} position={[0, 4, 0]} color="#e6e9ec" />
+        <RBox size={[SENTRAL_HALL_SIZE.w, 8, SENTRAL_HALL_SIZE.d]} radius={0.25} position={[0, 4, 0]} color="#e6e9ec" />
         <Box size={[26, 0.3, 14]} position={[0, 8.2, 0]} color="#c5ced8" outline={false} />
         <Box size={[8, 5, 0.2]} position={[0, 3, 8.1]} color="#1f5fa8" outline={false} />
         {/* Platform stubs */}

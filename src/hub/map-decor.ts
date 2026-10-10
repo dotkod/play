@@ -1,11 +1,8 @@
 import { hashString } from "@/shared/rng";
-import { STADIUM, STADIUM_SOLID_R } from "@/world/districts/bukit-jalan/meta";
-import { PASAR_HALLS, pasarHallFootprint } from "@/world/districts/pasar-besar/buildings";
-import { PETALING_SHOPS, petalingFootprint } from "@/world/districts/petaling-lane/buildings";
-import { PLAYGROUND, TERRACES } from "@/world/districts/taman-ceria/layout";
-import { PARKING_LOTS } from "@/world/parking-lots";
+import { pointInSolid, SOLIDS } from "@/world/placements";
 import { ROAD_STRIPS, WALK_PATHS, WALK_PATH_HALF } from "@/world/walk-spine";
-import { BUILDINGS, footprint, WALK_HALF } from "./world-data";
+import { PLAYGROUND } from "@/world/districts/taman-ceria/layout";
+import { WALK_HALF } from "./world-data";
 
 export type MapTree = { x: number; z: number; r: number };
 export type MapBlock = { x: number; z: number; w: number; d: number; color: string };
@@ -35,38 +32,13 @@ function nearRoad(x: number, z: number) {
   return nearStrip(x, z, 4.0);
 }
 
-function inAabb(x: number, z: number, minX: number, maxX: number, minZ: number, maxZ: number, pad: number) {
-  return x > minX - pad && x < maxX + pad && z > minZ - pad && z < maxZ + pad;
-}
-
-/** Canopy-aware solid cull — Pusat, Petaling, terraces, lots, landmarks. */
+/** Canopy-aware solid cull: buildings and lots get 4m, round and soft areas 2m. */
 function inBuilding(x: number, z: number) {
-  const pad = 4.0;
-  for (const b of BUILDINGS) {
-    const f = footprint(b);
-    if (inAabb(x, z, f.minX, f.maxX, f.minZ, f.maxZ, pad)) return true;
-  }
-  for (const s of PETALING_SHOPS) {
-    const f = petalingFootprint(s);
-    if (inAabb(x, z, f.minX, f.maxX, f.minZ, f.maxZ, pad)) return true;
-  }
-  for (const h of PASAR_HALLS) {
-    const f = pasarHallFootprint(h);
-    if (inAabb(x, z, f.minX, f.maxX, f.minZ, f.maxZ, pad)) return true;
-  }
-  for (const t of TERRACES) {
-    if (inAabb(x, z, t.x - t.w / 2, t.x + t.w / 2, t.z - t.d / 2, t.z + t.d / 2, pad)) return true;
-  }
-  for (const p of PARKING_LOTS) {
-    if (inAabb(x, z, p.x - p.w / 2, p.x + p.w / 2, p.z - p.d / 2, p.z + p.d / 2, pad)) return true;
-  }
-  const pg = PLAYGROUND;
-  if (inAabb(x, z, pg.x - pg.w / 2, pg.x + pg.w / 2, pg.z - pg.d / 2, pg.z + pg.d / 2, 2)) return true;
-  // Soft landmark footprints (map-only props that look wrong with trees through them)
-  if (Math.hypot(x + 28, z - 22) < 12) return true; // Masjid Lepak
-  if (x > -40 && x < -24 && z > 4 && z < 60) return true; // Sungai Lepak
-  if (Math.hypot(x - STADIUM.x, z - STADIUM.z) < STADIUM_SOLID_R + 2) return true;
-  return false;
+  return SOLIDS.some((s) => {
+    if (s.kind === "prop") return false;
+    const soft = s.r != null || s.kind === "scenery" || s.id === "playground";
+    return pointInSolid(x, z, s, soft ? 2 : 4);
+  });
 }
 
 /** Mid-rise / tower footprints along arterials — fill empty map green. */
@@ -74,25 +46,18 @@ export const MAP_BLOCKS: MapBlock[] = [
   // East toward Taman
   { x: 58, z: -9, w: 10, d: 8, color: "#c5ced8" },
   { x: 72, z: 9, w: 8, d: 12, color: "#b8c4d0" },
-  { x: 88, z: -8, w: 12, d: 7, color: "#d0d8e0" },
-  { x: 98, z: 10, w: 7, d: 9, color: "#aeb8c4" },
   // West toward Menara
   { x: -58, z: 9, w: 9, d: 8, color: "#c8d0da" },
   { x: -72, z: -9, w: 11, d: 7, color: "#b4bec8" },
-  { x: -82, z: 8, w: 8, d: 11, color: "#d4dde6" },
   // North toward KLCC
   { x: -10, z: -58, w: 8, d: 10, color: "#c5ced8" },
-  { x: 11, z: -62, w: 7, d: 9, color: "#a8b4c0" },
   { x: -9, z: -78, w: 9, d: 8, color: "#d0d8e0" },
   { x: 12, z: -82, w: 8, d: 12, color: "#b8c4d0" },
   // South pockets — well clear of arterial x=0, spur z=76, stadium (22,90), pasar halls
-  { x: -28, z: 42, w: 8, d: 7, color: "#c4b8a0" },
   { x: 38, z: 52, w: 7, d: 8, color: "#d0c4a8" },
   { x: 40, z: 66, w: 8, d: 7, color: "#b8b0a0" },
   // Sentral / Bintik / Kampung pockets (no block on the Petaling spur mouth)
-  { x: -28, z: -56, w: 10, d: 8, color: "#c5ced8" },
   { x: 56, z: 14, w: 7, d: 6, color: "#3a3f46" },
-  { x: -52, z: 44, w: 8, d: 6, color: "#8fbc6e" },
   // TLX corridor (north of the bus-stop arterial at z=-68)
   { x: 28, z: -78, w: 8, d: 9, color: "#a8c4d8" },
   { x: 48, z: -78, w: 10, d: 7, color: "#9eb4c8" },

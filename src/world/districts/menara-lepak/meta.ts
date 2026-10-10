@@ -9,3 +9,5 @@ export const MENARA_LEPAK = {
 export const TOWER_POS = { x: -92, z: -6 };
 export const MENARA_BUS_STOP = { x: -68, z: 5.6 };
 export const MENARA_HILL = { x: -90, z: -4, r: 22 };
+/** Square base of the tower (world metres). */
+export const MENARA_BASE = 10;

@@ -54,7 +54,9 @@ export const SPINE_EDGES: SpineEdge[] = [
   { a: "z-neg", b: "pusat" },
   { a: "pusat", b: "z-pos" },
   { a: "x-pos", b: "taman" },
-  { a: "x-neg", b: "menara" },
+  // Split at the Mega Mall driveway so its parking stub joins the graph
+  { a: "x-neg", b: "park-mega-j" },
+  { a: "park-mega-j", b: "menara" },
   { a: "z-neg", b: "tlx-j" },
   { a: "tlx-j", b: "klcc" },
   { a: "z-pos", b: "pasar" },

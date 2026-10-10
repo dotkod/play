@@ -1,6 +1,7 @@
 import { BILLBOARD_PANEL_W, BILLBOARD_SPOTS } from "@/content/ads/billboards";
-import { BUILDINGS, doorSpot, EXTENT, footprint, mamakTableSpots, ROAD_HALF, WALK_HALF } from "./districts/pusat-lepak/layout";
+import { BUILDINGS, doorSpot, EXTENT, mamakTableSpots, ROAD_HALF, WALK_HALF } from "./districts/pusat-lepak/layout";
 import { PARKING_LOTS } from "./parking-lots";
+import { solidAt } from "./placements";
 import { staticHash } from "./spatial-hash";
 import { ROAD_STRIPS } from "./walk-spine";
 
@@ -28,13 +29,7 @@ function onCarriageway(x: number, z: number) {
  * Cross-road sidewalk sits at |x|≈5.4 — Warung / Anne corner / Farmasi footprints reach there.
  * Pad covers tree canopy (Ball r≈1.1 + side blob) so foliage isn’t inside walls.
  */
-function insideBuilding(x: number, z: number, pad = 2.2) {
-  for (const b of BUILDINGS) {
-    const f = footprint(b);
-    if (x > f.minX - pad && x < f.maxX + pad && z > f.minZ - pad && z < f.maxZ + pad) return true;
-  }
-  return false;
-}
+const insideBuilding = (x: number, z: number) => !!solidAt(x, z, 2.2);
 
 function spotOk(x: number, z: number) {
   return !onCarriageway(x, z) && !insideBuilding(x, z);

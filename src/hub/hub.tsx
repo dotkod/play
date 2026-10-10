@@ -42,6 +42,7 @@ import { Minimap } from "./minimap";
 import { nearestNamedNpc } from "./named-npcs";
 import { Phone } from "./phone/phone";
 import { HUB_STRINGS } from "./strings";
+import { DEFAULT_SPAWN } from "@/world/districts/pusat-lepak/layout";
 import { type Building, BUILDINGS, doorSpot } from "./world-data";
 
 const World = dynamic(() => import("./world"), {
@@ -67,7 +68,6 @@ function softKerjaUrl(slug: string | null) {
 export const SPAWN_KEY = "dotkod-play:spawn";
 // Survives React Strict Mode's double useState init (which would otherwise eat SPAWN_KEY twice)
 const BOOT_KEY = "kuala-lepak:city-boot";
-const DEFAULT_SPAWN = { x: 7.5, z: -4.4, rotY: Math.PI / 2 };
 
 type CityBoot = {
   spawn: { x: number; z: number; rotY: number };

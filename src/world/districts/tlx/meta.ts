@@ -11,3 +11,5 @@ export const MENARA_106 = { x: 72, z: -82 };
 export const TLX_BUS_STOP = { x: 62, z: -68 };
 /** North of the road so map/3D asphalt stays visible through TLX. */
 export const TLX_PARK = { x: 70, z: -80, w: 18, d: 12 };
+/** Square podium under Menara 106. */
+export const MENARA_106_BASE = 14;

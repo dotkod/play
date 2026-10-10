@@ -14,6 +14,8 @@ export const WORLD_MIN_X = -110;
 export const WORLD_MAX_X = 145;
 export const WORLD_MIN_Z = -128;
 export const WORLD_MAX_Z = 95;
+/** Where a new session starts: north sidewalk beside Anne Maju, facing east. */
+export const DEFAULT_SPAWN = { x: 7.5, z: -4.4, rotY: Math.PI / 2 };
 export const SIDEWALK_MID = (ROAD_HALF + WALK_HALF) / 2;
 /**
  * Keep north/south shophouse X-ranges clear of the cross-road traffic lanes (±LANE≈1.5)
@@ -217,33 +219,6 @@ export function mamakTableSpots(b: Building): { x: number; z: number }[] {
     { x: westX, z: f.front + dir * 1.7 },
     { x: westX, z: f.front + dir * 3.5 },
   ];
-}
-
-/** Dev assert: no pairwise overlap, no road invasion. */
-export function assertBuildingLayout(list: Building[] = BUILDINGS) {
-  const errors: string[] = [];
-  for (const b of list) {
-    if (buildingBlocksCrossRoad(b)) errors.push(`${b.id} invades ±ROAD_CLEAR`);
-  }
-  for (let i = 0; i < list.length; i++) {
-    for (let j = i + 1; j < list.length; j++) {
-      const a = list[i];
-      const b = list[j];
-      if (a.side !== b.side) continue;
-      const fa = footprint(a);
-      const fb = footprint(b);
-      const ox = Math.min(fa.maxX, fb.maxX) - Math.max(fa.minX, fb.minX);
-      const oz = Math.min(fa.maxZ, fb.maxZ) - Math.max(fa.minZ, fb.minZ);
-      if (ox > 0 && oz > 0) errors.push(`${a.id} overlaps ${b.id} by ${ox.toFixed(2)}m`);
-      else if (ox > -BUILDING_GAP && ox <= 0 && oz > 0) errors.push(`${a.id} / ${b.id} gap ${(-ox).toFixed(2)}m < ${BUILDING_GAP}`);
-    }
-  }
-  return errors;
-}
-
-if (process.env.NODE_ENV !== "production") {
-  const errs = assertBuildingLayout();
-  for (const e of errs) console.error(`[pusat layout] ${e}`);
 }
 
 export function doorSpot(b: Building) {

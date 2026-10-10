@@ -7,7 +7,7 @@ import { monoStationById } from "@/content/transit/monorel";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
 import { RailStationMesh } from "@/world/rail-station-mesh";
 import { presetForFrac } from "../../lighting";
-import { MENARA_BUS_STOP, MENARA_HILL, TOWER_POS } from "./meta";
+import { MENARA_BASE, MENARA_BUS_STOP, MENARA_HILL, TOWER_POS } from "./meta";
 
 const SHAFT = "#d4dde6";
 const POD = "#c8d0da";
@@ -41,7 +41,7 @@ function MenaraTower() {
   return (
     <group position={[TOWER_POS.x, 3.2, TOWER_POS.z]}>
       {/* Base / podium */}
-      <RBox size={[10, 3.2, 10]} radius={0.2} position={[0, 1.6, 0]} color="#e8eef4" />
+      <RBox size={[MENARA_BASE, 3.2, MENARA_BASE]} radius={0.2} position={[0, 1.6, 0]} color="#e8eef4" />
       {/* Shaft */}
       <Cyl top={2.4} bottom={3.2} height={28} position={[0, 17.5, 0]} color={SHAFT} />
       <Cyl top={1.9} bottom={2.4} height={14} position={[0, 38.5, 0]} color={SHAFT} />

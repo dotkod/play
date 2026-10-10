@@ -4,7 +4,7 @@ import { memo } from "react";
 import { mrtStationById } from "@/content/transit/mrt-hijau";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
 import { RailStationMesh } from "@/world/rail-station-mesh";
-import { MENARA_106, TLX_BUS_STOP, TLX_PARK } from "./meta";
+import { MENARA_106, MENARA_106_BASE, TLX_BUS_STOP, TLX_PARK } from "./meta";
 
 const GLASS = "#9ec8e0";
 const STEEL = "#b8c4d0";
@@ -20,7 +20,7 @@ export const TlxScene = memo(function TlxScene() {
         <meshLambertMaterial color="#6fba62" />
       </mesh>
       <group position={[MENARA_106.x, 0, MENARA_106.z]}>
-        <RBox size={[14, 4, 14]} radius={0.2} position={[0, 2, 0]} color="#e8eef4" />
+        <RBox size={[MENARA_106_BASE, 4, MENARA_106_BASE]} radius={0.2} position={[0, 2, 0]} color="#e8eef4" />
         {tiers.map((h, i) => {
           const yy = y + h / 2;
           y += h;

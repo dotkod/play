@@ -17,17 +17,13 @@ import { Person, type Pose } from "@/shared/three/person";
 import { type Circle, dynamicColliders, staticColliders } from "./colliders";
 import { input, lookAxis, moveVector, view } from "./controls";
 import { WORLD_MAX_X, WORLD_MAX_Z, WORLD_MIN_X, WORLD_MIN_Z } from "@/world/bounds";
-import { TOWER_L, TOWER_R } from "@/world/districts/klcc/meta";
-import { TOWER_POS as MENARA_TOWER } from "@/world/districts/menara-lepak/meta";
-import { STADIUM, STADIUM_SOLID_R } from "@/world/districts/bukit-jalan/meta";
-import { PASAR_HALLS, pasarHallFootprint } from "@/world/districts/pasar-besar/buildings";
-import { PETALING_SHOPS, petalingFootprint } from "@/world/districts/petaling-lane/buildings";
-import { TERRACES } from "@/world/districts/taman-ceria/layout";
+import { STADIUM } from "@/world/districts/bukit-jalan/meta";
+import { SOLIDS } from "@/world/placements";
 import { takeTeleport } from "@/world/player-bridge";
 import { isWalkable, snapToWalkable } from "@/world/walkability";
 import { PHONE_DRAW_MS, player as playerShared } from "./traffic";
 import { HOME_BUILDING, homeDoorSpot } from "./home";
-import { type Building, BUILDINGS, doorSpot, footprint } from "./world-data";
+import { type Building, BUILDINGS, doorSpot } from "./world-data";
 
 const SPEED = 6;
 const RADIUS = 0.45;
@@ -45,61 +41,27 @@ type Box = {
 // facade so the grass verge / outer sidewalk isn’t an invisible wall under the building shadow.
 // No door tunnels — enter via the door prompt → interior/job overlay (never walk through mesh).
 const FRONT_PAD = 0.08;
-const solids: Box[] = [
-  ...BUILDINGS.map((b) => {
-    const f = footprint(b);
-    return b.side === "north"
-      ? { id: b.id, minX: f.minX - RADIUS, maxX: f.maxX + RADIUS, minZ: f.minZ - RADIUS, maxZ: f.maxZ + FRONT_PAD }
-      : { id: b.id, minX: f.minX - RADIUS, maxX: f.maxX + RADIUS, minZ: f.minZ - FRONT_PAD, maxZ: f.maxZ + RADIUS };
-  }),
-  ...TERRACES.map((t) => ({
-    minX: t.x - t.w / 2 - RADIUS,
-    maxX: t.x + t.w / 2 + RADIUS,
-    minZ: t.z - t.d / 2 - RADIUS,
-    maxZ: t.z + t.d / 2 + RADIUS,
-  })),
-  ...[TOWER_L, TOWER_R].map((t) => ({
-    minX: t.x - 3.8 - RADIUS,
-    maxX: t.x + 3.8 + RADIUS,
-    minZ: t.z - 3.8 - RADIUS,
-    maxZ: t.z + 3.8 + RADIUS,
-  })),
-  {
-    minX: MENARA_TOWER.x - 5 - RADIUS,
-    maxX: MENARA_TOWER.x + 5 + RADIUS,
-    minZ: MENARA_TOWER.z - 5 - RADIUS,
-    maxZ: MENARA_TOWER.z + 5 + RADIUS,
-  },
-  ...PETALING_SHOPS.map((s) => {
-    const f = petalingFootprint(s);
-    return {
-      id: s.id,
-      minX: f.minX - RADIUS,
-      maxX: f.maxX + RADIUS,
-      minZ: f.minZ - RADIUS,
-      maxZ: f.maxZ + RADIUS,
-    };
-  }),
-  ...PASAR_HALLS.map((h) => {
-    const f = pasarHallFootprint(h);
-    return {
-      id: h.id,
-      minX: f.minX - RADIUS,
-      maxX: f.maxX + RADIUS,
-      minZ: f.minZ - RADIUS,
-      maxZ: f.maxZ + RADIUS,
-    };
-  }),
-];
+const solids: Box[] = SOLIDS.filter((s) => s.blocksPlayer && s.r == null).map(({ id, box, front }) => ({
+  id,
+  minX: box.minX - RADIUS,
+  maxX: box.maxX + RADIUS,
+  minZ: box.minZ - (front === "minZ" ? FRONT_PAD : RADIUS),
+  maxZ: box.maxZ + (front === "maxZ" ? FRONT_PAD : RADIUS),
+}));
+const round = SOLIDS.filter((s) => s.blocksPlayer && s.r != null);
 /** Stadium bowl solid — north approach along x=STADIUM.x stays open to the gate. */
 const STADIUM_APPROACH_HALF = 3.2;
 const blocked = (x: number, z: number) => {
   if (solids.some((s) => x > s.minX && x < s.maxX && z > s.minZ && z < s.maxZ)) return true;
-  const dx = x - STADIUM.x;
-  const dz = z - STADIUM.z;
-  if (dx * dx + dz * dz >= (STADIUM_SOLID_R + RADIUS) ** 2) return false;
-  if (Math.abs(x - STADIUM.x) < STADIUM_APPROACH_HALF && z < STADIUM.z - 2) return false;
-  return true;
+  for (const c of round) {
+    const cx = (c.box.minX + c.box.maxX) / 2;
+    const cz = (c.box.minZ + c.box.maxZ) / 2;
+    if ((x - cx) ** 2 + (z - cz) ** 2 >= (c.r! + RADIUS) ** 2) continue;
+    // Stadium gate: the north approach along x=STADIUM.x stays open
+    if (c.id === "stadium" && Math.abs(x - STADIUM.x) < STADIUM_APPROACH_HALF && z < STADIUM.z - 2) continue;
+    return true;
+  }
+  return false;
 };
 
 // Push the player out of any overlapping circle; returns true if something was in the way

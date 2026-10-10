@@ -13,4 +13,6 @@ React Three Fiber). Before writing code, read `docs/KUALA_LEPAK.md`, especially 
 - Respect the strict React Compiler lint rules (no randomness/time in render, no setState in effects, no ref access in render).
 - All player-facing text in BM and EN string tables; parody names for real brands/landmarks; non-violent content.
 - Bump the game version in `meta.ts` and add a `CHANGELOG.md` entry for player-facing changes.
-- Run `pnpm exec tsc --noEmit && pnpm lint && pnpm build` before pushing.
+- Place buildings, landmarks, car parks and billboards through `src/world/placements.ts` (sizes exported from the district meta/layout and used by the scene). Never add a footprint only inside a scene or a one-off collision list.
+- Run `pnpm check:layout` after moving anything in the world. Don't add entries to `KNOWN` in `src/world/layout.test.ts` to silence a new failure; fix the layout.
+- Run `pnpm exec tsc --noEmit && pnpm lint && pnpm build` before pushing (build runs the tests).

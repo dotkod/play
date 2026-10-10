@@ -5,7 +5,7 @@ import { mrtStationById } from "@/content/transit/mrt-hijau";
 import { monoStationById } from "@/content/transit/monorel";
 import { Box, RBox } from "@/shared/three/toon";
 import { RailStationMesh } from "@/world/rail-station-mesh";
-import { BINTIK_BUS_STOP, BINTIK_STRIP } from "./meta";
+import { BINTIK_BLOCKS, BINTIK_BUS_STOP } from "./meta";
 
 const NEON = ["#ff5a7a", "#64d2ff", "#ffd60a", "#bf5af2", "#30d158"];
 
@@ -13,9 +13,9 @@ export const BintikScene = memo(function BintikScene() {
   return (
     <group>
       {/* Arterial asphalt from City ROAD_STRIPS */}
-      {[-8, -2, 4, 10].map((dx, i) => (
-        <group key={i} position={[BINTIK_STRIP.x + dx, 0, BINTIK_STRIP.z]}>
-          <RBox size={[5.5, 8 + (i % 3), 6]} radius={0.1} position={[0, 4 + (i % 3) / 2, 0]} color="#2a2a33" />
+      {BINTIK_BLOCKS.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]}>
+          <RBox size={[b.w, 8 + (i % 3), b.d]} radius={0.1} position={[0, 4 + (i % 3) / 2, 0]} color="#2a2a33" />
           <Box size={[5.2, 1.2, 0.12]} position={[0, 6, 3.1]} color={NEON[i % NEON.length]} outline={false} />
           <Box size={[4, 0.6, 0.1]} position={[0, 4.2, 3.15]} color="#ffffff" outline={false} />
         </group>

@@ -4,7 +4,7 @@ import { memo } from "react";
 import { Box, Cyl, RBox } from "@/shared/three/toon";
 import { LrtStationMesh } from "@/world/lrt-station-mesh";
 import { lrtStationById } from "@/content/transit/lrt-kelana";
-import { KLCC_BUS_STOP, KLCC_FOUNTAIN, KLCC_PARK, TOWER_L, TOWER_R } from "./meta";
+import { KLCC_BUS_STOP, KLCC_FOUNTAIN, KLCC_PARK, KLCC_PODIUM, TOWER_L, TOWER_R } from "./meta";
 
 const SILVER = "#c5ced8";
 const SILVER_DARK = "#8a96a3";
@@ -72,7 +72,7 @@ export const KlccScene = memo(function KlccScene() {
       <Box size={[12, 1.2, 0.1]} position={[0, 22.2, TOWER_L.z - 1.7]} color={GLASS} outline={false} />
 
       {/* Podium / mall stub */}
-      <RBox size={[22, 5, 10]} radius={0.2} position={[0, 2.5, -112]} color="#e8eef4" />
+      <RBox size={[KLCC_PODIUM.w, 5, KLCC_PODIUM.d]} radius={0.2} position={[KLCC_PODIUM.x, 2.5, KLCC_PODIUM.z]} color="#e8eef4" />
       <Box size={[18, 1.8, 0.12]} position={[0, 3.2, -106.9]} color="#1f5fa8" outline={false} />
 
       <LrtStationMesh x={lrtStationById("klcc").x} z={lrtStationById("klcc").z} />

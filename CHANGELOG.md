@@ -5,6 +5,12 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.60
+- SE billboard no longer stands in the middle of the Bukit Bintik neon strip
+- City map stops drawing filler blocks over real houses, roads, car parks and the Sentral hall
+- Wayfinder can route through the Mega Mall car park driveway
+- Layout check runs on every deploy so overlapping buildings and roads get caught before release
+
 ### 0.10.59
 - Taman Ceria is a real terrace row now — road to x=140, houses on the sidewalk with roofs/doors, home door reachable
 

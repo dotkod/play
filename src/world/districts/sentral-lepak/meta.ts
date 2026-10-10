@@ -8,3 +8,5 @@ export const SENTRAL_LEPAK = {
 
 export const SENTRAL_BUS_STOP = { x: -32, z: -40 };
 export const SENTRAL_HALL = { x: -42, z: -52 };
+/** Station hall footprint, centred on SENTRAL_HALL. */
+export const SENTRAL_HALL_SIZE = { w: 28, d: 16 };

@@ -8,3 +8,11 @@ export const KAMPUNG_LEPAK = {
 
 export const KAMPUNG_BUS_STOP = { x: -55, z: 38 };
 export const KAMPUNG_CENTRE = { x: -65, z: 50 };
+/** Stilt houses around the village centre (roof overhang included). */
+export const KAMPUNG_HOUSES = [
+  [-8, -4],
+  [0, 2],
+  [8, -2],
+  [-4, 8],
+  [6, 10],
+].map(([dx, dz]) => ({ x: KAMPUNG_CENTRE.x + dx, z: KAMPUNG_CENTRE.z + dz, w: 4.8, d: 3.8 }));
