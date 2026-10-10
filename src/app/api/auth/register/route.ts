@@ -7,6 +7,7 @@ import {
   makeSessionToken,
   normalizeUsername,
   profileKey,
+  profileTooBig,
   userKey,
   type UserRecord,
 } from "@/shared/server/auth";
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   const created = await redis.set(userKey(username), record, { nx: true });
   if (created !== "OK") return NextResponse.json({ error: "Username dah diambil" }, { status: 409 });
 
-  if (body?.profile && typeof body.profile === "object") {
+  if (body?.profile && typeof body.profile === "object" && !profileTooBig(body.profile)) {
     const profile = { ...(body.profile as object), username, updatedAt: Date.now() };
     await redis.set(profileKey(username), profile);
   }

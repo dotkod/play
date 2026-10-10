@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getSessionUsername, profileKey } from "@/shared/server/auth";
+import { getSessionUsername, profileKey, profileTooBig } from "@/shared/server/auth";
 import { getRedis } from "@/shared/server/redis";
 
 export async function GET() {
@@ -21,6 +21,7 @@ export async function PUT(req: NextRequest) {
   if (!body?.profile || typeof body.profile !== "object") {
     return NextResponse.json({ error: "Profile tak sah" }, { status: 400 });
   }
+  if (profileTooBig(body.profile)) return NextResponse.json({ error: "Profile terlalu besar" }, { status: 413 });
   const profile = { ...(body.profile as object), username, updatedAt: Date.now() };
   await redis.set(profileKey(username), profile);
   return NextResponse.json({ ok: true });

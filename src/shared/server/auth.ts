@@ -1,4 +1,4 @@
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { getRedis } from "./redis";
 
@@ -13,8 +13,14 @@ export function normalizeUsername(raw: string) {
   return raw.trim().replace(/^@/, "").toLowerCase();
 }
 
+const DEV_SECRET = "kuala-lepak-dev-secret-change-me";
+
+// The repo is public, so the dev fallback must never sign real sessions
 function secret() {
-  return process.env.AUTH_SECRET || process.env.KUALA_LEPAK_AUTH_SECRET || "kuala-lepak-dev-secret-change-me";
+  const value = process.env.AUTH_SECRET || process.env.KUALA_LEPAK_AUTH_SECRET;
+  if (value) return value;
+  if (process.env.NODE_ENV === "production") throw new Error("AUTH_SECRET is not set");
+  return DEV_SECRET;
 }
 
 export function hashPin(pin: string, salt = randomBytes(16).toString("hex")) {
@@ -29,7 +35,13 @@ export function verifyPin(pin: string, record: UserRecord) {
 }
 
 function sign(payload: string) {
-  return createHash("sha256").update(`${payload}.${secret()}`).digest("base64url");
+  return createHmac("sha256", secret()).update(payload).digest("base64url");
+}
+
+function sameSig(a: string, b: string) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
 }
 
 export function makeSessionToken(username: string) {
@@ -41,7 +53,7 @@ export function makeSessionToken(username: string) {
 export function readSessionToken(token: string | undefined): string | null {
   if (!token) return null;
   const [body, sig] = token.split(".");
-  if (!body || !sig || sign(body) !== sig) return null;
+  if (!body || !sig || !sameSig(sign(body), sig)) return null;
   try {
     const data = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { u?: string; exp?: number };
     if (!data.u || !USER_RE.test(data.u) || !data.exp || data.exp < Date.now()) return null;
@@ -54,6 +66,13 @@ export function readSessionToken(token: string | undefined): string | null {
 export async function getSessionUsername() {
   const jar = await cookies();
   return readSessionToken(jar.get(SESSION_COOKIE)?.value);
+}
+
+// Profiles are client-owned blobs; cap them so one account can't fill Redis
+export const PROFILE_MAX_BYTES = 64 * 1024;
+
+export function profileTooBig(profile: unknown) {
+  return JSON.stringify(profile).length > PROFILE_MAX_BYTES;
 }
 
 export function userKey(username: string) {
