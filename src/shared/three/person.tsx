@@ -19,6 +19,8 @@ export type Pose = {
   // Taking phone from pocket (0→1) or holding it up to look at the screen
   phone?: "draw" | "hold";
   phoneProgress?: number;
+  /** Surgical mask over the nose and mouth (city on haze days). */
+  masked?: boolean;
 };
 
 const HIP_STAND = 0.78;
@@ -36,6 +38,7 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
   const brows = useRef<THREE.Group>(null);
   const tray = useRef<THREE.Group>(null);
   const phone = useRef<THREE.Group>(null);
+  const mask = useRef<THREE.Group>(null);
 
   useFrame(({ clock }) => {
     const p = getPose();
@@ -91,6 +94,7 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
       armR.current.rotation.z = 0;
     }
     if (brows.current) brows.current.visible = !!p.angry;
+    if (mask.current) mask.current.visible = !!p.masked;
     if (tray.current) tray.current.visible = !!p.carrying;
     if (phone.current) {
       const show = p.phone === "hold" || (p.phone === "draw" && (p.phoneProgress ?? 0) > 0.38);
@@ -149,6 +153,13 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
             <Box size={[0.09, 0.022, 0.01]} position={[0.09, 0.1, 0.214]} rotation={[0, 0, 0.4]} color="#111" outline={false} />
           </group>
           <Headwear look={look} />
+          <group ref={mask} visible={false}>
+            <Box size={[0.34, 0.17, 0.04]} position={[0, -0.075, 0.222]} color="#cfe6f2" outline={false} />
+            <Box size={[0.3, 0.012, 0.012]} position={[0, -0.03, 0.245]} color="#a9cbe0" outline={false} />
+            <Box size={[0.3, 0.012, 0.012]} position={[0, -0.12, 0.245]} color="#a9cbe0" outline={false} />
+            <Box size={[0.012, 0.02, 0.36]} position={[-0.225, -0.03, 0.03]} color="#f4f6f8" outline={false} />
+            <Box size={[0.012, 0.02, 0.36]} position={[0.225, -0.03, 0.03]} color="#f4f6f8" outline={false} />
+          </group>
           {look.glasses && (
             <>
               <Box size={[0.14, 0.08, 0.02]} position={[-0.09, 0.03, 0.225]} color="#111" outline={false} />

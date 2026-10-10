@@ -5,6 +5,11 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.11.1
+- Street lamps switch on at dusk (6:30pm) and off at dawn (7am), with pools of light on the road
+- On jerebu days you and everyone on the street wear face masks; clear days, no masks
+- Buildings in front of you fade to see-through instead of vanishing, and the camera never ends up inside a roof
+
 ### 0.11.0
 - Brand-new Kuala Lepak: Pusat rebuilt from scratch as a proper 3×3-block town centre
 - Real streets: lane lines, zebra crossings, stop lines, working traffic lights, kerbs and tiled sidewalks, street lamps that light up at night, trees

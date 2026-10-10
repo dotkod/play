@@ -121,3 +121,9 @@ export function gameClockLabel(frac = clock.dayFrac): string {
   const mm = total % 60;
   return `${hh}:${String(mm).padStart(2, "0")}`;
 }
+
+/** Street lamps: on from dusk (18:30) to dawn (07:00) local time, off through the day. */
+export function lampsOn(frac = clock.dayFrac): boolean {
+  const h = frac * 24;
+  return h >= 18.5 || h < 7;
+}

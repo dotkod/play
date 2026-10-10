@@ -8,7 +8,7 @@
 import { useFrame } from "@react-three/fiber";
 import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { presetForFrac } from "@/world/lighting";
+import { lampsOn, presetForFrac } from "@/world/lighting";
 import { type Prop, STREETS } from "../plan";
 import { glowMaterial, hullMaterial, kitMaterial, mergeGlow, mergeParts, type Part } from "../kit/merge";
 import { BULBS, lampGlowParts, PROP_MODELS, signalPoleParts, treeParts } from "../kit/props";
@@ -31,7 +31,20 @@ function setMatrices(mesh: THREE.InstancedMesh | null, spots: Spot[]) {
 }
 
 /** One model, many copies. `glow` parts light up at night. */
-export function Instanced({ parts, spots, glow, outline = 0.03 }: { parts: Part[]; spots: Spot[]; glow?: Part[]; outline?: number }) {
+export function Instanced({
+  parts,
+  spots,
+  glow,
+  glowWhen = () => presetForFrac().windows,
+  outline = 0.03,
+}: {
+  parts: Part[];
+  spots: Spot[];
+  glow?: Part[];
+  /** When the glow parts are lit (default: at night). */
+  glowWhen?: () => boolean;
+  outline?: number;
+}) {
   const body = useRef<THREE.InstancedMesh>(null);
   const hull = useRef<THREE.InstancedMesh>(null);
   const lit = useRef<THREE.InstancedMesh>(null);
@@ -42,7 +55,7 @@ export function Instanced({ parts, spots, glow, outline = 0.03 }: { parts: Part[
     setMatrices(lit.current, spots);
   }, [spots]);
   useFrame(() => {
-    if (lit.current) lit.current.visible = presetForFrac().windows;
+    if (lit.current) lit.current.visible = glowWhen();
   });
   if (!spots.length) return null;
   return (
@@ -73,11 +86,40 @@ export const StreetProps = memo(function StreetProps() {
   return (
     <group>
       {models.map((m) => (
-        <Instanced key={m.key} parts={m.parts} spots={m.spots} glow={m.glow} />
+        <Instanced key={m.key} parts={m.parts} spots={m.spots} glow={m.glow} glowWhen={m.key === "lamp" ? lampsOn : undefined} />
       ))}
+      <LampPools />
       <TrafficLights />
     </group>
   );
+});
+
+/** Warm pools of light on the pavement under each lamp head, shown while lamps are on. */
+const LampPools = memo(function LampPools() {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  const lamps = useMemo(() => byKind("lamp"), []);
+  const geo = useMemo(() => new THREE.CircleGeometry(2.6, 28).rotateX(-Math.PI / 2), []);
+  const mat = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: "#ffd98a", transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }),
+    [],
+  );
+  useLayoutEffect(() => {
+    const m = mesh.current;
+    if (!m) return;
+    lamps.forEach((l, i) => {
+      // The head hangs 1.6 m out over the road from the pole
+      tmp.position.set(l.x + Math.sin(l.rotY) * 1.6, 0.07, l.z + Math.cos(l.rotY) * 1.6);
+      tmp.rotation.set(0, 0, 0);
+      tmp.updateMatrix();
+      m.setMatrixAt(i, tmp.matrix);
+    });
+    m.instanceMatrix.needsUpdate = true;
+    m.computeBoundingSphere();
+  }, [lamps]);
+  useFrame(() => {
+    if (mesh.current) mesh.current.visible = lampsOn();
+  });
+  return <instancedMesh ref={mesh} args={[geo, mat, lamps.length]} visible={false} />;
 });
 
 const BULB_ON: Record<(typeof BULBS)[number]["color"], THREE.Color> = {

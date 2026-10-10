@@ -6,6 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import { memo, useMemo, useState } from "react";
 import { type Look, townsfolk } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
+import { atmosphere } from "@/world/atmosphere";
 import { player } from "@/world/player-bridge";
 import { GRID } from "../plan";
 import { createPeds, type Ped, PED_R, stepPeds } from "../sim/peds";
@@ -20,7 +21,10 @@ function getCrowd() {
 
 function Walker({ ped }: { ped: Ped }) {
   const [look] = useState<Look>(() => townsfolk(ped.kind));
-  const getPose = useMemo(() => (): Pose => ({ x: ped.x, z: ped.z, rotY: ped.rot, walking: ped.walking, seated: false }), [ped]);
+  const getPose = useMemo(
+    () => (): Pose => ({ x: ped.x, z: ped.z, rotY: ped.rot, walking: ped.walking, seated: false, masked: atmosphere.haze !== "none" }),
+    [ped],
+  );
   return <Person look={look} getPose={getPose} />;
 }
 

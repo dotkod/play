@@ -14,6 +14,7 @@ import { lookAxis, moveVector, view } from "@/hub/controls";
 import { sfx } from "@/shared/audio";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
+import { atmosphere } from "@/world/atmosphere";
 import { PHONE_DRAW_MS, player as shared, takeTeleport } from "@/world/player-bridge";
 import { buildingHeight, BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
 import { cityDynamic } from "./dynamic";
@@ -176,6 +177,8 @@ export function CityPlayer({
         seated: false,
         phone: drawing ? "draw" : shared.phoneHeld ? "hold" : undefined,
         phoneProgress: drawing ? 1 - (shared.phoneDrawUntil - now) / PHONE_DRAW_MS : 1,
+        // Jerebu days: everyone outdoors masks up
+        masked: atmosphere.haze !== "none",
       };
     },
     [],
