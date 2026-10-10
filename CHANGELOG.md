@@ -5,6 +5,10 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.10.61
+- Night is readable now: blue-hour lighting instead of near-black
+- Haze, cloud and rain tint the city but can no longer black it out (night + jerebu was ~15% light)
+
 ### 0.10.60
 - SE billboard no longer stands in the middle of the Bukit Bintik neon strip
 - City map stops drawing filler blocks over real houses, roads, car parks and the Sentral hall

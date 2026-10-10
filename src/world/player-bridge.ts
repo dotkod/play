@@ -23,3 +23,8 @@ export function takeTeleport() {
   teleportQueue = null;
   return t;
 }
+
+// Dev only: jump around from the console, e.g. __klTeleport(-40, -44) to check a layout spot
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+  (window as unknown as { __klTeleport: typeof requestTeleport }).__klTeleport = requestTeleport;
+}

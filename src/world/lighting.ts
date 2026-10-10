@@ -60,17 +60,18 @@ export const PRESETS: Record<LightPresetId, LightPreset> = {
     sunHeight: 10,
     windows: false,
   },
+  // Readable "blue hour" night: moody colours, but streets and faces stay visible
   malam: {
     id: "malam",
-    bg: "#1a2438",
-    fog: "#1a2438",
-    fogNear: 40,
-    fogFar: 130,
-    hemiSky: "#3a4a6a",
-    hemiGround: "#1a2030",
-    hemiIntensity: 0.55,
-    sunIntensity: 0.35,
-    sunColor: "#a8b8ff",
+    bg: "#24345a",
+    fog: "#24345a",
+    fogNear: 45,
+    fogFar: 135,
+    hemiSky: "#9fb4e6",
+    hemiGround: "#3a4562",
+    hemiIntensity: 1.05,
+    sunIntensity: 0.8,
+    sunColor: "#c4d0ff",
     sunHeight: 22,
     windows: true,
   },
@@ -80,7 +81,14 @@ export const PRESETS: Record<LightPresetId, LightPreset> = {
 export const clock = {
   dayFrac: localDayFrac(),
   running: true,
+  /** Dev: keep dayFrac where it was set instead of following the device clock. */
+  frozen: false,
 };
+
+// Dev only: freeze the time of day from the console, e.g. __klClock.frozen = true; __klClock.dayFrac = 0.5
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+  (window as unknown as { __klClock: typeof clock }).__klClock = clock;
+}
 
 export function localDayFrac(now = new Date()): number {
   const ms = now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000 + now.getMilliseconds();
@@ -89,7 +97,7 @@ export function localDayFrac(now = new Date()): number {
 
 /** Pull from the player's real local time (call from the city loop). */
 export function syncClockFromDevice() {
-  if (!clock.running) return;
+  if (!clock.running || clock.frozen) return;
   clock.dayFrac = localDayFrac();
 }
 

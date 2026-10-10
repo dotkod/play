@@ -132,7 +132,15 @@ export function lightModFor(
     hemiIntensity *= 0.7;
   }
 
-  return { fogNear, fogFar, fog, bg, sunIntensity, hemiIntensity };
+  // Weather tints the scene but never blacks it out (night + heavy haze + cloud stacked to ~15%)
+  return {
+    fogNear,
+    fogFar: Math.max(fogFar, 60),
+    fog,
+    bg,
+    sunIntensity: Math.max(sunIntensity, base.sunIntensity * 0.55, 0.45),
+    hemiIntensity: Math.max(hemiIntensity, base.hemiIntensity * 0.8, 0.85),
+  };
 }
 
 const POLL_MS = 12 * 60 * 1000;
