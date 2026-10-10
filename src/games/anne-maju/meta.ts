@@ -2,7 +2,7 @@
 export const GAME = {
   name: "Anne Maju",
   // Bump with every player-facing change; see CHANGELOG.md
-  version: "1.6.0",
+  version: "1.7.0",
   slug: "anne-maju",
   tagline: "Satu shift jadi anne mamak. Dengar order, bancuh, hantar.",
   title: "Anne Maju: Game Mamak 90 Saat",

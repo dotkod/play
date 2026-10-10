@@ -306,9 +306,9 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       <LandscapeGate />
       <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked} />
 
-      {!jobOpen && <WalletHud started={started} />}
+      {!shiftLive && <WalletHud started={started} />}
 
-      <div className={`edge-tr ${jobOpen ? "hidden" : ""} pointer-events-none absolute z-20 flex flex-col items-end gap-2`}>
+      <div className={`edge-tr ${shiftLive ? "hidden" : ""} pointer-events-none absolute z-20 flex flex-col items-end gap-2`}>
         <div className="pointer-events-auto flex gap-2">
           <MuteButton />
           <div className="flex h-9 items-center rounded-xl bg-ink/80 p-1 text-xs font-extrabold shadow-lg">
@@ -357,7 +357,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
 
       {jobOpen === "anne-maju" && <AnneMajuGame onExit={exitJob} embedded seamless onLiveChange={setShiftLive} />}
 
-      {started && !jobOpen && (
+      {started && !shiftLive && (
         <div className="edge-br absolute z-10 flex flex-col items-end gap-3">
           <div className="flex items-center gap-2">
             <span className="rounded-xl bg-ink/80 px-2 py-1 text-[10px] font-extrabold tracking-wide text-cream uppercase">

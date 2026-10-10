@@ -5,6 +5,9 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.12.1
+- In Anne Maju your wallet, minimap, phone and sound/language stay on screen until a shift starts
+
 ### 0.12.0
 - Walk straight into Restoran Anne Maju: the real restaurant is inside the building (tables, counter, Anne), no screen change
 - Step inside and the shift card pops up over the room; start and the camera glides to the serving view while the city keeps living outside
@@ -310,6 +313,10 @@ next to the short commit of the deploy.
 - Finishing an Anne Maju shift adds the RM to your city wallet when you walk back
 
 ## Anne Maju
+
+### 1.7.0
+- New shop UI: a compact shift card (Shift / Top / How to tabs), one HUD bar for time, takings and streak, a clean pause card and a results card
+- No exit buttons: just walk out of the shop; mid-shift, pause (⏸, Esc or P) and pick "Stop shift"
 
 ### 1.6.0
 - Plays inside the city's own restaurant: walk in, start a shift from the card, serve, walk out

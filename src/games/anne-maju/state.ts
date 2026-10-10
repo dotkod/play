@@ -78,6 +78,7 @@ export type Lines = {
 };
 
 export type Action =
+  | { type: "reset" }
   | { type: "start"; now: number; mode: Mode }
   | { type: "tutorial"; now: number; spawn: Spawn }
   | { type: "tick"; now: number; spawn: Spawn | null; lines: Lines }
@@ -174,6 +175,10 @@ function seat(s: GameState, spawn: Spawn, now: number, tutorial = false): GameSt
 
 export function reducer(s: GameState, a: Action): GameState {
   switch (a.type) {
+    // Back to the counter: no shift running (stop mid-shift, or close the results)
+    case "reset":
+      return initialState;
+
     case "start":
       return { ...initialState, mode: a.mode, phase: "playing", startAt: a.now, now: a.now, nextSpawnAt: a.now + 600 };
 

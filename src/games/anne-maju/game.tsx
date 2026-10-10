@@ -8,7 +8,6 @@ import { queueJobResult } from "@/core/job-handoff";
 import { music, setMuted, sfx, unlockAudio, useMuted } from "@/shared/audio";
 import { LandscapeGate, requestLandscape } from "@/shared/landscape-gate";
 import { hashString, rand, seedRandom, unseedRandom } from "@/shared/rng";
-import { shareResult, type ShareOutcome } from "@/shared/share";
 import { ANNE_LOOK, type Look, randomParty } from "@/shared/three/look";
 import { useBestScore } from "@/shared/use-best-score";
 import { type Cup, type Drink, drinkName, FULL_MENU, isCupComplete, type Menu, randomDrink, randomLine, sameDrink } from "./drinks";
@@ -16,7 +15,13 @@ import { getLang, type Lang, setLang, t, useLang, useT } from "./i18n";
 import { LeaderboardPanel, useBoard } from "./leaderboard-panel";
 import { GAME } from "./meta";
 import { addCareer, career, currentOutfit, dailyKey, markTutorialDone, menuFor, newUnlocks, nextUnlock, OUTFITS, setOutfit, tutorialDone, type Unlock } from "./progress";
-import { encodeResult, nextRank, rankFor, rm } from "./result";
+import { rankFor, rm } from "./result";
+import { CountUp, OutfitPicker, Stat, titleStroke, Version } from "./ui/bits";
+import { PauseCard } from "./ui/pause-card";
+import { ResultCard } from "./ui/result-card";
+import { ShiftCard } from "./ui/shift-card";
+import { ShiftHud } from "./ui/shift-hud";
+import { useShiftScore } from "./ui/use-shift-score";
 import {
   currentStep,
   difficulty,
@@ -177,6 +182,23 @@ export function AnneMajuGame({
     return () => document.removeEventListener("visibilitychange", onHide);
   }, []);
 
+  // Esc / P pauses (and resumes) a shift — the obvious way out from the keyboard
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" && e.key.toLowerCase() !== "p") return;
+      const phase = stateRef.current.phase;
+      if (phase === "playing") {
+        dispatch({ type: "pause", now: Date.now() });
+        music.stop();
+      } else if (phase === "paused") {
+        dispatch({ type: "resume", now: Date.now() });
+        music.start();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Stable so the memoised 3D counter doesn't re-render on every game tick
   const onPick = useCallback((part: Step, value: string) => {
     pickSound(part, value);
@@ -220,17 +242,42 @@ export function AnneMajuGame({
     music.start();
   };
 
+  /** Stop the shift and stay in the shop (seamless: you then walk out yourself). */
+  const stopShift = () => {
+    music.stop();
+    unseedRandom();
+    dispatch({ type: "reset" });
+  };
+
+  if (seamless && (s.phase === "intro" || s.phase === "over")) {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-30 overflow-hidden select-none">
+        <SeamlessRoom s={s} serveEvent={serveEvent} onTable={() => {}} anneLook={anneLook} anchors={anchors} serving={s.phase === "over"} overlays={false} panel={panel} />
+        {s.phase === "intro" ? (
+          <ShiftCard
+            challenge={challenge}
+            careerSen={careerSen}
+            outfitId={outfit.id}
+            onOutfit={(id) => {
+              setOutfit(id);
+              setOutfitState(currentOutfit());
+            }}
+            onStart={() => play("normal")}
+            onDaily={() => play("daily")}
+          />
+        ) : (
+          <ResultCard s={s} result={result} careerSen={careerSen} onRestart={() => startShift(s.mode)} onClose={stopShift} />
+        )}
+      </div>
+    );
+  }
+
   if (s.phase === "intro" || s.phase === "over") {
     return (
-      <div className={`fixed inset-0 z-40 overflow-hidden select-none ${seamless ? "pointer-events-none [&>*]:pointer-events-auto" : ""}`}>
-        {seamless ? (
-          <SeamlessRoom s={s} serveEvent={serveEvent} onTable={() => {}} anneLook={anneLook} anchors={anchors} serving={s.phase === "over"} overlays={false} panel={panel} />
-        ) : (
-          <DemoBackdrop anneLook={anneLook} />
-        )}
+      <div className="fixed inset-0 z-40 overflow-hidden select-none">
+        <DemoBackdrop anneLook={anneLook} />
         {s.phase === "intro" ? (
           <Intro
-            seamless={seamless}
             challenge={challenge}
             careerSen={careerSen}
             outfitId={outfit.id}
@@ -324,28 +371,42 @@ export function AnneMajuGame({
           />
         )}
         <div className="edge-bl absolute flex items-center gap-2">
-          <Hud s={s} moneyRef={moneyEl} />
-          {s.phase === "playing" && (
-            <button
-              type="button"
-              aria-label={tr.pause}
-              onClick={pause}
-              className="grid size-11 place-items-center rounded-xl bg-ink/90 text-lg text-cream shadow-lg active:scale-95"
-            >
-              ⏸
-            </button>
-          )}
-          {tutorial && (
-            <button
-              type="button"
-              onClick={() => {
+          {seamless ? (
+            <ShiftHud
+              s={s}
+              moneyRef={moneyEl}
+              onPause={pause}
+              onSkipTutorial={() => {
                 markTutorialDone();
                 startShift("normal");
               }}
-              className="rounded-xl bg-ink/80 px-3 py-2 text-xs font-extrabold text-cream shadow-lg active:scale-95"
-            >
-              {tr.skipTutorial} ⏭
-            </button>
+            />
+          ) : (
+            <>
+              <Hud s={s} moneyRef={moneyEl} />
+              {s.phase === "playing" && (
+                <button
+                  type="button"
+                  aria-label={tr.pause}
+                  onClick={pause}
+                  className="grid size-11 place-items-center rounded-xl bg-ink/90 text-lg text-cream shadow-lg active:scale-95"
+                >
+                  ⏸
+                </button>
+              )}
+              {tutorial && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    markTutorialDone();
+                    startShift("normal");
+                  }}
+                  className="rounded-xl bg-ink/80 px-3 py-2 text-xs font-extrabold text-cream shadow-lg active:scale-95"
+                >
+                  {tr.skipTutorial} ⏭
+                </button>
+              )}
+            </>
           )}
         </div>
         {combo && (
@@ -390,7 +451,12 @@ export function AnneMajuGame({
           )}
         </div>
       </div>
-      {s.phase === "paused" && <PauseMenu onResume={resume} onRestart={() => startShift(s.mode)} onExit={onExit} embedded={embedded} />}
+      {s.phase === "paused" &&
+        (seamless ? (
+          <PauseCard onResume={resume} onRestart={() => startShift(s.mode)} onStop={stopShift} />
+        ) : (
+          <PauseMenu onResume={resume} onRestart={() => startShift(s.mode)} onExit={onExit} embedded={embedded} />
+        ))}
       {s.phase === "tutorialDone" && (
         <Modal>
           <p className="text-3xl font-extrabold">{tr.tutorialDoneTitle}</p>
@@ -456,26 +522,6 @@ function Hud({ s, moneyRef }: { s: GameState; moneyRef: RefObject<HTMLSpanElemen
   );
 }
 
-// Money ticks up instead of jumping
-function CountUp({ sen }: { sen: number }) {
-  const [shown, setShown] = useState(sen);
-  const from = useRef(sen);
-  useEffect(() => {
-    const start = performance.now();
-    const a = from.current;
-    let raf = 0;
-    const step = (now: number) => {
-      const k = Math.min(1, (now - start) / 450);
-      const v = Math.round(a + (sen - a) * (1 - Math.pow(1 - k, 3)));
-      setShown(v);
-      from.current = v;
-      if (k < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [sen]);
-  return <>{rm(shown)}</>;
-}
 
 // The noted order, pinned on the counter until that table is done
 function Slip({ s }: { s: GameState }) {
@@ -672,20 +718,10 @@ function StepRail({ cup, onRewind, onDiscard }: { cup: Cup; onRewind: (p: Step) 
 }
 
 // "v1.5.1 · a1b2c3d" so players (and bug reports) can say exactly which build they're on
-function Version({ className = "" }: { className?: string }) {
-  const build = process.env.NEXT_PUBLIC_BUILD;
-  return (
-    <p className={`text-[11px] font-bold tabular-nums ${className}`}>
-      v{GAME.version}
-      {build ? ` · ${build}` : ""}
-    </p>
-  );
-}
 
-const titleStroke = "[-webkit-text-stroke:7px_#1f1a17] [paint-order:stroke_fill]";
+
 
 function Intro({
-  seamless = false,
   challenge,
   careerSen,
   outfitId,
@@ -693,7 +729,6 @@ function Intro({
   onStart,
   onDaily,
 }: {
-  seamless?: boolean;
   challenge?: number;
   careerSen: number;
   outfitId: string;
@@ -708,11 +743,7 @@ function Intro({
   const { board } = useBoard();
   const upcoming = nextUnlock(careerSen);
   return (
-    <div
-      className={`absolute inset-0 safe-px flex items-start justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent safe-pt pb-4 ${
-        seamless ? "pointer-events-none from-ink/70 via-ink/20 [&>*]:pointer-events-auto" : ""
-      }`}
-    >
+    <div className="absolute inset-0 safe-px flex items-start justify-between gap-6 overflow-y-auto bg-gradient-to-r from-ink/80 via-ink/35 to-transparent safe-pt pb-4">
       {/* my-auto centres when there's room but never pushes content up under the top buttons */}
       <div className="my-auto flex max-w-md flex-col gap-2.5 text-cream">
         <span className="w-fit rounded-full bg-chili px-3 py-1 text-xs font-extrabold tracking-wide uppercase">{tr.badge}</span>
@@ -765,32 +796,6 @@ function Intro({
   );
 }
 
-// Outfits for Anne, unlocked by total earnings; locked ones show what they cost
-function OutfitPicker({ careerSen, outfitId, onOutfit }: { careerSen: number; outfitId: string; onOutfit: (id: string) => void }) {
-  const tr = useT();
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs font-extrabold text-cream/80">{tr.outfitTitle}</span>
-      {OUTFITS.map((o) => {
-        const open = careerSen >= o.at;
-        return (
-          <button
-            key={o.id}
-            type="button"
-            disabled={!open}
-            onClick={() => onOutfit(o.id)}
-            title={open ? o.id : rm(o.at)}
-            className={`grid size-9 place-items-center rounded-xl text-lg transition ${
-              o.id === outfitId ? "bg-amber-300 shadow-[0_3px_0_#1f1a17]" : open ? "bg-cream/20 active:scale-95" : "bg-ink/40 opacity-50"
-            }`}
-          >
-            {open ? o.emoji : "🔒"}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function GameOver({
   s,
@@ -804,68 +809,9 @@ function GameOver({
   onRestart: () => void;
 }) {
   const tr = useT();
-  const lang = useLang();
-  const auth = useAuth();
-  const { best, submit } = useBestScore(GAME.storageKey);
-  const [prevBest] = useState(best);
-  const [shareState, setShareState] = useState<ShareOutcome | null>(null);
-  const { board, refresh } = useBoard();
-  const [saved, setSaved] = useState<{ rank: number | null; daily: boolean } | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const posted = useRef(false);
-  const rank = rankFor(s.earned, lang);
-  const next = nextRank(s.earned, lang);
-  const isRecord = s.earned > prevBest;
+  const { rank, next, isRecord, saved, saving, error, board, username, share: onShare, shareState } = useShiftScore(s);
   const upcoming = nextUnlock(careerSen);
-
-  useEffect(() => {
-    submit(s.earned);
-    if (s.earned > prevBest && prevBest > 0) sfx.record();
-  }, [s.earned, submit, prevBest]);
-
-  useEffect(() => {
-    if (posted.current || s.earned === 0 || !auth.username) return;
-    let cancelled = false;
-    setSaving(true);
-    setError(null);
-    void (async () => {
-      try {
-        const res = await fetch("/api/scores", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ earned: s.earned, served: s.served, mode: s.mode, day: dailyKey() }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? tr.saveFailed);
-        if (cancelled) return;
-        posted.current = true;
-        setSaved({ rank: data.rank, daily: !!data.daily });
-        sfx.correct();
-        await refresh();
-      } catch (err) {
-        if (!cancelled) setError((err as Error).message);
-      } finally {
-        if (!cancelled) setSaving(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [s.earned, s.served, s.mode, auth.username, refresh, tr.saveFailed]);
-
-  const onShare = async () => {
-    sfx.tap();
-    const path = `/${GAME.slug}/k/${encodeResult({ earned: s.earned, served: s.served })}`;
-    setShareState(
-      await shareResult({
-        title: GAME.name,
-        text: tr.shareText(rm(s.earned), rank.emoji, rank.title),
-        url: `${window.location.origin}${path}`,
-        image: `${path}/opengraph-image`,
-      }),
-    );
-  };
+  const auth = { username };
 
   return (
     <div className="absolute inset-0 safe-px flex overflow-y-auto bg-ink/60 safe-pt pb-4 backdrop-blur-[2px]">
@@ -962,11 +908,3 @@ function GameOver({
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-cream p-1.5 shadow-[0_3px_0_#1f1a17]">
-      <p className="text-lg font-extrabold">{value}</p>
-      <p className="text-ink/50">{label}</p>
-    </div>
-  );
-}
