@@ -6,8 +6,8 @@
  */
 
 import { PerformanceMonitor } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useRef, useState } from "react";
 import { RainFX } from "@/hub/rain-fx";
 import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
 import { clock, syncClockFromDevice } from "@/world/lighting";
@@ -34,6 +34,15 @@ function PosterCamera() {
     camera.position.set(12, 26, -48);
     camera.lookAt(40, 0, -18);
   });
+  return null;
+}
+
+/** Dev only: expose the camera and scene as window.__klThree for debugging. */
+function DevHandle() {
+  const three = useThree();
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __klThree: unknown }).__klThree = three;
+  }, [three]);
   return null;
 }
 
@@ -66,6 +75,7 @@ export default function CityWorld({ spawn, onZone, active = true, poster = false
           }}
         />
         <Clock active={active} />
+        <DevHandle />
         <LightingRig shadows={shadows} />
         <CityGround />
         <CityBuildings />

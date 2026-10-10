@@ -15,7 +15,7 @@ import { sfx } from "@/shared/audio";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { PHONE_DRAW_MS, player as shared, takeTeleport } from "@/world/player-bridge";
-import { BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
+import { buildingHeight, BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
 import { cityDynamic } from "./dynamic";
 
 const SPEED = 6;
@@ -24,6 +24,16 @@ const LOOK: Look = { skin: "#c98d60", shirt: "#fcd34d", pants: "#2a2a33", headwe
 
 /** Enterable buildings (for now: the ones with a job inside). */
 const DOORS = BUILDINGS.filter((b) => b.game).map((b) => ({ b }));
+
+/** Roof boxes the camera must never sit inside (footprint grown a little, roof + parapet). */
+const ROOFS = BUILDINGS.map((b) => ({ r: b.rect, top: buildingHeight(b) + 1.2 }));
+
+/** Highest roof under (x, z), or 0. */
+function roofAt(x: number, z: number) {
+  let top = 0;
+  for (const { r, top: t } of ROOFS) if (t > top && x > r.minX - 0.8 && x < r.maxX + 0.8 && z > r.minZ - 0.8 && z < r.maxZ + 0.8) top = t;
+  return top;
+}
 
 /** Push a circle out of every box and circle it overlaps. */
 function resolve(p: THREE.Vector3) {
@@ -80,6 +90,7 @@ export function CityPlayer({
   const ring = useRef<THREE.Mesh>(null);
   const camPos = useMemo(() => new THREE.Vector3(), []);
   const camTarget = useMemo(() => new THREE.Vector3(), []);
+  const camHeight = useRef(11);
   const B = GRID.bounds;
 
   useFrame((_, delta) => {
@@ -125,7 +136,16 @@ export function CityPlayer({
     const portrait = size.width < size.height;
     const back = portrait ? 11 : 8.5;
     const up = portrait ? 14 : 11;
-    camPos.set(p.x + sy * back, up, p.z + cy * back);
+    // Never inside a building: rise over shophouse roofs, pull in under tall towers
+    let k = 1;
+    let y = up;
+    const roof = roofAt(p.x + sy * back, p.z + cy * back);
+    if (roof > y - 0.5) {
+      if (roof + 1.5 <= up + 6) y = roof + 1.5;
+      else while (k > 0.2 && roofAt(p.x + sy * back * k, p.z + cy * back * k) > y - 0.5) k -= 0.05;
+    }
+    camHeight.current += (y - camHeight.current) * Math.min(1, dt * 6);
+    camPos.set(p.x + sy * back * k, camHeight.current, p.z + cy * back * k);
     camera.position.copy(camPos);
     camTarget.set(p.x - sy * 1.5, 2.2, p.z - cy * 1.5);
     camera.lookAt(camTarget);

@@ -39,8 +39,11 @@ function groups(): Group[] {
   }));
 }
 
-/** Does the 2D segment a→b cross the rectangle (slab test)? */
-function segmentHitsRect(ax: number, az: number, bx: number, bz: number, r: Rect) {
+/**
+ * Where the 2D segment a→b leaves the rectangle, as t in [0, 1], or null if it misses
+ * (slab test). The camera ray slopes down, so it is lowest where it leaves.
+ */
+function segmentExit(ax: number, az: number, bx: number, bz: number, r: Rect): number | null {
   let t0 = 0;
   let t1 = 1;
   const dx = bx - ax;
@@ -52,15 +55,22 @@ function segmentHitsRect(ax: number, az: number, bx: number, bz: number, r: Rect
     [dz, r.maxZ - az],
   ]) {
     if (Math.abs(p) < 1e-9) {
-      if (q < 0) return false;
+      if (q < 0) return null;
       continue;
     }
     const t = q / p;
     if (p < 0) t0 = Math.max(t0, t);
     else t1 = Math.min(t1, t);
-    if (t0 > t1) return false;
+    if (t0 > t1) return null;
   }
-  return true;
+  return t1;
+}
+
+/** Faded copy of the shared kit material, one per building group so each can fade alone. */
+function fadeMaterial() {
+  const m = kitMaterial().clone();
+  m.transparent = true;
+  return m;
 }
 
 function RowSign({ g }: { g: Group }) {
@@ -95,7 +105,6 @@ function RowSign({ g }: { g: Group }) {
 }
 
 const BuildingGroup = memo(function BuildingGroup({ g }: { g: Group }) {
-  const root = useRef<THREE.Group>(null);
   const glow = useRef<THREE.Mesh>(null);
   const geo = useMemo(() => {
     const all = g.members.map(buildingParts);
@@ -107,22 +116,38 @@ const BuildingGroup = memo(function BuildingGroup({ g }: { g: Group }) {
     return { ...merged, glow: lit.length ? mergeGlow(lit) : null };
   }, [g]);
 
-  useFrame(({ camera }) => {
-    if (!root.current) return;
-    // Cutaway: hide the row if it stands between the camera and the player
-    const inside = player.x > g.rect.minX && player.x < g.rect.maxX && player.z > g.rect.minZ && player.z < g.rect.maxZ;
-    const r = { minX: g.rect.minX - 0.6, maxX: g.rect.maxX + 0.6, minZ: g.rect.minZ - 0.6, maxZ: g.rect.maxZ + 0.6 };
-    const blocks = !inside && segmentHitsRect(camera.position.x, camera.position.z, player.x, player.z, r);
-    root.current.visible = !blocks;
-    if (glow.current) glow.current.visible = presetForFrac().windows;
+  const body = useRef<THREE.Mesh>(null);
+  const hull = useRef<THREE.Mesh>(null);
+  const sign = useRef<THREE.Group>(null);
+  const faded = useRef<THREE.MeshToonMaterial | null>(null);
+  const opacity = useRef(1);
+
+  useFrame(({ camera }, delta) => {
+    // See-through only when this group truly blocks the view of the player: the camera ray
+    // is still below the roofline where it leaves the footprint (looking over a low roof is fine)
+    const t = segmentExit(camera.position.x, camera.position.z, player.x, player.z, g.rect);
+    const eyeH = camera.position.y + (1.6 - camera.position.y) * (t ?? 1);
+    const blocks = t !== null && eyeH < g.height + 0.5;
+    const want = blocks ? 0.18 : 1;
+    opacity.current += (want - opacity.current) * Math.min(1, delta * 10);
+    const solid = opacity.current > 0.98;
+    faded.current ??= fadeMaterial();
+    faded.current.opacity = opacity.current;
+    faded.current.depthWrite = solid;
+    if (body.current) body.current.material = solid ? kitMaterial() : faded.current;
+    if (hull.current) hull.current.visible = solid;
+    if (sign.current) sign.current.visible = opacity.current > 0.6;
+    if (glow.current) glow.current.visible = solid && presetForFrac().windows;
   });
 
   return (
-    <group ref={root}>
-      <mesh geometry={geo.body} material={kitMaterial()} castShadow receiveShadow />
-      {geo.hull && <mesh geometry={geo.hull} material={hullMaterial()} />}
+    <group>
+      <mesh ref={body} geometry={geo.body} material={kitMaterial()} castShadow receiveShadow />
+      {geo.hull && <mesh ref={hull} geometry={geo.hull} material={hullMaterial()} />}
       {geo.glow && <mesh ref={glow} geometry={geo.glow} material={glowMaterial()} visible={false} />}
-      <RowSign g={g} />
+      <group ref={sign}>
+        <RowSign g={g} />
+      </group>
     </group>
   );
 });
