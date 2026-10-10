@@ -40,6 +40,29 @@
   }
 }
 
+/* Foldable phone: cover pops in, then the clamshell / book unfolds */
+@keyframes phone-cover {
+  from { transform: translateY(24px) scale(0.85); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes phone-flip-open {
+  from { transform: perspective(1400px) rotateX(64deg) scaleY(0.5); opacity: 0.4; }
+  to { transform: perspective(1400px) rotateX(0) scaleY(1); opacity: 1; }
+}
+@keyframes phone-fold-open {
+  from { transform: perspective(1600px) rotateY(-64deg) scaleX(0.5); opacity: 0.4; }
+  to { transform: perspective(1600px) rotateY(0) scaleX(1); opacity: 1; }
+}
+.phone-cover {
+  animation: phone-cover 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.phone-flip-open {
+  animation: phone-flip-open 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.phone-fold-open {
+  animation: phone-fold-open 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .phone-rise {
   animation: phone-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

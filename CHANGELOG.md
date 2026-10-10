@@ -5,6 +5,10 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.11.2
+- New phone: a flip phone on bigger screens (pops up closed with the time on the cover, then flips open) and a fold phone on phones (opens like a book into a split screen: apps on the left, the open app on the right)
+- Cars and vans have proper wheel wells; shophouse rooftops no longer shimmer
+
 ### 0.11.1
 - Street lamps switch on at dusk (6:30pm) and off at dawn (7am), with pools of light on the road
 - On jerebu days you and everyone on the street wear face masks; clear days, no masks
