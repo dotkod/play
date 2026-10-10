@@ -51,7 +51,7 @@ function paintBase() {
   return c;
 }
 
-export function CityMinimap({ size }: { size: number }) {
+export function CityMinimap({ size, onOpen }: { size: number; onOpen?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
@@ -97,11 +97,9 @@ export function CityMinimap({ size }: { size: number }) {
     return () => cancelAnimationFrame(raf);
   }, [size]);
   return (
-    <canvas
-      ref={ref}
-      style={{ width: size, height: size }}
-      className="rounded-2xl border-[3px] border-ink bg-[#8fca7f] shadow-[0_4px_0_#1f1a17]"
-      aria-label="Peta"
-    />
+    <button type="button" onClick={onOpen} aria-label="Peta" className="relative block rounded-2xl active:translate-y-0.5">
+      <canvas ref={ref} style={{ width: size, height: size }} className="rounded-2xl border-[3px] border-ink bg-[#8fca7f] shadow-[0_4px_0_#1f1a17]" />
+      <span className="absolute right-1.5 bottom-1.5 grid size-6 place-items-center rounded-lg border-2 border-ink bg-cream text-[11px] font-extrabold text-ink">⤢</span>
+    </button>
   );
 }

@@ -164,3 +164,9 @@ export function makeGrid(blocksX: number, blocksZ: number): Grid {
 export function asphalt(g: Grid): Rect[] {
   return [...g.segments.map((s) => s.rect), ...g.junctions.map((j) => j.rect)];
 }
+
+/** Parody street names: east-west roads by row (north to south), north-south by column (west to east). */
+export const STREET_NAMES = {
+  x: ["Jalan Santai", "Jalan Lepak", "Jalan Teh Tarik", "Jalan Roti Canai"],
+  z: ["Lorong Mamak", "Jalan Kopi O", "Jalan Cendol", "Lorong Kucing"],
+};

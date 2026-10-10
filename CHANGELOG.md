@@ -5,6 +5,11 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.13.0
+- New city map: tap the minimap (or press M) for an illustrated map with real roads, zebra crossings, street names, every building, the park and live pins for you, Anne Maju and the bus stop
+- Drag to pan, scroll or pinch to zoom, tap a building to see what it is; legend chips jump to each place
+- Your character stays put while the map is open
+
 ### 0.12.1
 - In Anne Maju your wallet, minimap, phone and sound/language stay on screen until a shift starts
 

@@ -8,6 +8,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BUILDINGS, inRect, roomRect, SPAWN } from "@/city/plan";
+import { CityMapModal } from "@/city/components/city-map";
 import { CityMinimap } from "@/city/components/minimap";
 import { logoutAccount, refreshAuth, takeAuthHello, useAuth } from "@/core/auth-client";
 import { emit } from "@/core/events";
@@ -91,6 +92,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const [jobOpen, setJobOpen] = useState(() => bootKerja(initialJob));
   const [started, setStarted] = useState(() => !!bootKerja(initialJob));
   const [shiftLive, setShiftLive] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phoneBusy, setPhoneBusy] = useState(false);
   const phoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,6 +278,11 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         start();
         return;
       }
+      if (started && !shiftLive && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        setMapOpen((o) => !o);
+        return;
+      }
       if (started && e.key.toLowerCase() === "t") {
         e.preventDefault();
         if (phoneBusy || phoneOpen) closePhone();
@@ -304,7 +311,8 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
       <LandscapeGate />
-      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked} />
+      {/* Walking pauses while the map is open (the city itself keeps living) */}
+      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked && !mapOpen} />
 
       {!shiftLive && <WalletHud started={started} />}
 
@@ -328,7 +336,11 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
             {tr.logout}
           </button>
         </div>
-        {started && <CityMinimap size={touch ? 104 : 140} />}
+        {started && (
+          <div className="pointer-events-auto">
+            <CityMinimap size={touch ? 104 : 140} onOpen={() => setMapOpen(true)} />
+          </div>
+        )}
       </div>
 
       {!started && !tutorialOpen && <StartScreen tr={tr} touch={touch} onStart={start} />}
@@ -370,6 +382,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       )}
 
       <Phone open={phoneOpen} onClose={closePhone} />
+      <CityMapModal open={mapOpen && !shiftLive} onClose={() => setMapOpen(false)} />
 
       {started && touch && !phoneBusy && !shiftLive && (
         <>
