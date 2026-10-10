@@ -133,7 +133,7 @@ function WorldSim({ active, chunks }: { active: boolean; chunks: ReturnType<type
   return null;
 }
 
-const LightingRig = memo(function LightingRig({ shadows }: { shadows: boolean }) {
+export const LightingRig = memo(function LightingRig({ shadows }: { shadows: boolean }) {
   const hemi = useRef<THREE.HemisphereLight>(null);
   const sun = useRef<THREE.DirectionalLight>(null);
   const fog = useRef<THREE.Fog>(null);

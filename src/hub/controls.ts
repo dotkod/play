@@ -19,6 +19,11 @@ export const view = {
   cutawayIds: new Set<string>(),
 };
 
+// Dev only: aim the camera from the console, e.g. __klView.yaw = Math.PI
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+  (window as unknown as { __klView: typeof view }).__klView = view;
+}
+
 const MOVE_KEYS = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 const LOOK_LEFT = ["q", ",", "["];
 const LOOK_RIGHT = ["r", ".", "]"];

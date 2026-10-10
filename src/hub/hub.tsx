@@ -43,12 +43,24 @@ import { nearestNamedNpc } from "./named-npcs";
 import { Phone } from "./phone/phone";
 import { HUB_STRINGS } from "./strings";
 import { DEFAULT_SPAWN } from "@/world/districts/pusat-lepak/layout";
+import { SPAWN as V2_SPAWN } from "@/city/plan";
 import { type Building, BUILDINGS, doorSpot } from "./world-data";
 
 const World = dynamic(() => import("./world"), {
   ssr: false,
   loading: () => <div className="grid h-full place-items-center bg-[#9fdcd2] text-sm font-bold text-ink/60">…</div>,
 });
+
+// The rebuilt city (src/city), previewed at /?city=v2 while the original stays live
+const CityWorld = dynamic(() => import("@/city/components/world"), {
+  ssr: false,
+  loading: () => <div className="grid h-full place-items-center bg-[#9fdcd2] text-sm font-bold text-ink/60">…</div>,
+});
+
+function useCityV2() {
+  const [v2] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("city") === "v2");
+  return v2;
+}
 
 const AnneMajuGame = dynamic(() => import("@/games/anne-maju/game").then((m) => m.AnneMajuGame), {
   ssr: false,
@@ -150,6 +162,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const tr = HUB_STRINGS[lang];
   const auth = useAuth();
   const [{ spawn, returning, payout }] = useState(bootCity);
+  const cityV2 = useCityV2();
   const [jobOpen, setJobOpen] = useState(() => bootKerja(initialJob));
   const [started, setStarted] = useState(() => returning || !!bootKerja(initialJob));
   const [doorVeil, setDoorVeil] = useState<"cover" | "unveil" | null>(null);
@@ -661,7 +674,11 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
       <LandscapeGate />
-      <World spawn={spawn} onZone={setZone} onNearCat={setNearCat} active={started && !blocked} />
+      {cityV2 ? (
+        <CityWorld spawn={V2_SPAWN} onZone={setZone} active={started && !blocked} />
+      ) : (
+        <World spawn={spawn} onZone={setZone} onNearCat={setNearCat} active={started && !blocked} />
+      )}
 
       <WalletHud started={started} />
       <TaskBanner started={started} />
@@ -688,7 +705,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
             </button>
           )}
         </div>
-        {started && (
+        {started && !cityV2 && (
           <div className="pointer-events-auto">
             <Minimap size={touch ? 104 : 140} onOpen={() => setMapOpen(true)} />
           </div>
