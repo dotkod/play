@@ -7,6 +7,7 @@
  *   shophouse shophouse  mall
  */
 
+import { STREET_COLLIDERS } from "@/lrt/plan/colliders";
 import { makeColliders } from "./colliders";
 import { makeGrid } from "./grid";
 import { makeLanes } from "./lanes";
@@ -34,7 +35,13 @@ const LOTS = planLots(
 export const BUILDINGS = LOTS.buildings;
 export const BLOCK_KINDS = LOTS.blockKinds;
 export const STREETS = planStreets(GRID, BUILDINGS, BLOCK_KINDS);
-export const COLLIDERS = makeColliders(BUILDINGS, STREETS.props, STREETS.signals);
+
+const BASE_COLLIDERS = makeColliders(BUILDINGS, STREETS.props, STREETS.signals);
+/** City solids + LRT street-level (stairs, plaza, pillars, flaps). Elevated LRT boxes stay dynamic. */
+export const COLLIDERS = {
+  boxes: [...BASE_COLLIDERS.boxes, ...STREET_COLLIDERS.boxes],
+  circles: [...BASE_COLLIDERS.circles, ...STREET_COLLIDERS.circles],
+};
 export const LANES = makeLanes(GRID);
 
 const anne = BUILDINGS.find((b) => b.id === "anne-maju")!;

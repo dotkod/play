@@ -3,7 +3,7 @@
 import { Logo } from "@/shared/logo";
 import type { HUB_STRINGS } from "../strings";
 
-// Title screen over the live city: logo, what's inside, and one big button to start walking
+// Title screen over the live city: logo, what's inside, and one big button to begin
 export function StartScreen({ tr, touch, onStart }: { tr: (typeof HUB_STRINGS)["ms"]; touch: boolean; onStart: () => void }) {
   return (
     <div className="absolute inset-0 z-10 flex cursor-pointer overflow-y-auto text-center text-cream" onClick={onStart}>

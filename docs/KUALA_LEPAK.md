@@ -58,7 +58,7 @@ Section 13 is the phased roadmap with acceptance criteria.
 - Street cats (Oyen, Comot, Tompok, Si Hitam, Putih): wander/sit/groom/sleep, meow, can be **petted** (crouch, purr, hearts, follow you).
 - Collisions for buildings, props, people, vehicles, cats.
 - Minimap (player-centred, tap to walk), BM/EN, mute, synthesized music + ambience.
-- Doors: Restoran Anne Maju (playable), Stesen LRT ("akan datang").
+- Doors: Restoran Anne Maju (playable). LRT Laluan Kelana: three elevated stations in the live city (Utara / Pusat / Selatan); sandbox still at `/?lrt=1`.
 - Returning from a game respawns you at that building's door.
 
 **Anne Maju (city door overlay + `/anne-maju` redirect, `src/games/anne-maju/`)**
@@ -294,7 +294,7 @@ Transit is both **fast travel** and **gameplay** (rides, crowds, the LRT job).
 - Stations are **enterable buildings**: platform scene, train arrives with doors, ride = short
   cutscene → teleport to the destination district (streamed in, §7).
 - Rush hour (07:30–09:00, 17:30–19:30 game time) = packed platforms → the **LRT Sardin** job.
-- Elevated guideways visible in the city (the current Stesen LRT platform is the template).
+- Elevated guideway + three stations walkable in the live Pusat city (compressed path in `src/lrt/plan`).
 
 ### 6.4 Day/night & weather (later phases)
 - Game clock: follows the player's **real local time**. Lighting presets: pagi, tengah hari,
@@ -361,7 +361,7 @@ type Profile = {
   level: number;                   // derived from xp, stored for quick reads
   reputation: Record<string, number>; // per place/NPC id, 0-100
   outfits: { owned: string[]; equipped: string };
-  inventory: Record<string, number>;  // items (nasi lemak bungkus, Touch 'n Go card…)
+  inventory: Record<string, number>;  // items (nasi lemak bungkus, Touch n Lepak card…)
   home: string | null;             // housing id (null = sofa at Kak Yati's place)
   flags: Record<string, boolean>;  // story flags
   tasks: { active: TaskProgress[]; done: string[] };
@@ -381,7 +381,7 @@ type Profile = {
 ### 8.2 Economy
 - Currency: **RM** (stored in sen). Jobs pay their score (Anne Maju: RM earned in the shift),
   tasks pay fixed rewards.
-- Spending: outfits, food (restores "tenaga" (energy) if we add it), transit fares (Touch 'n Go-style
+- Spending: outfits, food (restores "tenaga" (energy) if we add it), transit fares (Touch n Lepak-style
   card top-ups), rent/house upgrades, gifts for NPCs (reputation).
 - Keep prices low and generous; the goal is progression, not grind.
 

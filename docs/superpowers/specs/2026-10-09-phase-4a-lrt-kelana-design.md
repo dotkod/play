@@ -9,7 +9,7 @@
 |---|---|
 | Full red line: Pusat, KLCC, Kampung, Sentral, Taman | MRT, Monorel |
 | Overlay board + ride cutscene (bus-pattern) | Full 3D walkable platforms at every stop |
-| Fare RM1.20 from wallet | Touch ’n Go card / top-up UI |
+| Fare RM1.20 from wallet | Touch n Lepak card / top-up UI |
 | Pusat Stesen LRT door live; stub stations elsewhere | LRT Sardin job |
 | Places, map markers, daily “naik LRT” | Rush-hour crowding |
 

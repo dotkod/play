@@ -519,7 +519,7 @@ function Dompet({ lang }: { lang: "ms" | "en" }) {
       <div className="mb-4 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#1c1c1e] via-[#2c2c2e] to-[#0a84ff] p-5 text-white shadow-lg">
         <p className="text-[13px] font-medium tracking-[0.08em] text-white/70 uppercase">{tr.wallet}</p>
         <p className="mt-3 text-[40px] leading-none font-semibold tracking-tight tabular-nums">{rm(p.wallet)}</p>
-        <p className="mt-4 text-[12px] text-white/55">Kuala Lepak · Touch n Go vibes</p>
+        <p className="mt-4 text-[12px] text-white/55">Kuala Lepak · Touch n Lepak</p>
       </div>
 
       <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">Activity</p>

@@ -5,6 +5,48 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.16.1
+- Anne Maju door card: on phones it docks as a bottom sheet above the joystick so you can walk out; look pad stays free for a full camera orbit (Q/R on keyboard)
+
+### 0.16.0
+- Live city: LRT Laluan Kelana with three elevated stations (Utara, Pusat, Selatan) — Touch n Lepak, ride the shuttle, auto-exit back onto the sidewalks (`?lrt=1` sandbox still works)
+
+### 0.15.0
+- LRT: after Touch n Lepak, auto-walk through the gate onto the train; at your stop, auto-walk out through the exit gate
+
+### 0.14.9
+- LRT: Touch n Lepak asks for destination (fare by distance); auto-alight there — no Turun button
+
+### 0.14.8
+- LRT cabin TVs: station name only (no ads), larger type
+
+### 0.14.7
+- LRT cabin: windows show the outside world (light tint); door leafs slide without flickering against the wall
+
+### 0.14.6
+- LRT cabin: proper side/end walls with windows (visible while riding); door bay stays open for boarding
+
+### 0.14.5
+- LRT platforms: yellow tactile edge, full screen-door run, benches/bins, banded shelter; solid edge / end / wing collision when doors are closed
+
+### 0.14.4
+- LRT ride: auto walk to a seat on board; at each stop tap **Turun stesen** / Enter to walk out (no free walk inside the car)
+
+### 0.14.3
+- LRT stations: street + platform name boards, wider plaza entrance with lift/escalator, glass, handrails and canopy (sandbox)
+
+### 0.14.2
+- LRT cabin: wider aisle, seats/poles clear of the walkway, camera pulled back — walk the car while it moves (exit when doors open)
+
+### 0.14.1
+- LRT sandbox station screens show next and following train times (destination + ETA / doors open)
+
+### 0.14.0
+- LRT sandbox preview at `/?lrt=1`: three elevated stations (Utara, Pusat, Selatan), Touch n Lepak gates, and a real shuttle you walk into and ride (not in the live city yet)
+
+### 0.13.1
+- Start button copy: "Jom lepak" / "Let's lepak" (was "Mula jalan" / "Start exploring")
+
 ### 0.13.0
 - New city map: tap the minimap (or press M) for an illustrated map with real roads, zebra crossings, street names, every building, the park and live pins for you, Anne Maju and the bus stop
 - Drag to pan, scroll or pinch to zoom, tap a building to see what it is; legend chips jump to each place
@@ -318,6 +360,9 @@ next to the short commit of the deploy.
 - Finishing an Anne Maju shift adds the RM to your city wallet when you walk back
 
 ## Anne Maju
+
+### 1.7.1
+- Phone layout: shift card is a bottom sheet above the move stick so you can walk out; look pad / Q·R still turn the camera a full circle
 
 ### 1.7.0
 - New shop UI: a compact shift card (Shift / Top / How to tabs), one HUD bar for time, takings and streak, a clean pause card and a results card

@@ -34,7 +34,7 @@ export function Joystick() {
   return (
     <div
       ref={base}
-      className="edge-bl absolute mb-12 ml-3 size-32 touch-none rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
+      className="edge-bl absolute z-50 mb-12 ml-3 size-32 touch-none rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
       onPointerDown={(e) => {
         pointer.current = e.pointerId;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -57,7 +57,7 @@ export function LookPad() {
   const base = useRef<HTMLDivElement>(null);
   const [knobX, setKnobX] = useState(0);
   const pointer = useRef<number | null>(null);
-  const R = 40;
+  const R = 52;
 
   const move = (e: React.PointerEvent) => {
     const rect = base.current!.getBoundingClientRect();
@@ -76,7 +76,7 @@ export function LookPad() {
     <div
       ref={base}
       aria-label="Look"
-      className="edge-br absolute mb-12 mr-3 flex h-20 w-28 touch-none items-center justify-center rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
+      className="edge-br absolute z-50 mb-12 mr-3 flex h-24 w-36 touch-none items-center justify-center rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
       onPointerDown={(e) => {
         pointer.current = e.pointerId;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -87,7 +87,7 @@ export function LookPad() {
       onPointerCancel={end}
     >
       <div
-        className="size-11 rounded-full border-4 border-ink bg-sky-300 shadow-lg"
+        className="size-12 rounded-full border-4 border-ink bg-sky-300 shadow-lg"
         style={{ transform: `translateX(${knobX}px)` }}
       />
     </div>

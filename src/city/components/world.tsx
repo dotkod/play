@@ -9,6 +9,9 @@ import { PerformanceMonitor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import { RainFX } from "@/hub/rain-fx";
+import { LrtStations } from "@/lrt/components/stations";
+import { LrtShuttleTick } from "@/lrt/components/shuttle-tick";
+import { LrtTrain } from "@/lrt/components/train";
 import { useVisibleFrameloop } from "@/shared/three/use-frameloop";
 import { clock, syncClockFromDevice } from "@/world/lighting";
 import { LightingRig } from "./lighting";
@@ -82,6 +85,9 @@ export default function CityWorld({ spawn, onZone, active = true, poster = false
         <CityBuildings />
         <MamakRoom />
         <StreetProps />
+        <LrtShuttleTick active={active && !poster} />
+        <LrtStations />
+        <LrtTrain active={active && !poster} />
         <CityTraffic active={active} />
         <CityPedestrians />
         <RainFX />

@@ -14,6 +14,10 @@ import { logoutAccount, refreshAuth, takeAuthHello, useAuth } from "@/core/auth-
 import { emit } from "@/core/events";
 import { JOB_RESULT_KEY, settleJobResults, type JobResult } from "@/core/job-handoff";
 import { getProfile } from "@/core/profile";
+import { cancelDestPick, fare, formatRm, groundScripted, rideBusy } from "@/lrt/components/fare";
+import { LrtDestPicker } from "@/lrt/components/dest-picker";
+import { STATIONS } from "@/lrt/plan";
+import { LRT_STRINGS } from "@/lrt/strings";
 import { ambience, audioReady, music, sfx, unlockAudio } from "@/shared/audio";
 import { getLang, setLang, useLang } from "@/shared/lang";
 import { LandscapeGate } from "@/shared/landscape-gate";
@@ -32,6 +36,24 @@ const CityWorld = dynamic(() => import("@/city/components/world"), {
   ssr: false,
   loading: () => <div className="grid h-full place-items-center bg-[#9fdcd2] text-sm font-bold text-ink/60">…</div>,
 });
+
+const LrtSandbox = dynamic(() => import("@/lrt").then((m) => m.LrtSandbox), {
+  ssr: false,
+  loading: () => <div className="grid h-full place-items-center bg-[#9fdcd2] text-sm font-bold text-ink/60">…</div>,
+});
+
+/** Preview the immersive LRT line without mounting the live city. */
+function useLrtSandbox() {
+  const [on] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return new URLSearchParams(window.location.search).get("lrt") === "1";
+    } catch {
+      return false;
+    }
+  });
+  return on;
+}
 
 const AnneMajuGame = dynamic(() => import("@/games/anne-maju/game").then((m) => m.AnneMajuGame), {
   ssr: false,
@@ -88,6 +110,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
   const auth = useAuth();
+  const lrtSandbox = useLrtSandbox();
   const [payout] = useState(bootPayout);
   const [jobOpen, setJobOpen] = useState(() => bootKerja(initialJob));
   const [started, setStarted] = useState(() => !!bootKerja(initialJob));
@@ -101,8 +124,13 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     payout && payout.earned > 0 ? { text: HUB_STRINGS[getLang()].paid(JOB_TITLES[payout.job] ?? payout.job, rm(payout.earned)), id: 1 } : null,
   );
   const [touch, setTouch] = useState(false);
+  const [lrtDestPick, setLrtDestPick] = useState(false);
+  const [lrtPrompt, setLrtPrompt] = useState<string | null>(null);
+  const [showMoveStick, setShowMoveStick] = useState(true);
+  const [showLookPad, setShowLookPad] = useState(true);
   const toastSeq = useRef(1);
   const helloDone = useRef(false);
+  const lrtTr = LRT_STRINGS[lang];
 
   const flash = (text: string) => {
     toastSeq.current += 1;
@@ -272,6 +300,11 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      if (fare.ui === "destPick" && e.key === "Escape") {
+        e.preventDefault();
+        cancelDestPick();
+        return;
+      }
       if (!started && (e.key === "Enter" || e.key === " ")) {
         e.preventDefault();
         input.enter = false;
@@ -293,6 +326,49 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  // Poll LRT fare UI / prompts (module singleton — not React state)
+  useEffect(() => {
+    if (!started || shiftLive || lrtSandbox) return;
+    const toastKind = (kind: string) => {
+      if (kind === "needMoney") flash(lrtTr.needMoney);
+      else if (kind.startsWith("paid:")) {
+        const [, destId, senStr] = kind.split(":");
+        const dest = STATIONS.find((s) => s.id === destId);
+        const name = dest ? (lang === "ms" ? dest.nameMs : dest.nameEn).replace(/^Stesen |^Station /i, "") : destId!;
+        flash(lrtTr.paidOk(name, formatRm(Number(senStr))));
+      } else {
+        const st = STATIONS.find((s) => s.id === kind);
+        if (st) flash(lrtTr.arrived(lang === "ms" ? st.nameMs : st.nameEn));
+      }
+    };
+    const id = setInterval(() => {
+      setLrtDestPick(fare.ui === "destPick");
+      const p = fare.prompt;
+      if (fare.ui === "destPick") setLrtPrompt(null);
+      else if (p === "toPlatform") setLrtPrompt(lrtTr.toPlatformHint);
+      else if (p === "toExit") setLrtPrompt(lrtTr.toExitHint);
+      else if (p === "boarding") setLrtPrompt(lrtTr.boardingHint);
+      else if (p === "alighting") setLrtPrompt(lrtTr.alightingHint);
+      else if (fare.riding && fare.ridePhase === "seated" && fare.destId) {
+        const dest = STATIONS.find((s) => s.id === fare.destId);
+        const name = dest ? (lang === "ms" ? dest.nameMs : dest.nameEn).replace(/^Stesen |^Station /i, "") : "";
+        setLrtPrompt(lrtTr.cabinHint(name));
+      } else if (p === "tng") setLrtPrompt(lrtTr.tngPrompt);
+      else if (p === "wait") setLrtPrompt(lrtTr.waitTrain);
+      else if (p === "board") setLrtPrompt(lrtTr.boardPrompt);
+      else setLrtPrompt(null);
+      const scripted = rideBusy() || groundScripted() || fare.riding;
+      setShowMoveStick(!scripted && fare.ui !== "destPick");
+      setShowLookPad(fare.ridePhase === "seated" || (!scripted && fare.ui !== "destPick"));
+      if (fare.toast) {
+        const stopId = fare.toast;
+        fare.toast = null;
+        toastKind(stopId);
+      }
+    }, 120);
+    return () => clearInterval(id);
+  }, [started, shiftLive, lrtSandbox, lrtTr, lang]);
+
   useEffect(() => {
     const mq = matchMedia("(pointer: coarse)");
     const sync = () => setTouch(mq.matches);
@@ -303,16 +379,17 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
 
   // In the restaurant the job's own UI takes the corners; during a shift the city steps back
   const blocked = shiftLive;
-  const showHint = started && !jobOpen && !phoneOpen && !phoneBusy;
+  const showHint = started && !jobOpen && !phoneOpen && !phoneBusy && !lrtDestPick && !lrtPrompt;
 
   if (!auth.ready) return <AuthSplash />;
   if (!auth.username) return <AuthGate />;
+  if (lrtSandbox) return <LrtSandbox />;
 
   return (
     <div className="relative h-dvh w-full overflow-hidden select-none">
       <LandscapeGate />
       {/* Walking pauses while the map is open (the city itself keeps living) */}
-      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked && !mapOpen} />
+      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked && !mapOpen && !lrtDestPick} />
 
       {!shiftLive && <WalletHud started={started} />}
 
@@ -367,6 +444,26 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         </div>
       )}
 
+      {started && !shiftLive && lrtDestPick && (
+        <LrtDestPicker
+          onToast={(kind) => {
+            if (kind === "needMoney") flash(lrtTr.needMoney);
+            else if (kind.startsWith("paid:")) {
+              const [, destId, senStr] = kind.split(":");
+              const dest = STATIONS.find((s) => s.id === destId);
+              const name = dest ? (lang === "ms" ? dest.nameMs : dest.nameEn).replace(/^Stesen |^Station /i, "") : destId!;
+              flash(lrtTr.paidOk(name, formatRm(Number(senStr))));
+            }
+          }}
+        />
+      )}
+
+      {started && !shiftLive && lrtPrompt && !lrtDestPick && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-16 z-30 flex justify-center px-4">
+          <p className="rounded-full bg-ink/80 px-4 py-1.5 text-sm font-extrabold text-amber-200">{lrtPrompt}</p>
+        </div>
+      )}
+
       {jobOpen === "anne-maju" && <AnneMajuGame onExit={exitJob} embedded seamless onLiveChange={setShiftLive} />}
 
       {started && !shiftLive && (
@@ -384,12 +481,8 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       <Phone open={phoneOpen} onClose={closePhone} />
       <CityMapModal open={mapOpen && !shiftLive} onClose={() => setMapOpen(false)} />
 
-      {started && touch && !phoneBusy && !shiftLive && (
-        <>
-          <Joystick />
-          <LookPad />
-        </>
-      )}
+      {started && touch && !phoneBusy && !shiftLive && showMoveStick && <Joystick />}
+      {started && touch && !phoneBusy && !shiftLive && showLookPad && <LookPad />}
     </div>
   );
 }

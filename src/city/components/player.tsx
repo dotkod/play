@@ -3,7 +3,8 @@
 /**
  * The player in the v2 city: walks with keys or the joystick, collides with everything the
  * plan builds (walls, pillars, lamps, trees, furniture) and with moving cars and people,
- * and reports which door they're standing at.
+ * and reports which door they're standing at. Also owns LRT fare / elevated walk when near
+ * the Kelana line stations.
  */
 
 import { useFrame, useThree } from "@react-three/fiber";
@@ -11,6 +12,11 @@ import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { currentOutfit } from "@/games/anne-maju/progress";
 import { lookAxis, moveVector, view } from "@/hub/controls";
+import { fare } from "@/lrt/components/fare";
+import { gateOpen } from "@/lrt/components/gate-state";
+import { localToWorldCam, tickRideSession, type RideRefs } from "@/lrt/components/ride-session";
+import { coverTopAt, DECK_Y, SEAT_ROOT_Y } from "@/lrt/plan";
+import { getShuttle } from "@/lrt/sim/shuttle";
 import { sfx } from "@/shared/audio";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
@@ -40,6 +46,10 @@ function roofAt(x: number, z: number) {
 /** Push a circle out of every box and circle it overlaps. */
 function resolve(p: THREE.Vector3) {
   for (const c of COLLIDERS.boxes) {
+    if (c.id.endsWith("-entry-flap")) {
+      const stId = c.id.slice(0, -"-entry-flap".length);
+      if (gateOpen[stId] || fare.paid) continue;
+    }
     const r = c.rect;
     const nx = Math.max(r.minX, Math.min(p.x, r.maxX));
     const nz = Math.max(r.minZ, Math.min(p.z, r.maxZ));
@@ -52,7 +62,6 @@ function resolve(p: THREE.Vector3) {
       p.x = nx + (dx / d) * RADIUS;
       p.z = nz + (dz / d) * RADIUS;
     } else {
-      // Centre inside the box: leave by the nearest side
       const out = [p.x - r.minX, r.maxX - p.x, p.z - r.minZ, r.maxZ - p.z];
       const k = out.indexOf(Math.min(...out));
       if (k === 0) p.x = r.minX - RADIUS;
@@ -85,24 +94,30 @@ export function CityPlayer({
 }) {
   const { camera, size } = useThree();
   const body = useRef<THREE.Group>(null);
+  const lift = useRef<THREE.Group>(null);
   const hadShot = useRef(false);
   const pos = useRef(new THREE.Vector3(spawn.x, 0, spawn.z));
   const rot = useRef(spawn.rotY);
   const moving = useRef(false);
+  const seated = useRef(false);
   const stride = useRef({ dist: 0, alt: false });
   const zone = useRef<string | null>(null);
   const ring = useRef<THREE.Mesh>(null);
+  const floorY = useRef(0);
   const camPos = useMemo(() => new THREE.Vector3(), []);
   const camTarget = useMemo(() => new THREE.Vector3(), []);
   const camHeight = useRef(11);
+  const enterLatch = useRef(false);
+  const walkStep = useRef(0);
+  const sitLock = useRef(0);
   const B = GRID.bounds;
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 20);
     const p = pos.current;
     const persp = state.camera as THREE.PerspectiveCamera;
+    const shuttle = getShuttle();
 
-    // A job has the camera (e.g. serving at Anne Maju): glide there, hide the walker
     const shot = cityCamera.shot;
     if (shot) {
       hadShot.current = true;
@@ -112,7 +127,6 @@ export function CityPlayer({
       const bottom = shot.panel.side === "bottom" ? shot.panel.px : 0;
       const visW = Math.max(1, size.width - right);
       const visH = Math.max(1, size.height - bottom);
-      // Fit the room's width in the visible part, then widen for any panel along the bottom
       const halfH = Math.atan(shot.fitHalfWidth / shot.fitDistance / (visW / visH));
       const fovVis = Math.max(42, (2 * halfH * 180) / Math.PI);
       const fov = (2 * Math.atan(Math.tan((fovVis * Math.PI) / 360) * (size.height / visH)) * 180) / Math.PI;
@@ -137,66 +151,161 @@ export function CityPlayer({
     if (tp) {
       p.set(tp.x, 0, tp.z);
       rot.current = tp.rotY;
+      floorY.current = 0;
+      seated.current = false;
     }
     const onPhone = shared.phoneHeld || Date.now() < shared.phoneDrawUntil;
-    if (active && !onPhone) {
-      const turn = lookAxis();
-      if (turn !== 0) view.yaw += turn * 2.2 * dt;
+
+    const refs: RideRefs = {
+      p,
+      rot,
+      moving,
+      seated,
+      stride,
+      floorY,
+      walkStep,
+      sitLock,
+      enterLatch,
+    };
+    const mode = !onPhone && active ? tickRideSession(refs, dt, active, false) : "off";
+
+    if (mode === "off") {
+      seated.current = false;
+      floorY.current = 0;
+      if (active && !onPhone) {
+        const turn = lookAxis();
+        if (turn !== 0) view.yaw += turn * 2.2 * dt;
+      }
+      const mv = active && !onPhone ? moveVector() : { x: 0, y: 0 };
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const vx = mv.x * cy - mv.y * sy;
+      const vz = -mv.x * sy - mv.y * cy;
+      moving.current = vx !== 0 || vz !== 0;
+      const ox = p.x;
+      const oz = p.z;
+      if (moving.current) {
+        p.x = THREE.MathUtils.clamp(p.x + vx * SPEED * dt, B.minX + 1, B.maxX - 1);
+        p.z = THREE.MathUtils.clamp(p.z + vz * SPEED * dt, B.minZ + 1, B.maxZ - 1);
+        const want = Math.atan2(vx, vz);
+        const diff = Math.atan2(Math.sin(want - rot.current), Math.cos(want - rot.current));
+        rot.current += diff * Math.min(1, dt * 12);
+      }
+      resolve(p);
+      stride.current.dist += Math.hypot(p.x - ox, p.z - oz);
+      if (stride.current.dist > 1.1) {
+        stride.current.dist = 0;
+        stride.current.alt = !stride.current.alt;
+        sfx.step(stride.current.alt);
+      }
+    } else if (mode === "lrtFree") {
+      // Stay inside city bounds while roaming station plazas
+      p.x = THREE.MathUtils.clamp(p.x, B.minX + 1, B.maxX - 1);
+      p.z = THREE.MathUtils.clamp(p.z, B.minZ + 1, B.maxZ - 1);
     }
-    const mv = active && !onPhone ? moveVector() : { x: 0, y: 0 };
-    const cy = Math.cos(view.yaw);
-    const sy = Math.sin(view.yaw);
-    const vx = mv.x * cy - mv.y * sy;
-    const vz = -mv.x * sy - mv.y * cy;
-    moving.current = vx !== 0 || vz !== 0;
-    const ox = p.x;
-    const oz = p.z;
-    if (moving.current) {
-      p.x = THREE.MathUtils.clamp(p.x + vx * SPEED * dt, B.minX + 1, B.maxX - 1);
-      p.z = THREE.MathUtils.clamp(p.z + vz * SPEED * dt, B.minZ + 1, B.maxZ - 1);
-      const want = Math.atan2(vx, vz);
-      const diff = Math.atan2(Math.sin(want - rot.current), Math.cos(want - rot.current));
-      rot.current += diff * Math.min(1, dt * 12);
-    }
-    resolve(p);
-    stride.current.dist += Math.hypot(p.x - ox, p.z - oz);
-    if (stride.current.dist > 1.1) {
-      stride.current.dist = 0;
-      stride.current.alt = !stride.current.alt;
-      sfx.step(stride.current.alt);
-    }
+
     shared.x = p.x;
     shared.z = p.z;
     shared.rot = rot.current;
 
-    // Third-person follow; yaw only changes when the player turns the camera
-    const portrait = size.width < size.height;
-    const back = portrait ? 11 : 8.5;
-    const up = portrait ? 14 : 11;
-    // Never inside a building: rise over shophouse roofs, pull in under tall towers
-    let k = 1;
-    let y = up;
-    const roof = roofAt(p.x + sy * back, p.z + cy * back);
-    if (roof > y - 0.5) {
-      if (roof + 1.5 <= up + 6) y = roof + 1.5;
-      else while (k > 0.2 && roofAt(p.x + sy * back * k, p.z + cy * back * k) > y - 0.5) k -= 0.05;
+    if (lift.current) {
+      lift.current.position.y = seated.current ? DECK_Y + SEAT_ROOT_Y : floorY.current;
     }
-    camHeight.current += (y - camHeight.current) * Math.min(1, dt * 6);
-    camPos.set(p.x + sy * back * k, camHeight.current, p.z + cy * back * k);
-    camera.position.copy(camPos);
-    camTarget.set(p.x - sy * 1.5, 2.2, p.z - cy * 1.5);
-    camera.lookAt(camTarget);
-    if (ring.current) ring.current.position.set(p.x, 0.07, p.z);
+    if (ring.current) {
+      ring.current.visible = mode === "off" || mode === "lrtFree";
+      ring.current.position.set(p.x, floorY.current + 0.07, p.z);
+    }
 
-    // Door zone: standing in front of a shop door
-    const hit = DOORS.find(({ b }) => {
-      const along = b.facing === "n" || b.facing === "s";
-      return Math.abs(p.x - b.door.x) < (along ? 2.4 : 1.8) && Math.abs(p.z - b.door.z) < (along ? 1.8 : 2.4);
-    });
-    const id = hit?.b.id ?? null;
-    if (id !== zone.current) {
-      zone.current = id;
-      onZone(hit?.b ?? null);
+    const cy = Math.cos(view.yaw);
+    const sy = Math.sin(view.yaw);
+
+    if (mode === "riding") {
+      const wantFov = fare.ridePhase === "seated" ? 72 : 58;
+      if (Math.abs(persp.fov - wantFov) > 0.5) {
+        persp.fov += (wantFov - persp.fov) * Math.min(1, dt * 6);
+        persp.updateProjectionMatrix();
+      }
+      if (fare.ridePhase === "seated") {
+        const yawOff = view.yaw - shuttle.rotY;
+        const camLx = Math.sin(yawOff) * 0.35;
+        const camLz = fare.seatLocalZ - 3.4;
+        const wCam = localToWorldCam(camLx, camLz, shuttle.rotY, shuttle.x, shuttle.z);
+        camera.position.set(wCam.x, DECK_Y + 2.15, wCam.z);
+        const lookLx = fare.seatLocalX * 0.2 + Math.sin(yawOff) * 0.8;
+        const lookLz = fare.seatLocalZ + 2.8 + Math.cos(yawOff) * 0.4;
+        const lookW = localToWorldCam(lookLx, lookLz, shuttle.rotY, shuttle.x, shuttle.z);
+        camTarget.set(lookW.x, DECK_Y + 1.75, lookW.z);
+        camera.lookAt(camTarget);
+        camHeight.current = DECK_Y + 2.15;
+      } else {
+        const back = 2.4;
+        const rel = view.yaw - shuttle.rotY;
+        const clx = fare.rideLocalX + Math.sin(rel) * back * 0.15;
+        const clz = fare.rideLocalZ + Math.cos(rel) * back;
+        const wCam = localToWorldCam(clx, clz, shuttle.rotY, shuttle.x, shuttle.z);
+        camera.position.set(wCam.x, DECK_Y + 1.95, wCam.z);
+        camTarget.set(p.x, DECK_Y + 1.35, p.z);
+        camera.lookAt(camTarget);
+        camHeight.current = DECK_Y + 1.95;
+      }
+    } else if (mode === "scripted" || mode === "lrtFree") {
+      if (Math.abs(persp.fov - 50) > 0.5) {
+        persp.fov += (50 - persp.fov) * Math.min(1, dt * 6);
+        persp.updateProjectionMatrix();
+      }
+      const portrait = size.width < size.height;
+      let back = portrait ? 11 : 8.5;
+      let up = portrait ? 14 : 11;
+      const cover = coverTopAt(p.x, p.z);
+      if (cover > 0) {
+        back = portrait ? 7 : 5.5;
+        up = Math.max(up, cover - floorY.current + 2.2);
+      }
+      const seatX = p.x + sy * back;
+      const seatZ = p.z + cy * back;
+      const seatCover = coverTopAt(seatX, seatZ);
+      if (seatCover > floorY.current + up - 0.5) up = seatCover - floorY.current + 1.8;
+      camHeight.current += (floorY.current + up * (cover > 0 ? 1 : 0.85) - camHeight.current) * Math.min(1, dt * 6);
+      camPos.set(seatX, camHeight.current, seatZ);
+      camera.position.lerp(camPos, 1 - Math.exp(-dt * 6));
+      camTarget.set(p.x - sy * 1.2, floorY.current + 1.6, p.z - cy * 1.2);
+      camera.lookAt(camTarget);
+    } else {
+      if (Math.abs(persp.fov - 50) > 0.5) {
+        persp.fov = 50;
+        persp.updateProjectionMatrix();
+      }
+      const portrait = size.width < size.height;
+      const back = portrait ? 11 : 8.5;
+      const up = portrait ? 14 : 11;
+      let k = 1;
+      let y = up;
+      const roof = roofAt(p.x + sy * back, p.z + cy * back);
+      if (roof > y - 0.5) {
+        if (roof + 1.5 <= up + 6) y = roof + 1.5;
+        else while (k > 0.2 && roofAt(p.x + sy * back * k, p.z + cy * back * k) > y - 0.5) k -= 0.05;
+      }
+      camHeight.current += (y - camHeight.current) * Math.min(1, dt * 6);
+      camPos.set(p.x + sy * back * k, camHeight.current, p.z + cy * back * k);
+      camera.position.copy(camPos);
+      camTarget.set(p.x - sy * 1.5, 2.2, p.z - cy * 1.5);
+      camera.lookAt(camTarget);
+    }
+
+    // Door zone: only when freely walking the street (not mid-ride)
+    if (mode === "off") {
+      const hit = DOORS.find(({ b }) => {
+        const along = b.facing === "n" || b.facing === "s";
+        return Math.abs(p.x - b.door.x) < (along ? 2.4 : 1.8) && Math.abs(p.z - b.door.z) < (along ? 1.8 : 2.4);
+      });
+      const id = hit?.b.id ?? null;
+      if (id !== zone.current) {
+        zone.current = id;
+        onZone(hit?.b ?? null);
+      }
+    } else if (zone.current !== null) {
+      zone.current = null;
+      onZone(null);
     }
   });
 
@@ -209,11 +318,10 @@ export function CityPlayer({
         x: pos.current.x,
         z: pos.current.z,
         rotY: rot.current,
-        walking: moving.current && !drawing && !shared.phoneHeld,
-        seated: false,
+        walking: moving.current && !drawing && !shared.phoneHeld && !seated.current,
+        seated: seated.current,
         phone: drawing ? "draw" : shared.phoneHeld ? "hold" : undefined,
         phoneProgress: drawing ? 1 - (shared.phoneDrawUntil - now) / PHONE_DRAW_MS : 1,
-        // Jerebu days: everyone outdoors masks up
         masked: atmosphere.haze !== "none",
       };
     },
@@ -222,8 +330,10 @@ export function CityPlayer({
 
   return (
     <>
-      <group ref={body}>
-        <Person look={look} getPose={getPose} />
+      <group ref={lift}>
+        <group ref={body}>
+          <Person look={look} getPose={getPose} />
+        </group>
       </group>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.55, 0.72, 32]} />
