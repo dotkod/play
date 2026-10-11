@@ -5,6 +5,13 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.16.4
+- LRT: train path locked to the elevated guideway (was wrongly at city centre z=0 and cut through buildings)
+
+### 0.16.3
+- Phone apps: tighter type and padding so Mesej / Profil / Dompet / Tetapan fit the small handset
+- Walk while the phone is out and it goes back in the pocket (closes)
+
 ### 0.16.2
 - Phone: standard handset on the right (no flip/fold), city stays visible behind it
 

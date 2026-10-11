@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DOOR_HALF, PLAT_EDGE_Z, PLATFORM_Y, TRACK_Z } from "./constants";
-import { PATH_LENGTH, stationS } from "./path";
+import { PATH_LENGTH, samplePath, stationS } from "./path";
 import { SPAWN, STATIONS, floorYAt, inRect } from "./index";
 
 describe("lrt plan", () => {
@@ -20,6 +20,14 @@ describe("lrt plan", () => {
   it("has a usable guideway length that fits the city", () => {
     expect(PATH_LENGTH).toBeGreaterThan(160);
     expect(PATH_LENGTH).toBeLessThan(220);
+  });
+
+  it("path samples sit on TRACK_Z (same as stations / guideway — not city centre z=0)", () => {
+    for (const st of STATIONS) {
+      const sample = samplePath(st.s);
+      expect(sample.z).toBe(TRACK_Z);
+      expect(Math.abs(sample.x - st.x)).toBeLessThan(0.01);
+    }
   });
 
   it("spawns on the street outside pusat, not on the platform", () => {

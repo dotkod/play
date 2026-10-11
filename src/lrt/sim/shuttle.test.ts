@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { STATIONS } from "../plan";
+import { STATIONS, TRACK_Z } from "../plan";
 import { getShuttle, resetShuttle, tickShuttle } from "./shuttle";
 
 describe("lrt shuttle", () => {
@@ -13,6 +13,7 @@ describe("lrt shuttle", () => {
     expect(st.doorsOpen).toBe(true);
     expect(st.atStopId).toBe("pusat");
     expect(st.speed).toBe(0);
+    expect(st.z).toBe(TRACK_Z);
   });
 
   it("never opens doors while moving", () => {

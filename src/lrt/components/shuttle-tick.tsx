@@ -6,9 +6,15 @@
  */
 
 import { useFrame } from "@react-three/fiber";
-import { tickShuttle } from "../sim/shuttle";
+import { useEffect } from "react";
+import { resetShuttle, tickShuttle } from "../sim/shuttle";
 
 export function LrtShuttleTick({ active }: { active: boolean }) {
+  // Fresh pose on mount so a stale singleton can't keep a wrong z (e.g. city centre).
+  useEffect(() => {
+    resetShuttle();
+  }, []);
+
   useFrame((_, delta) => {
     if (active) tickShuttle(Math.min(delta, 1 / 20));
   }, -50);

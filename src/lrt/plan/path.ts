@@ -2,7 +2,7 @@
  * Straight elevated guideway along +x. Distance s=0 is the western end (Utara beyond).
  */
 
-import { STATION_GAP } from "./constants";
+import { STATION_GAP, TRACK_Z } from "./constants";
 
 /** Half-length past the outer stations so the train can approach cleanly. */
 const PAD = 22;
@@ -23,7 +23,8 @@ export function samplePath(s: number): PathSample {
   const clamped = Math.max(0, Math.min(PATH_LENGTH, s));
   const x = PATH_MIN_X + clamped;
   // Facing east when travelling increasing s; caller flips for westbound.
-  return { x, z: 0, rotY: Math.PI / 2, s: clamped };
+  // z must match TRACK_Z / stations / guideway — never hardcode 0 (cuts the city).
+  return { x, z: TRACK_Z, rotY: Math.PI / 2, s: clamped };
 }
 
 export function xToS(x: number) {
