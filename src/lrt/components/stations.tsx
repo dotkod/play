@@ -17,6 +17,7 @@ import {
 import { DOOR_HALF, PLAT_EDGE_Z, PLATFORM_Y, STATIONS, type LrtStation, type Rect } from "../plan";
 import { platformDoorsOpen } from "../sim/shuttle";
 import { gateOpen } from "./gate-state";
+import { StationLift } from "./lift";
 import { StationNameBoards } from "./name-board";
 import { StationPid } from "./pid";
 
@@ -52,14 +53,13 @@ function segmentExit(ax: number, az: number, bx: number, bz: number, r: Rect): n
   return t1;
 }
 
-function StationMesh({ stX, id }: { stX: number; id: string }) {
-  const body = useMemo(() => cachedParts(`lrt-st-body-v5-${id}`, () => stationBodyParts(stX), 0.025), [stX, id]);
-  const roof = useMemo(() => cachedParts(`lrt-st-roof-v5-${id}`, () => stationRoofParts(stX), 0.025), [stX, id]);
+function StationMesh({ st }: { st: LrtStation }) {
+  const body = useMemo(() => cachedParts(`lrt-st-body-v17-${st.id}`, () => stationBodyParts(st), 0.025), [st]);
+  const roof = useMemo(() => cachedParts(`lrt-st-roof-v17-${st.id}`, () => stationRoofParts(st), 0.025), [st]);
   const roofMesh = useRef<THREE.Mesh>(null);
   const roofHull = useRef<THREE.Mesh>(null);
   const faded = useRef<THREE.MeshToonMaterial | null>(null);
   const opacity = useRef(1);
-  const st = STATIONS.find((s) => s.id === id)!;
 
   useFrame(({ camera }, delta) => {
     // Fade roofs when they sit between the camera and the player (city cutaway pattern)
@@ -94,13 +94,14 @@ function StationMesh({ stX, id }: { stX: number; id: string }) {
   );
 }
 
-function FareGate({ x, z, id, alwaysOpen }: { x: number; z: number; id?: string; alwaysOpen?: boolean }) {
+function FareGate({ x, z, id, freeExit }: { x: number; z: number; id?: string; freeExit?: boolean }) {
   const flap = useRef<THREE.Group>(null);
   const cabinet = useMemo(() => cachedParts("lrt-gate", gateParts, 0.02), []);
   const leaf = useMemo(() => cachedParts("lrt-flap", gateFlapParts, 0.02), []);
   useFrame(() => {
     if (!flap.current) return;
-    const open = alwaysOpen || (!!id && gateOpen[id]);
+    // Entry opens after TnG; exit stays closed visually (collider is free — see skipFlaps)
+    const open = !freeExit && !!id && gateOpen[id];
     const want = open ? Math.PI / 2 : 0;
     flap.current.rotation.y += (want - flap.current.rotation.y) * 0.18;
   });
@@ -160,10 +161,11 @@ export function LrtStations() {
       {guide.hull && <mesh geometry={guide.hull} material={hullMaterial()} />}
       {STATIONS.map((st) => (
         <group key={st.id}>
-          <StationMesh stX={st.x} id={st.id} />
+          <StationMesh st={st} />
+          <StationLift st={st} />
           <PlatformScreenDoors st={st} />
           <FareGate x={st.entryGate.x} z={st.entryGate.z} id={st.id} />
-          <FareGate x={st.exitGate.x} z={st.exitGate.z} alwaysOpen />
+          <FareGate x={st.exitGate.x} z={st.exitGate.z} freeExit />
           <StationPid st={st} />
           <StationNameBoards st={st} />
         </group>

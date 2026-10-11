@@ -10,32 +10,24 @@ import { STATIONS, rect, type Rect } from "./stations";
 export type BoxCollider = { id: string; rect: Rect };
 export type CircleCollider = { id: string; x: number; z: number; r: number };
 
-/** Stairs, plaza canopy, lift/esc, entry flaps — block at y=0 too. */
+/** Plaza canopy, lift shaft walls — street solids only (never on asphalt). */
 export function streetLevelColliders(): { boxes: BoxCollider[]; circles: CircleCollider[] } {
   const boxes: BoxCollider[] = [];
   const circles: CircleCollider[] = [];
   for (const st of STATIONS) {
-    // Canopy legs only on the north half of the plaza (keep south open for sidewalk peds)
     const canopyZ1 = (st.street.minZ + st.street.maxZ) / 2;
     boxes.push({
       id: `${st.id}-canopy-sides-w`,
-      rect: rect(st.street.minX - 0.25, st.street.minX + 0.15, st.street.minZ, canopyZ1),
+      rect: rect(st.street.minX - 0.2, st.street.minX + 0.2, st.street.minZ, canopyZ1),
     });
     boxes.push({
       id: `${st.id}-canopy-sides-e`,
-      rect: rect(st.street.maxX - 0.15, st.street.maxX + 0.25, st.street.minZ, canopyZ1),
+      rect: rect(st.street.maxX - 0.2, st.street.maxX + 0.2, st.street.minZ, canopyZ1),
     });
-    boxes.push({
-      id: `${st.id}-entry-flap`,
-      rect: rect(st.entryGate.x - 0.55, st.entryGate.x + 0.55, st.entryGate.z - 0.2, st.entryGate.z + 0.2),
-    });
-    boxes.push({ id: `${st.id}-stair-w`, rect: rect(st.stairs.minX - 0.3, st.stairs.minX, st.stairs.minZ, st.stairs.maxZ) });
-    boxes.push({ id: `${st.id}-stair-e`, rect: rect(st.stairs.maxX, st.stairs.maxX + 0.3, st.stairs.minZ, st.stairs.maxZ) });
     st.serviceBoxes.forEach((r, i) => {
-      boxes.push({ id: `${st.id}-service-${i}`, rect: r });
+      boxes.push({ id: `${st.id}-shaft-${i}`, rect: r });
     });
   }
-  // Guideway pillar trunks (street level)
   const step = 18;
   for (let x = PATH_MIN_X + 6; x < PATH_MAX_X; x += step) {
     circles.push({ id: `lrt-pillar-${x}`, x, z: TRACK_Z, r: 0.55 });
@@ -64,6 +56,17 @@ export function elevatedColliders(): BoxCollider[] {
     });
     st.furniture.forEach((r, i) => {
       boxes.push({ id: `${st.id}-furn-${i}`, rect: r });
+    });
+    st.fareBarriers.forEach((r, i) => {
+      boxes.push({ id: `${st.id}-fare-${i}`, rect: r });
+    });
+    boxes.push({
+      id: `${st.id}-entry-flap`,
+      rect: rect(st.entryGate.x - 0.55, st.entryGate.x + 0.55, st.entryGate.z - 0.2, st.entryGate.z + 0.2),
+    });
+    boxes.push({
+      id: `${st.id}-exit-flap`,
+      rect: rect(st.exitGate.x - 0.55, st.exitGate.x + 0.55, st.exitGate.z - 0.2, st.exitGate.z + 0.2),
     });
   }
   const z0 = TRACK_Z - TRAIN_WIDTH / 2 - 0.4;

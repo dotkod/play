@@ -95,6 +95,56 @@ export function carParts(kind: CarKind, paint: string): Part[] {
   return parts;
 }
 
+/**
+ * Ride-taxi shell: solid body with a passenger-door gap on −x so a swinging door mesh can open.
+ * Traffic taxis keep using `carParts("taxi")` (fully closed).
+ */
+export function taxiRideShellParts(): Part[] {
+  const { len, width } = VEHICLE_SIZE.taxi;
+  const body = "#d8352a";
+  const bodyH = 0.65;
+  const cabinH = 0.62;
+  const cabinLen = len * 0.5;
+  const cabinZ = -len * 0.04;
+  const base = 0.32;
+  const doorLen = 1.05;
+  const doorZ = cabinZ + 0.08;
+  const half = width / 2;
+  // Cabin is three slabs: right wall, roof strip, front/back — leave −x door bay open
+  const cabinY = base + bodyH + cabinH / 2;
+  const parts: Part[] = [
+    ...wheels(len, width),
+    ...chassis(len, width, base + bodyH, body),
+    // Right half of cabin
+    box([half - 0.06, cabinH, cabinLen], [half / 2 - 0.02, cabinY, cabinZ], body),
+    // Roof spanning full width
+    box([width - 0.12, 0.12, cabinLen], [0, base + bodyH + cabinH - 0.02, cabinZ], body),
+    // Front / rear cabin pillars on the left (door sits between them)
+    box([0.14, cabinH, (cabinLen - doorLen) / 2], [-half + 0.1, cabinY, doorZ + doorLen / 2 + (cabinLen - doorLen) / 4], body),
+    box([0.14, cabinH, (cabinLen - doorLen) / 2], [-half + 0.1, cabinY, doorZ - doorLen / 2 - (cabinLen - doorLen) / 4], body),
+    // Glass (right + front band)
+    box([half - 0.1, cabinH * 0.65, cabinLen - 0.3], [half / 2 - 0.04, cabinY + 0.02, cabinZ], GLASS, { outline: false }),
+    box([width - 0.35, cabinH * 0.62, 0.08], [0.05, cabinY + 0.02, cabinZ + cabinLen / 2 - 0.08], GLASS, { outline: false }),
+    box([0.3, 0.14, 0.04], [width / 2 - 0.3, base + bodyH * 0.7, len / 2 + 0.01], LIGHT, { outline: false }),
+    box([0.3, 0.14, 0.04], [-width / 2 + 0.3, base + bodyH * 0.7, len / 2 + 0.01], LIGHT, { outline: false }),
+    box([0.3, 0.14, 0.04], [width / 2 - 0.3, base + bodyH * 0.7, -len / 2 - 0.01], TAIL, { outline: false }),
+    box([0.3, 0.14, 0.04], [-width / 2 + 0.3, base + bodyH * 0.7, -len / 2 - 0.01], TAIL, { outline: false }),
+    box([width + 0.02, 0.18, len + 0.02], [0, 0.8, 0], "#f7f5ef", { outline: false }),
+    box([0.7, 0.22, 0.3], [0, base + bodyH + cabinH + 0.11, cabinZ], "#fcd34d"),
+  ];
+  return parts;
+}
+
+/** Local hinge + size for the passenger door mesh (matches shell gap). */
+export const TAXI_RIDE_DOOR = {
+  hingeX: -VEHICLE_SIZE.taxi.width / 2 + 0.04,
+  y: 0.32 + 0.65 + 0.31,
+  z: -VEHICLE_SIZE.taxi.len * 0.04 + 0.08,
+  w: 0.08,
+  h: 0.9,
+  d: 1.0,
+};
+
 export function vanParts(brand: Brand): Part[] {
   const { len, width } = VEHICLE_SIZE.van;
   const c = BRANDS[brand];

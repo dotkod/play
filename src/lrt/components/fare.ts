@@ -70,7 +70,7 @@ export const fare = {
   boardLock: 0,
   ui: null as null | "destPick",
   pendingFrom: null as string | null,
-  prompt: null as null | "tng" | "wait" | "board" | "boarding" | "alighting" | "toPlatform" | "toExit",
+  prompt: null as null | "tng" | "wait" | "board" | "boarding" | "alighting" | "toPlatform" | "toExit" | "lift",
   toast: null as string | null,
 };
 

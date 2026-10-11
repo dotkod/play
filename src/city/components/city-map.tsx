@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { player } from "@/world/player-bridge";
 import { useLang } from "@/shared/lang";
+import { LINE_COLOR, PATH_MAX_X, PATH_MIN_X, STATIONS, TRACK_Z } from "@/lrt/plan";
 import { asphalt, BUILDINGS, type CityBuilding, GRID, inRect, STREET_NAMES, STREETS } from "../plan";
 
 const PPM = 8; // pixels per metre on the painted map
@@ -20,8 +21,30 @@ const X = (x: number) => (x - B.minX) * PPM;
 const Z = (z: number) => (z - B.minZ) * PPM;
 
 const T = {
-  ms: { title: "Peta", area: "Pusat Lepak", you: "Kau", anne: "Anne Maju", bus: "Bas", park: "Taman", recentre: "Pusat semula", close: "Tutup", hint: "Seret untuk gerak · tekan bangunan" },
-  en: { title: "Map", area: "Pusat Lepak", you: "You", anne: "Anne Maju", bus: "Bus", park: "Park", recentre: "Re-centre", close: "Close", hint: "Drag to move · tap a building" },
+  ms: {
+    title: "Peta",
+    area: "Pusat Lepak",
+    you: "Kau",
+    anne: "Anne Maju",
+    bus: "Bas",
+    park: "Taman",
+    lrt: "LRT",
+    recentre: "Pusat semula",
+    close: "Tutup",
+    hint: "Seret untuk gerak · tekan bangunan",
+  },
+  en: {
+    title: "Map",
+    area: "Pusat Lepak",
+    you: "You",
+    anne: "Anne Maju",
+    bus: "Bus",
+    park: "Park",
+    lrt: "LRT",
+    recentre: "Re-centre",
+    close: "Close",
+    hint: "Drag to move · tap a building",
+  },
 };
 
 let painted: HTMLCanvasElement | null = null;
@@ -125,6 +148,36 @@ function paintMap(): HTMLCanvasElement {
     }
   }
 
+  // LRT Laluan Kelana — elevated guideway + station plazas (plan-driven)
+  g.strokeStyle = LINE_COLOR;
+  g.lineWidth = 5;
+  g.lineCap = "round";
+  g.beginPath();
+  g.moveTo(X(PATH_MIN_X), Z(TRACK_Z));
+  g.lineTo(X(PATH_MAX_X), Z(TRACK_Z));
+  g.stroke();
+  g.strokeStyle = "rgba(255,255,255,0.55)";
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.moveTo(X(PATH_MIN_X), Z(TRACK_Z));
+  g.lineTo(X(PATH_MAX_X), Z(TRACK_Z));
+  g.stroke();
+  for (const st of STATIONS) {
+    rect(st.street, "#f3d0c8");
+    g.strokeStyle = LINE_COLOR;
+    g.lineWidth = 2.5;
+    g.strokeRect(X(st.street.minX), Z(st.street.minZ), (st.street.maxX - st.street.minX) * PPM, (st.street.maxZ - st.street.minZ) * PPM);
+    // Station blob on the guideway
+    g.fillStyle = LINE_COLOR;
+    g.beginPath();
+    g.arc(X(st.x), Z(TRACK_Z), 0.9 * PPM, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = "#fff";
+    g.beginPath();
+    g.arc(X(st.x), Z(TRACK_Z), 0.45 * PPM, 0, Math.PI * 2);
+    g.fill();
+  }
+
   // Street names along the middle block of each road
   g.font = `800 ${PPM * 1.5}px system-ui, sans-serif`;
   g.textAlign = "center";
@@ -144,7 +197,7 @@ function paintMap(): HTMLCanvasElement {
   // Middle of the central block, so labels sit mid-road and never on a junction
   const midBlock = (lines: number[]) => {
     const k = Math.floor((lines.length - 2) / 2);
-    return (lines[k] + lines[k + 1]) / 2;
+    return (lines[k]! + lines[k + 1]!) / 2;
   };
   GRID.zs.forEach((z, j) => label(STREET_NAMES.x[j] ?? "", midBlock(GRID.xs), z, 0));
   GRID.xs.forEach((x, i) => label(STREET_NAMES.z[i] ?? "", x, midBlock(GRID.zs), -Math.PI / 2));
@@ -351,6 +404,16 @@ export function CityMapModal({ open, onClose }: { open: boolean; onClose: () => 
             <div ref={canvasHost} />
             {anne && <Pin x={(anne.rect.minX + anne.rect.maxX) / 2} z={(anne.rect.minZ + anne.rect.maxZ) / 2} icon="🍵" tone="bg-amber-300" label={tr.anne} />}
             <Pin x={STREETS.busStop.x} z={STREETS.busStop.z} icon="🚌" tone="bg-sky-300" label={tr.bus} />
+            {STATIONS.map((st) => (
+              <Pin
+                key={st.id}
+                x={st.x}
+                z={(st.street.minZ + st.street.maxZ) / 2}
+                icon="🚇"
+                tone="bg-[#c62f25] text-white"
+                label={lang === "ms" ? st.nameMs : st.nameEn}
+              />
+            ))}
             {/* You: a pulsing ring with a heading arrow */}
             <div ref={me} className="absolute" style={{ left: X(player.x), top: Z(player.z) }}>
               <span className="absolute size-16 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full bg-chili/30" />
@@ -404,6 +467,13 @@ export function CityMapModal({ open, onClose }: { open: boolean; onClose: () => 
           )}
           <button type="button" onClick={() => centreOn(STREETS.busStop.x, STREETS.busStop.z)} className="flex items-center gap-1.5 rounded-full bg-sky-300 px-3 py-1">
             🚌 {tr.bus}
+          </button>
+          <button
+            type="button"
+            onClick={() => centreOn(STATIONS[1]!.x, (STATIONS[1]!.street.minZ + STATIONS[1]!.street.maxZ) / 2)}
+            className="flex items-center gap-1.5 rounded-full bg-[#c62f25] px-3 py-1 text-white"
+          >
+            🚇 {tr.lrt}
           </button>
           <button
             type="button"

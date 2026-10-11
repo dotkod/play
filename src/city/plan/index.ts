@@ -8,8 +8,9 @@
  */
 
 import { STREET_COLLIDERS } from "@/lrt/plan/colliders";
+import { STATIONS } from "@/lrt/plan/stations";
 import { makeColliders } from "./colliders";
-import { makeGrid } from "./grid";
+import { makeGrid, grow, inRect, type Rect } from "./grid";
 import { makeLanes } from "./lanes";
 import { planLots } from "./lots";
 import { planStreets } from "./props";
@@ -34,10 +35,17 @@ const LOTS = planLots(
 
 export const BUILDINGS = LOTS.buildings;
 export const BLOCK_KINDS = LOTS.blockKinds;
-export const STREETS = planStreets(GRID, BUILDINGS, BLOCK_KINDS);
+
+/** Keep kerb trees/lamps out of LRT plazas / lift shafts. */
+const LRT_PROP_CLEAR: Rect[] = STATIONS.flatMap((st) => [grow(st.street, 1.2), grow(st.lift, 0.8)]);
+const RAW_STREETS = planStreets(GRID, BUILDINGS, BLOCK_KINDS);
+export const STREETS = {
+  ...RAW_STREETS,
+  props: RAW_STREETS.props.filter((p) => !LRT_PROP_CLEAR.some((r) => inRect(p.x, p.z, r, 0.4))),
+};
 
 const BASE_COLLIDERS = makeColliders(BUILDINGS, STREETS.props, STREETS.signals);
-/** City solids + LRT street-level (stairs, plaza, pillars, flaps). Elevated LRT boxes stay dynamic. */
+/** City solids + LRT street-level (plaza / shaft / pillars). Elevated flaps + fare walls resolve in ride-session. */
 export const COLLIDERS = {
   boxes: [...BASE_COLLIDERS.boxes, ...STREET_COLLIDERS.boxes],
   circles: [...BASE_COLLIDERS.circles, ...STREET_COLLIDERS.circles],

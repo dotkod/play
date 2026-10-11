@@ -21,6 +21,8 @@ export type Pose = {
   phoneProgress?: number;
   /** Surgical mask over the nose and mouth (city on haze days). */
   masked?: boolean;
+  /** -1..1 look tilt (positive = tongak / look up). Character only — not camera. */
+  lookPitch?: number;
 };
 
 const HIP_STAND = 0.78;
@@ -39,6 +41,8 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
   const tray = useRef<THREE.Group>(null);
   const phone = useRef<THREE.Group>(null);
   const mask = useRef<THREE.Group>(null);
+  const chest = useRef<THREE.Group>(null);
+  const head = useRef<THREE.Group>(null);
 
   useFrame(({ clock }) => {
     const p = getPose();
@@ -48,6 +52,11 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
     // Kids are scaled down; when seated, lift them so they still sit on the stool
     root.current.position.set(p.x, p.seated && look.kid ? HIP_SEAT * (1 - KID_SCALE) : 0, p.z);
     root.current.rotation.y = p.rotY;
+
+    // Tongak: tip chest/head back — camera stay framed on the player
+    const lp = Math.max(-1, Math.min(1, p.lookPitch ?? 0));
+    if (chest.current) chest.current.rotation.x = -lp * 0.28;
+    if (head.current) head.current.rotation.x = -lp * 0.65;
 
     const swing = p.walking ? Math.sin(t * 11) * 0.65 : 0;
     if (p.seated) {
@@ -120,56 +129,58 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
           <Box size={[0.17, 0.78, 0.2]} position={[0, -0.39, 0]} color={look.pants} />
         </group>
 
-        <RBox size={[0.52, 0.62, 0.3]} radius={0.05} position={[0, 0.33, 0]} color={look.shirt} />
-        {/* Baju kurung: long top flaring over the hips */}
-        {look.dress && <RBox size={[0.58, 0.3, 0.36]} radius={0.06} position={[0, 0.02, 0]} color={look.shirt} />}
-        {look.apron && <Box size={[0.46, 0.72, 0.04]} position={[0, 0.22, 0.17]} color={look.apron} />}
+        <group ref={chest}>
+          <RBox size={[0.52, 0.62, 0.3]} radius={0.05} position={[0, 0.33, 0]} color={look.shirt} />
+          {/* Baju kurung: long top flaring over the hips */}
+          {look.dress && <RBox size={[0.58, 0.3, 0.36]} radius={0.06} position={[0, 0.02, 0]} color={look.shirt} />}
+          {look.apron && <Box size={[0.46, 0.72, 0.04]} position={[0, 0.22, 0.17]} color={look.apron} />}
 
-        <group ref={armL} position={[-0.33, 0.58, 0]}>
-          <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
-          <Box size={[0.12, 0.1, 0.13]} position={[0, -0.53, 0]} color={look.skin} />
-        </group>
-        <group ref={armR} position={[0.33, 0.58, 0]}>
-          <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
-          <Box size={[0.12, 0.1, 0.13]} position={[0, -0.53, 0]} color={look.skin} />
-          {look.carry && <Carried kind={look.carry} />}
-          {/* Tiny handset pulled from the pocket */}
-          <group ref={phone} position={[0.02, -0.58, 0.08]} visible={false}>
-            <Box size={[0.14, 0.26, 0.04]} color="#1a1a1c" outline={false} />
-            <Box size={[0.11, 0.2, 0.01]} position={[0, 0.01, 0.025]} color="#64d2ff" outline={false} />
+          <group ref={armL} position={[-0.33, 0.58, 0]}>
+            <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
+            <Box size={[0.12, 0.1, 0.13]} position={[0, -0.53, 0]} color={look.skin} />
           </group>
-        </group>
+          <group ref={armR} position={[0.33, 0.58, 0]}>
+            <Box size={[0.13, 0.52, 0.15]} position={[0, -0.24, 0]} color={look.shirt} />
+            <Box size={[0.12, 0.1, 0.13]} position={[0, -0.53, 0]} color={look.skin} />
+            {look.carry && <Carried kind={look.carry} />}
+            {/* Tiny handset pulled from the pocket */}
+            <group ref={phone} position={[0.02, -0.58, 0.08]} visible={false}>
+              <Box size={[0.14, 0.26, 0.04]} color="#1a1a1c" outline={false} />
+              <Box size={[0.11, 0.2, 0.01]} position={[0, 0.01, 0.025]} color="#64d2ff" outline={false} />
+            </group>
+          </group>
 
-        <group ref={tray} position={[0, 0.62, 0.55]} visible={false}>
-          <Cyl top={0.2} bottom={0.2} height={0.03} color="#b9bec4" />
-          <Cyl top={0.07} bottom={0.055} height={0.16} position={[0, 0.095, 0]} color="#c9965f" />
-        </group>
+          <group ref={tray} position={[0, 0.62, 0.55]} visible={false}>
+            <Cyl top={0.2} bottom={0.2} height={0.03} color="#b9bec4" />
+            <Cyl top={0.07} bottom={0.055} height={0.16} position={[0, 0.095, 0]} color="#c9965f" />
+          </group>
 
-        <group position={[0, 0.88, 0]}>
-          <RBox size={[0.44, 0.44, 0.42]} radius={0.09} color={look.skin} />
-          {/* Face */}
-          <Box size={[0.05, 0.08, 0.01]} position={[-0.09, 0.03, 0.212]} color="#111" outline={false} />
-          <Box size={[0.05, 0.08, 0.01]} position={[0.09, 0.03, 0.212]} color="#111" outline={false} />
-          <Box size={[0.1, 0.018, 0.01]} position={[0, -0.09, 0.212]} color="#5a2a22" outline={false} />
-          <group ref={brows} visible={false}>
-            <Box size={[0.09, 0.022, 0.01]} position={[-0.09, 0.1, 0.214]} rotation={[0, 0, -0.4]} color="#111" outline={false} />
-            <Box size={[0.09, 0.022, 0.01]} position={[0.09, 0.1, 0.214]} rotation={[0, 0, 0.4]} color="#111" outline={false} />
+          <group ref={head} position={[0, 0.88, 0]}>
+            <RBox size={[0.44, 0.44, 0.42]} radius={0.09} color={look.skin} />
+            {/* Face */}
+            <Box size={[0.05, 0.08, 0.01]} position={[-0.09, 0.03, 0.212]} color="#111" outline={false} />
+            <Box size={[0.05, 0.08, 0.01]} position={[0.09, 0.03, 0.212]} color="#111" outline={false} />
+            <Box size={[0.1, 0.018, 0.01]} position={[0, -0.09, 0.212]} color="#5a2a22" outline={false} />
+            <group ref={brows} visible={false}>
+              <Box size={[0.09, 0.022, 0.01]} position={[-0.09, 0.1, 0.214]} rotation={[0, 0, -0.4]} color="#111" outline={false} />
+              <Box size={[0.09, 0.022, 0.01]} position={[0.09, 0.1, 0.214]} rotation={[0, 0, 0.4]} color="#111" outline={false} />
+            </group>
+            <Headwear look={look} />
+            <group ref={mask} visible={false}>
+              <Box size={[0.34, 0.17, 0.04]} position={[0, -0.075, 0.222]} color="#cfe6f2" outline={false} />
+              <Box size={[0.3, 0.012, 0.012]} position={[0, -0.03, 0.245]} color="#a9cbe0" outline={false} />
+              <Box size={[0.3, 0.012, 0.012]} position={[0, -0.12, 0.245]} color="#a9cbe0" outline={false} />
+              <Box size={[0.012, 0.02, 0.36]} position={[-0.225, -0.03, 0.03]} color="#f4f6f8" outline={false} />
+              <Box size={[0.012, 0.02, 0.36]} position={[0.225, -0.03, 0.03]} color="#f4f6f8" outline={false} />
+            </group>
+            {look.glasses && (
+              <>
+                <Box size={[0.14, 0.08, 0.02]} position={[-0.09, 0.03, 0.225]} color="#111" outline={false} />
+                <Box size={[0.14, 0.08, 0.02]} position={[0.09, 0.03, 0.225]} color="#111" outline={false} />
+                <Box size={[0.08, 0.02, 0.02]} position={[0, 0.05, 0.225]} color="#111" outline={false} />
+              </>
+            )}
           </group>
-          <Headwear look={look} />
-          <group ref={mask} visible={false}>
-            <Box size={[0.34, 0.17, 0.04]} position={[0, -0.075, 0.222]} color="#cfe6f2" outline={false} />
-            <Box size={[0.3, 0.012, 0.012]} position={[0, -0.03, 0.245]} color="#a9cbe0" outline={false} />
-            <Box size={[0.3, 0.012, 0.012]} position={[0, -0.12, 0.245]} color="#a9cbe0" outline={false} />
-            <Box size={[0.012, 0.02, 0.36]} position={[-0.225, -0.03, 0.03]} color="#f4f6f8" outline={false} />
-            <Box size={[0.012, 0.02, 0.36]} position={[0.225, -0.03, 0.03]} color="#f4f6f8" outline={false} />
-          </group>
-          {look.glasses && (
-            <>
-              <Box size={[0.14, 0.08, 0.02]} position={[-0.09, 0.03, 0.225]} color="#111" outline={false} />
-              <Box size={[0.14, 0.08, 0.02]} position={[0.09, 0.03, 0.225]} color="#111" outline={false} />
-              <Box size={[0.08, 0.02, 0.02]} position={[0, 0.05, 0.225]} color="#111" outline={false} />
-            </>
-          )}
         </group>
       </group>
     </group>

@@ -10,6 +10,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BUILDINGS, inRect, roomRect, SPAWN } from "@/city/plan";
 import { CityMapModal } from "@/city/components/city-map";
 import { CityMinimap } from "@/city/components/minimap";
+import { taxiDestById } from "@/city/sim/taxi-dests";
+import { taxi } from "@/city/sim/taxi-ride";
 import { logoutAccount, refreshAuth, takeAuthHello, useAuth } from "@/core/auth-client";
 import { emit } from "@/core/events";
 import { JOB_RESULT_KEY, settleJobResults, type JobResult } from "@/core/job-handoff";
@@ -377,17 +379,30 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       else if (p === "wait") setLrtPrompt(lrtTr.waitTrain);
       else if (p === "board") setLrtPrompt(lrtTr.boardPrompt);
       else setLrtPrompt(null);
-      const scripted = rideBusy() || groundScripted() || fare.riding;
+      const taxiLocked = taxi.phase === "boarding" || taxi.phase === "riding" || taxi.phase === "alighting";
+      const scripted = rideBusy() || groundScripted() || fare.riding || taxiLocked;
       setShowMoveStick(!scripted && fare.ui !== "destPick");
-      setShowLookPad(fare.ridePhase === "seated" || (!scripted && fare.ui !== "destPick"));
+      setShowLookPad(fare.ridePhase === "seated" || taxi.phase === "riding" || (!scripted && fare.ui !== "destPick"));
       if (fare.toast) {
         const stopId = fare.toast;
         fare.toast = null;
         toastKind(stopId);
       }
+      // Taxi status chip (wins over LRT while a ride is active)
+      if (taxi.prompt === "arriving" || taxi.prompt === "boarding") setLrtPrompt(tr.taxiArriving);
+      else if (taxi.prompt === "riding") setLrtPrompt(tr.taxiRiding);
+      else if (taxi.prompt === "alighting") setLrtPrompt(tr.taxiAlighting);
+      if (taxi.toast?.startsWith("arrived:")) {
+        const dest = taxiDestById(taxi.toast.slice("arrived:".length));
+        taxi.toast = null;
+        const name = dest ? (lang === "ms" ? dest.nameMs : dest.nameEn) : "";
+        flash(tr.taxiArrived(name));
+      } else if (taxi.toast) {
+        taxi.toast = null;
+      }
     }, 120);
     return () => clearInterval(id);
-  }, [started, shiftLive, lrtSandbox, lrtTr, lang]);
+  }, [started, shiftLive, lrtSandbox, lrtTr, lang, tr]);
 
   useEffect(() => {
     const mq = matchMedia("(pointer: coarse)");
@@ -409,7 +424,8 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     <div className="relative h-dvh w-full overflow-hidden select-none">
       <LandscapeGate />
       {/* Walking pauses while the map is open (the city itself keeps living) */}
-      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked && !mapOpen && !lrtDestPick} />
+      {/* Keep active during TnG dest pick (sandbox does) — ride-session freezes walk; deactivating dropped floorY + skipped flaps */}
+      <CityWorld spawn={bootKerja(initialJob) ? IN_SHOP_SPAWN : SPAWN} onZone={noZone} active={started && !blocked && !mapOpen} />
 
       {!shiftLive && <WalletHud started={started} />}
 
@@ -498,7 +514,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         </div>
       )}
 
-      <Phone open={phoneOpen} onClose={closePhone} />
+      <Phone open={phoneOpen} onClose={closePhone} onToast={flash} />
       <CityMapModal open={mapOpen && !shiftLive} onClose={() => setMapOpen(false)} />
 
       {started && touch && !phoneBusy && !shiftLive && showMoveStick && <Joystick />}

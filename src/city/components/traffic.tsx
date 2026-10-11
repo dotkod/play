@@ -16,6 +16,7 @@ import { cachedParts, hullMaterial, kitMaterial } from "../kit/merge";
 import { labelTexture } from "../kit/textures";
 import { bikeParts, BRANDS, carParts, VAN_LABEL, vanParts } from "../kit/vehicles";
 import { createTraffic, type Obstacle, stepTraffic, type Vehicle, vehicleCircles } from "../sim/traffic";
+import { setTaxiPeers, taxi, taxiCircles } from "../sim/taxi-ride";
 import { cityDynamic } from "./dynamic";
 
 const SKINS = ["#c98d60", "#a96d47", "#e0b48a", "#8d5a3b"];
@@ -68,7 +69,10 @@ export const CityTraffic = memo(function CityTraffic({ active = true }: { active
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 1 / 20);
     const t = clock.elapsedTime;
-    const people: Obstacle[] = [{ x: player.x, z: player.z, r: 0.45 }, ...cityDynamic.people];
+    // Ride taxi ↔ traffic: each side sees the other so neither drives through
+    setTaxiPeers(traffic.vehicles.map((v) => ({ x: v.x, z: v.z, rot: v.rot, len: v.len, width: v.width })));
+    const rideTaxi = taxiCircles();
+    const people: Obstacle[] = [{ x: player.x, z: player.z, r: 0.45 }, ...cityDynamic.people, ...rideTaxi];
     const honks = stepTraffic(traffic, dt, t, people);
     if (active && honks.length) {
       // Only honk if the honking car is near enough to hear
@@ -92,7 +96,8 @@ export const CityTraffic = memo(function CityTraffic({ active = true }: { active
         nearestBike = v.kind === "bike";
       }
     });
-    cityDynamic.vehicles = vehicleCircles(traffic);
+    // Solid to the player while arriving; during board/ride/alight the session owns the body
+    cityDynamic.vehicles = [...vehicleCircles(traffic), ...(taxi.phase === "arriving" ? rideTaxi : [])];
     if (active && (engineTick.current = (engineTick.current + 1) % 6) === 0) ambience.setEngine(Math.max(0, 1 - nearest / 14), nearestBike);
   });
 

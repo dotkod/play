@@ -22,6 +22,7 @@ import { CityGround } from "./ground";
 import { CityPedestrians } from "./pedestrians";
 import { CityPlayer } from "./player";
 import { StreetProps } from "./props";
+import { CityTaxiRide } from "./taxi-ride";
 import { CityTraffic } from "./traffic";
 
 type Props = {
@@ -89,6 +90,7 @@ export default function CityWorld({ spawn, onZone, active = true, poster = false
         <LrtStations />
         <LrtTrain active={active && !poster} />
         <CityTraffic active={active} />
+        <CityTaxiRide />
         <CityPedestrians />
         <RainFX />
         {poster ? <PosterCamera /> : <CityPlayer spawn={spawn} onZone={onZone} active={active} />}

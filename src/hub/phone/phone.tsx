@@ -2,15 +2,19 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getAuth, loginAccount, logoutAccount, registerAccount, useAuth } from "@/core/auth-client";
-import { XP_PER_LEVEL, markInboxRead, unreadInboxCount, useProfile } from "@/core/profile";
-import { setMuted, useMuted } from "@/shared/audio";
+import { XP_PER_LEVEL, addMoney, markInboxRead, spendMoney, unreadInboxCount, useProfile } from "@/core/profile";
+import { fare, rideBusy } from "@/lrt/components/fare";
+import { sfx, setMuted, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
+import { player } from "@/world/player-bridge";
+import { TAXI_FARE_SEN, taxiDestChoices } from "@/city/sim/taxi-dests";
+import { startTaxiRide, taxiBusy } from "@/city/sim/taxi-ride";
 import { HUB } from "../meta";
 import { rm } from "../hud";
 import { HUB_STRINGS } from "../strings";
 
-type AppId = "home" | "mesej" | "profil" | "dompet" | "tetapan";
-type IconKind = "mesej" | "tugasan" | "profil" | "dompet" | "tetapan" | "kerja" | "peta";
+type AppId = "home" | "mesej" | "profil" | "dompet" | "tetapan" | "teksi";
+type IconKind = "mesej" | "tugasan" | "profil" | "dompet" | "tetapan" | "kerja" | "peta" | "teksi";
 
 const APP_ICON: Record<IconKind, { bg: string }> = {
   mesej: { bg: "linear-gradient(160deg,#64d2ff 0%,#0a84ff 55%,#0071e3 100%)" },
@@ -20,13 +24,22 @@ const APP_ICON: Record<IconKind, { bg: string }> = {
   tetapan: { bg: "linear-gradient(160deg,#d1d1d6 0%,#8e8e93 50%,#636366 100%)" },
   kerja: { bg: "linear-gradient(160deg,#bf5af2 0%,#5e5ce6 100%)" },
   peta: { bg: "linear-gradient(160deg,#64d2ff 0%,#30d158 55%,#ffd60a 100%)" },
+  teksi: { bg: "linear-gradient(160deg,#fcd34d 0%,#f59e0b 45%,#d8352a 100%)" },
 };
 
 /**
  * In-city handset: a small standard smartphone docks on the right so the city and
  * character stay visible. No flip/fold — just a slab phone.
  */
-export function Phone({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function Phone({
+  open,
+  onClose,
+  onToast,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onToast?: (text: string) => void;
+}) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
   const auth = useAuth();
@@ -78,6 +91,13 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
                 {app === "profil" && <Profil lang={lang} auth={auth} />}
                 {app === "dompet" && <Dompet lang={lang} />}
                 {app === "tetapan" && <Tetapan lang={lang} auth={auth} />}
+                {app === "teksi" && (
+                  <Teksi
+                    lang={lang}
+                    onClosePhone={dismiss}
+                    onToast={onToast}
+                  />
+                )}
               </>
             )}
           </div>
@@ -89,7 +109,11 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 function titleOf(app: AppId, tr: (typeof HUB_STRINGS)["ms"]) {
-  return app === "mesej" ? tr.appMesej : app === "profil" ? tr.appProfil : app === "dompet" ? tr.appDompet : tr.appTetapan;
+  if (app === "mesej") return tr.appMesej;
+  if (app === "profil") return tr.appProfil;
+  if (app === "dompet") return tr.appDompet;
+  if (app === "teksi") return tr.appTeksi;
+  return tr.appTetapan;
 }
 
 const WALLPAPER = "bg-[radial-gradient(130%_90%_at_10%_-10%,#ff8a5c_0%,#e14bff_38%,#4b6dff_72%,#0b1224_100%)]";
@@ -189,6 +213,7 @@ function HomeScreen({
         <IosIcon kind="profil" label={tr.appProfil} onClick={() => onOpen("profil")} />
         <IosIcon kind="dompet" label={tr.appDompet} onClick={() => onOpen("dompet")} />
         <IosIcon kind="tetapan" label={tr.appTetapan} onClick={() => onOpen("tetapan")} />
+        <IosIcon kind="teksi" label={tr.appTeksi} onClick={() => onOpen("teksi")} />
         <IosIcon kind="kerja" label={tr.appKerja} soon />
       </div>
 
@@ -335,6 +360,17 @@ function AppGlyph({ kind, size = 24 }: { kind: IconKind; size?: number }) {
       </svg>
     );
   }
+  if (kind === "teksi") {
+    return (
+      <svg width={s} height={s} viewBox="0 0 32 32" fill="none" aria-hidden>
+        <rect x="5" y="14" width="22" height="9" rx="2.2" fill="white" />
+        <path d="M9 14l2.2-4.2h9.6L23 14" stroke="white" strokeWidth="2.2" strokeLinejoin="round" />
+        <circle cx="10.5" cy="23.2" r="2.1" fill="white" />
+        <circle cx="21.5" cy="23.2" r="2.1" fill="white" />
+        <rect x="12.5" y="9.2" width="7" height="2.2" rx="0.6" fill="white" />
+      </svg>
+    );
+  }
   return (
     <svg width={s} height={s} viewBox="0 0 32 32" fill="none" aria-hidden>
       <path d="M8 22.5l4.2-10.5L16 18l3.2-5.5L24 22.5H8Z" fill="white" />
@@ -425,6 +461,62 @@ function Profil({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof use
       <div className="overflow-hidden rounded-[12px] bg-white shadow-sm">
         <SettingsRow label={tr.wallet} trailing={<span className="text-[13px] font-semibold tabular-nums text-black">{rm(p.wallet)}</span>} />
         <SettingsRow label="XP" border trailing={<span className="text-[13px] font-semibold tabular-nums text-black">{p.xp}</span>} />
+      </div>
+    </div>
+  );
+}
+
+function Teksi({
+  lang,
+  onClosePhone,
+  onToast,
+}: {
+  lang: "ms" | "en";
+  onClosePhone: () => void;
+  onToast?: (text: string) => void;
+}) {
+  const tr = HUB_STRINGS[lang];
+  const choices = taxiDestChoices(player.x, player.z);
+
+  const order = (destId: string) => {
+    if (taxiBusy() || rideBusy() || fare.riding) {
+      onToast?.(tr.taxiBusy);
+      return;
+    }
+    const ok = spendMoney(TAXI_FARE_SEN, "Teksi Kumar", "Kumar's taxi");
+    if (!ok) {
+      onToast?.(tr.needMoney);
+      return;
+    }
+    if (!startTaxiRide(destId, player.x, player.z)) {
+      addMoney(TAXI_FARE_SEN, "Teksi refund", "Taxi refund");
+      onToast?.(tr.taxiBusy);
+      return;
+    }
+    sfx.chime();
+    onToast?.(tr.taxiArriving);
+    onClosePhone();
+  };
+
+  return (
+    <div className="flex min-h-full flex-col bg-[#f2f2f7] px-2 pb-3">
+      <p className="px-1.5 pt-0.5 pb-1 text-[22px] leading-none font-bold tracking-tight text-black">{tr.taxiTitle}</p>
+      <p className="mb-3 px-1.5 text-[12px] font-medium text-[#8e8e93]">{tr.taxiPickHint}</p>
+      <div className="flex flex-col gap-2">
+        {choices.map((d) => {
+          const name = lang === "ms" ? d.nameMs : d.nameEn;
+          return (
+            <button
+              key={d.id}
+              type="button"
+              className="flex items-center justify-between rounded-[12px] bg-white px-3.5 py-3 text-left shadow-sm active:scale-[0.99]"
+              onClick={() => order(d.id)}
+            >
+              <span className="text-[15px] font-semibold text-black">{name}</span>
+              <span className="text-[13px] font-semibold tabular-nums text-[#d8352a]">{tr.taxiFare}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

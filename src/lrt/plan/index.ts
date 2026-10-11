@@ -7,7 +7,7 @@ export * from "./colliders";
 
 const pusat = STATIONS[1]!;
 
-/** Street spawn south of Stesen Pusat, facing the entrance (north = -z). */
+/** Outer-north-sidewalk spawn at Stesen Pusat, facing the lift (north = -z). */
 export const SPAWN = {
   x: (pusat.street.minX + pusat.street.maxX) / 2,
   z: pusat.street.maxZ - 0.45,

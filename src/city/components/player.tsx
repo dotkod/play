@@ -11,11 +11,11 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { currentOutfit } from "@/games/anne-maju/progress";
-import { lookAxis, moveVector, view } from "@/hub/controls";
+import { lookAxis, moveVector, tickLookPitch, view } from "@/hub/controls";
 import { fare } from "@/lrt/components/fare";
 import { gateOpen } from "@/lrt/components/gate-state";
 import { localToWorldCam, tickRideSession, type RideRefs } from "@/lrt/components/ride-session";
-import { coverTopAt, DECK_Y, SEAT_ROOT_Y } from "@/lrt/plan";
+import { coverTopAt, DECK_Y, SEAT_ROOT_Y, floorYAt } from "@/lrt/plan";
 import { getShuttle } from "@/lrt/sim/shuttle";
 import { sfx } from "@/shared/audio";
 import type { Look } from "@/shared/three/look";
@@ -23,6 +23,7 @@ import { Person, type Pose } from "@/shared/three/person";
 import { atmosphere } from "@/world/atmosphere";
 import { PHONE_DRAW_MS, player as shared, takeTeleport } from "@/world/player-bridge";
 import { buildingHeight, BUILDINGS, type CityBuilding, COLLIDERS, GRID } from "../plan";
+import { taxi, taxiBusy, tickTaxiRide } from "../sim/taxi-ride";
 import { cityCamera } from "./camera-override";
 import { cityDynamic } from "./dynamic";
 
@@ -168,14 +169,23 @@ export function CityPlayer({
       sitLock,
       enterLatch,
     };
-    const mode = !drawing && active ? tickRideSession(refs, dt, active, false) : "off";
+    // Teksi ride owns the player when active; otherwise LRT session (flaps / deck) stays live
+    let mode: "off" | "lrtFree" | "scripted" | "riding" = "off";
+    if (!drawing && taxiBusy()) {
+      mode = tickTaxiRide(refs, dt);
+    } else if (!drawing) {
+      mode = tickRideSession(refs, dt, active && !drawing, false);
+    }
 
     if (mode === "off") {
       seated.current = false;
-      floorY.current = 0;
+      // Keep elevated LRT height if we're still on a station deck (don't fall through when session releases)
+      const elevY = floorYAt(p.x, p.z);
+      floorY.current = elevY > 0.5 ? elevY : 0;
       if (active && !drawing) {
         const turn = lookAxis();
         if (turn !== 0) view.yaw += turn * 2.2 * dt;
+        tickLookPitch(dt);
       }
       const mv = active && !drawing ? moveVector() : { x: 0, y: 0 };
       const cy = Math.cos(view.yaw);
@@ -219,8 +229,25 @@ export function CityPlayer({
 
     const cy = Math.cos(view.yaw);
     const sy = Math.sin(view.yaw);
+    if (mode !== "off" || (active && !drawing)) tickLookPitch(dt);
+    const pitch = view.pitch; // + = look up; orbit camera, look-at stays on character
 
-    if (mode === "riding") {
+    if (mode === "riding" && taxiBusy()) {
+      // Follow the taxi from behind (street ride)
+      const wantFov = 58;
+      if (Math.abs(persp.fov - wantFov) > 0.5) {
+        persp.fov += (wantFov - persp.fov) * Math.min(1, dt * 6);
+        persp.updateProjectionMatrix();
+      }
+      const back = 7.5;
+      const cyT = Math.cos(taxi.rotY);
+      const syT = Math.sin(taxi.rotY);
+      camPos.set(taxi.x - syT * back * 0.15 + Math.sin(view.yaw) * 1.2, 4.2 - pitch * 0.4, taxi.z - cyT * back);
+      camera.position.lerp(camPos, 1 - Math.exp(-dt * 5));
+      camTarget.set(taxi.x, 1.2 + pitch * 0.2, taxi.z);
+      camera.lookAt(camTarget);
+      camHeight.current = 4.2;
+    } else if (mode === "riding") {
       const wantFov = fare.ridePhase === "seated" ? 72 : 58;
       if (Math.abs(persp.fov - wantFov) > 0.5) {
         persp.fov += (wantFov - persp.fov) * Math.min(1, dt * 6);
@@ -229,13 +256,14 @@ export function CityPlayer({
       if (fare.ridePhase === "seated") {
         const yawOff = view.yaw - shuttle.rotY;
         const camLx = Math.sin(yawOff) * 0.35;
-        const camLz = fare.seatLocalZ - 3.4;
+        const camLz = fare.seatLocalZ - 3.4 + pitch * 0.4;
         const wCam = localToWorldCam(camLx, camLz, shuttle.rotY, shuttle.x, shuttle.z);
-        camera.position.set(wCam.x, DECK_Y + 2.15, wCam.z);
+        camera.position.set(wCam.x, DECK_Y + 2.15 - pitch * 0.55, wCam.z);
         const lookLx = fare.seatLocalX * 0.2 + Math.sin(yawOff) * 0.8;
         const lookLz = fare.seatLocalZ + 2.8 + Math.cos(yawOff) * 0.4;
         const lookW = localToWorldCam(lookLx, lookLz, shuttle.rotY, shuttle.x, shuttle.z);
-        camTarget.set(lookW.x, DECK_Y + 1.75, lookW.z);
+        // Aim stays on the seated body — sky fills above when pitched up
+        camTarget.set(lookW.x, DECK_Y + 1.75 + pitch * 0.35, lookW.z);
         camera.lookAt(camTarget);
         camHeight.current = DECK_Y + 2.15;
       } else {
@@ -244,8 +272,8 @@ export function CityPlayer({
         const clx = fare.rideLocalX + Math.sin(rel) * back * 0.15;
         const clz = fare.rideLocalZ + Math.cos(rel) * back;
         const wCam = localToWorldCam(clx, clz, shuttle.rotY, shuttle.x, shuttle.z);
-        camera.position.set(wCam.x, DECK_Y + 1.95, wCam.z);
-        camTarget.set(p.x, DECK_Y + 1.35, p.z);
+        camera.position.set(wCam.x, DECK_Y + 1.95 - pitch * 0.45, wCam.z);
+        camTarget.set(p.x, DECK_Y + 1.35 + pitch * 0.25, p.z);
         camera.lookAt(camTarget);
         camHeight.current = DECK_Y + 1.95;
       }
@@ -255,21 +283,25 @@ export function CityPlayer({
         persp.updateProjectionMatrix();
       }
       const portrait = size.width < size.height;
-      let back = portrait ? 11 : 8.5;
-      let up = portrait ? 14 : 11;
+      // Orbit elevation: pitch up → flatter (more sky), look-at locked on torso
+      const dist = portrait ? 16 : 13.5;
+      let orbit = (portrait ? 0.72 : 0.62) - pitch * 0.7;
+      orbit = Math.max(0.08, Math.min(1.15, orbit));
+      let back = Math.cos(orbit) * dist;
+      let up = Math.sin(orbit) * dist;
       const cover = coverTopAt(p.x, p.z);
       if (cover > 0) {
-        back = portrait ? 7 : 5.5;
+        back *= 0.65;
         up = Math.max(up, cover - floorY.current + 2.2);
       }
       const seatX = p.x + sy * back;
       const seatZ = p.z + cy * back;
       const seatCover = coverTopAt(seatX, seatZ);
       if (seatCover > floorY.current + up - 0.5) up = seatCover - floorY.current + 1.8;
-      camHeight.current += (floorY.current + up * (cover > 0 ? 1 : 0.85) - camHeight.current) * Math.min(1, dt * 6);
+      camHeight.current += (floorY.current + up - camHeight.current) * Math.min(1, dt * 6);
       camPos.set(seatX, camHeight.current, seatZ);
       camera.position.lerp(camPos, 1 - Math.exp(-dt * 6));
-      camTarget.set(p.x - sy * 1.2, floorY.current + 1.6, p.z - cy * 1.2);
+      camTarget.set(p.x, floorY.current + 1.45 + pitch * 0.25, p.z);
       camera.lookAt(camTarget);
     } else {
       if (Math.abs(persp.fov - 50) > 0.5) {
@@ -277,8 +309,11 @@ export function CityPlayer({
         persp.updateProjectionMatrix();
       }
       const portrait = size.width < size.height;
-      const back = portrait ? 11 : 8.5;
-      const up = portrait ? 14 : 11;
+      const dist = portrait ? 16 : 13.5;
+      let orbit = (portrait ? 0.72 : 0.62) - pitch * 0.7;
+      orbit = Math.max(0.08, Math.min(1.15, orbit));
+      const back = Math.cos(orbit) * dist;
+      const up = Math.sin(orbit) * dist;
       let k = 1;
       let y = up;
       const roof = roofAt(p.x + sy * back, p.z + cy * back);
@@ -289,7 +324,7 @@ export function CityPlayer({
       camHeight.current += (y - camHeight.current) * Math.min(1, dt * 6);
       camPos.set(p.x + sy * back * k, camHeight.current, p.z + cy * back * k);
       camera.position.copy(camPos);
-      camTarget.set(p.x - sy * 1.5, 2.2, p.z - cy * 1.5);
+      camTarget.set(p.x, 1.45 + pitch * 0.25, p.z);
       camera.lookAt(camTarget);
     }
 
@@ -326,6 +361,7 @@ export function CityPlayer({
         phone: drawing ? "draw" : holding ? "hold" : undefined,
         phoneProgress: drawing ? 1 - (shared.phoneDrawUntil - now) / PHONE_DRAW_MS : 1,
         masked: atmosphere.haze !== "none",
+        lookPitch: view.pitch,
       };
     },
     [],

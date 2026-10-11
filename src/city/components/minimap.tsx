@@ -9,6 +9,7 @@
 import { useEffect, useRef } from "react";
 import { view } from "@/hub/controls";
 import { player } from "@/world/player-bridge";
+import { LINE_COLOR, PATH_MAX_X, PATH_MIN_X, STATIONS, TRACK_Z } from "@/lrt/plan";
 import { asphalt, BUILDINGS, GRID, STREETS } from "../plan";
 
 const PPM = 3; // pixels per metre on the static layer
@@ -38,6 +39,21 @@ function paintBase() {
     g.strokeStyle = "rgba(31,26,23,0.55)";
     g.lineWidth = 1.5;
     g.strokeRect(X(b.rect.minX), Z(b.rect.minZ), (b.rect.maxX - b.rect.minX) * PPM, (b.rect.maxZ - b.rect.minZ) * PPM);
+  }
+  // LRT guideway + stations
+  g.strokeStyle = LINE_COLOR;
+  g.lineWidth = 2.5;
+  g.lineCap = "round";
+  g.beginPath();
+  g.moveTo(X(PATH_MIN_X), Z(TRACK_Z));
+  g.lineTo(X(PATH_MAX_X), Z(TRACK_Z));
+  g.stroke();
+  for (const st of STATIONS) {
+    rect(st.street, "#e8b4aa");
+    g.fillStyle = LINE_COLOR;
+    g.beginPath();
+    g.arc(X(st.x), Z(TRACK_Z), 1.6, 0, Math.PI * 2);
+    g.fill();
   }
   // Anne Maju marker
   const anne = BUILDINGS.find((b) => b.game);

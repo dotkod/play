@@ -8,20 +8,30 @@ export const PLATFORM_Y = 8.12;
 export const GUIDE_Y = 7.55;
 
 /**
- * Guideway centreline z — north grass/junction belt of Pusat 3×3 so street plazas
- * meet the north sidewalks without planting lift cores on ped loops.
- * Sandbox and city share this plan so both fit ~±95 m.
+ * Guideway centreline — grass north of Pusat's outer north sidewalk.
+ * Northern EW asphalt is z∈[-79,-71]; outer sidewalk is z∈[-83.5,-79].
  */
-export const TRACK_Z = -90;
+export const TRACK_Z = -91;
 /** Side platform sits on the south (+z) of the track. */
 export const PLATFORM_DEPTH = 5.5;
-export const PLATFORM_ALONG = 28;
+/** Narrower decks so ± station centres stay inside north-row lots, not NS arterials. */
+export const PLATFORM_ALONG = 22;
 /** Track-side edge of the platform deck (shared by kit, colliders, PSD). */
 export const PLAT_EDGE_Z = TRACK_Z + 1.6;
-/** South edge of the platform deck. */
+/** South edge of the platform deck (still north of asphalt). */
 export const PLAT_BACK_Z = PLAT_EDGE_Z + PLATFORM_DEPTH;
-/** Compressed spacing so 3 stops fit the city (~195 m). */
-export const STATION_GAP = 72;
+/**
+ * Spacing so stations land at x ≈ -50 / 0 / +50 (north-row block centres),
+ * not on the NS roads at ±75.
+ */
+export const STATION_GAP = 50;
+/**
+ * Street plaza on the OUTER north sidewalk (north of the EW road).
+ * Must stay in z∈[-83.5,-79] — never on asphalt or the inner sidewalk.
+ */
+/** Just south of PLAT_BACK_Z so plaza abuts the deck (no road span). */
+export const STREET_Z0 = -83.8;
+export const STREET_Z1 = -79.5;
 
 export const TRAIN_LEN = 16;
 export const TRAIN_WIDTH = 3.4;

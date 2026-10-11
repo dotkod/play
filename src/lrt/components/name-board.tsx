@@ -71,8 +71,8 @@ function paint(st: LrtStation) {
 }
 
 const SIZE: Record<NameBoard["kind"], { w: number; h: number }> = {
-  street: { w: 11.2, h: 1.7 },
-  canopy: { w: 12.5, h: 3.4 },
+  street: { w: 7.2, h: 1.35 },
+  canopy: { w: 7.2, h: 1.35 },
   platform: { w: 2.8, h: 1.15 },
 };
 

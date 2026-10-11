@@ -5,6 +5,78 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.16.28
+- Teksi: door opens for board/exit (no more walking through the car); taxi brakes for traffic and traffic brakes for the taxi
+
+### 0.16.27
+- Phone: Teksi Kumar — pick a destination, taxi picks you up, door + ride, drop on the sidewalk
+
+### 0.16.26
+- Look up: character tongak + camera orbit (look-at stays on you so you stay in frame)
+
+### 0.16.25
+- Look stick up/down: character tongak (head tilt); camera stays on the player
+
+### 0.16.24
+- Camera: look stick up/down tilts aim (tongak), not zoom in/out
+
+### 0.16.23
+- Camera: right look stick pitches up/down (desktop T/G) — was yaw-only
+
+### 0.16.22
+- LRT: exit path waits for the lift on the apron, rides down, then leaves (was stuck in the shaft)
+
+### 0.16.21
+- LRT: paid auto-walk goes through the entry aisle (was wedging on the mid fare wall)
+
+### 0.16.20
+- LRT gates: solid mid wall (not a fake open aisle); exit flap stays closed; free exit collider
+
+### 0.16.19
+- LRT lift: shaft moved into the plaza (off the platform); clear apron exit; no centre pillar / bench clash
+
+### 0.16.18
+- LRT lift: full-height shaft walls; cabin no longer rides empty (you stay locked in until arrival)
+
+### 0.16.17
+- LRT in the city: Touch n Lepak dest pick no longer kills the ride session (gate flaps + deck height stay live)
+
+### 0.16.16
+- LRT: glass fare walls beside Touch n Lepak — can't walk onto the platform around the gates
+
+### 0.16.15
+- LRT lift: removed the tall shaft towers that stacked through the entrance canopy
+
+### 0.16.14
+- LRT lift: door portals are short (no full-height wall through the player); shaft colliders stay street-only
+
+### 0.16.13
+- LRT lift: entering from the deck no longer drops you to the street while the cabin summons
+
+### 0.16.12
+- LRT lift: concrete shaft with door openings only; cabin off the platform aisle; sliding doors
+
+### 0.16.11
+- LRT lift: release on arrival (was locking the player in the cabin forever)
+
+### 0.16.10
+- Map + minimap: LRT Laluan Kelana guideway and Utara / Pusat / Selatan stations
+
+### 0.16.9
+- LRT: one street name board (no stacked canopy sign); kerb trees cleared from plazas; simpler entrance canopy
+
+### 0.16.8
+- LRT: stairs replaced with an animated lift (street ↔ deck); step in and it rides
+
+### 0.16.7
+- LRT: stations sit on the outer north sidewalk (north of the EW road) — no stairs/plaza/concourse on asphalt
+
+### 0.16.6
+- LRT: access over the northern road is a flat skybridge; stairs/escalator only on the sidewalk plaza
+
+### 0.16.5
+- LRT: street entrances sit on the north sidewalk (not in the road lanes); stations centred on the north blocks
+
 ### 0.16.4
 - LRT: train path locked to the elevated guideway (was wrongly at city centre z=0 and cut through buildings)
 

@@ -52,31 +52,39 @@ export function Joystick() {
   );
 }
 
-/** Horizontal look pad — camera yaw only (right thumb). No auto camera. */
+/** Right look stick — yaw (X) + pitch (Y, up = look up). No auto camera. */
 export function LookPad() {
   const base = useRef<HTMLDivElement>(null);
-  const [knobX, setKnobX] = useState(0);
+  const [knob, setKnob] = useState({ x: 0, y: 0 });
   const pointer = useRef<number | null>(null);
-  const R = 52;
+  const R = 46;
 
   const move = (e: React.PointerEvent) => {
     const rect = base.current!.getBoundingClientRect();
     let dx = e.clientX - (rect.left + rect.width / 2);
-    if (Math.abs(dx) > R) dx = Math.sign(dx) * R;
-    setKnobX(dx);
+    let dy = e.clientY - (rect.top + rect.height / 2);
+    const len = Math.hypot(dx, dy);
+    if (len > R) {
+      dx = (dx / len) * R;
+      dy = (dy / len) * R;
+    }
+    setKnob({ x: dx, y: dy });
     input.look = dx / R;
+    // Screen up = look up (invert dy like the move stick)
+    input.lookY = -dy / R;
   };
   const end = () => {
     pointer.current = null;
-    setKnobX(0);
+    setKnob({ x: 0, y: 0 });
     input.look = 0;
+    input.lookY = 0;
   };
 
   return (
     <div
       ref={base}
       aria-label="Look"
-      className="edge-br absolute z-50 mb-12 mr-3 flex h-24 w-36 touch-none items-center justify-center rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
+      className="edge-br absolute z-50 mb-12 mr-3 size-32 touch-none rounded-full border-4 border-ink/40 bg-ink/25 backdrop-blur-sm"
       onPointerDown={(e) => {
         pointer.current = e.pointerId;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -87,8 +95,8 @@ export function LookPad() {
       onPointerCancel={end}
     >
       <div
-        className="size-12 rounded-full border-4 border-ink bg-sky-300 shadow-lg"
-        style={{ transform: `translateX(${knobX}px)` }}
+        className="absolute top-1/2 left-1/2 size-14 rounded-full border-4 border-ink bg-sky-300 shadow-lg"
+        style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }}
       />
     </div>
   );

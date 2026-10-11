@@ -7,7 +7,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { view } from "@/hub/controls";
+import { tickLookPitch, view } from "@/hub/controls";
 import type { Look } from "@/shared/three/look";
 import { Person, type Pose } from "@/shared/three/person";
 import { player as shared } from "@/world/player-bridge";
@@ -79,6 +79,8 @@ export function LrtPlayer({
 
     const cy = Math.cos(view.yaw);
     const sy = Math.sin(view.yaw);
+    tickLookPitch(dt);
+    const pitch = view.pitch;
 
     if (fare.riding) {
       const wantFov = fare.ridePhase === "seated" ? 72 : 58;
@@ -91,13 +93,13 @@ export function LrtPlayer({
       if (fare.ridePhase === "seated") {
         const yawOff = view.yaw - shuttle.rotY;
         const camLx = Math.sin(yawOff) * 0.35;
-        const camLz = fare.seatLocalZ - 3.4;
+        const camLz = fare.seatLocalZ - 3.4 + pitch * 0.4;
         const wCam = localToWorldCam(camLx, camLz, shuttle.rotY, shuttle.x, shuttle.z);
-        camera.position.set(wCam.x, DECK_Y + 2.15, wCam.z);
+        camera.position.set(wCam.x, DECK_Y + 2.15 - pitch * 0.55, wCam.z);
         const lookLx = fare.seatLocalX * 0.2 + Math.sin(yawOff) * 0.8;
         const lookLz = fare.seatLocalZ + 2.8 + Math.cos(yawOff) * 0.4;
         const lookW = localToWorldCam(lookLx, lookLz, shuttle.rotY, shuttle.x, shuttle.z);
-        camTarget.set(lookW.x, DECK_Y + 1.75, lookW.z);
+        camTarget.set(lookW.x, DECK_Y + 1.75 + pitch * 0.35, lookW.z);
         camera.lookAt(camTarget);
         camHeight.current = DECK_Y + 2.15;
       } else {
@@ -106,8 +108,8 @@ export function LrtPlayer({
         const clx = fare.rideLocalX + Math.sin(rel) * back * 0.15;
         const clz = fare.rideLocalZ + Math.cos(rel) * back;
         const wCam = localToWorldCam(clx, clz, shuttle.rotY, shuttle.x, shuttle.z);
-        camera.position.set(wCam.x, DECK_Y + 1.95, wCam.z);
-        camTarget.set(p.x, DECK_Y + 1.35, p.z);
+        camera.position.set(wCam.x, DECK_Y + 1.95 - pitch * 0.45, wCam.z);
+        camTarget.set(p.x, DECK_Y + 1.35 + pitch * 0.25, p.z);
         camera.lookAt(camTarget);
         camHeight.current = DECK_Y + 1.95;
       }
@@ -118,21 +120,24 @@ export function LrtPlayer({
         camera.updateProjectionMatrix();
       }
       const portrait = size.width < size.height;
-      let back = portrait ? 11 : 8.5;
-      let up = portrait ? 14 : 11;
+      const dist = portrait ? 16 : 13.5;
+      let orbit = (portrait ? 0.72 : 0.62) - pitch * 0.7;
+      orbit = Math.max(0.08, Math.min(1.15, orbit));
+      let back = Math.cos(orbit) * dist;
+      let up = Math.sin(orbit) * dist;
       const cover = coverTopAt(p.x, p.z);
       if (cover > 0) {
-        back = portrait ? 7 : 5.5;
+        back *= 0.65;
         up = Math.max(up, cover - floorY.current + 2.2);
       }
       const seatX = p.x + sy * back;
       const seatZ = p.z + cy * back;
       const seatCover = coverTopAt(seatX, seatZ);
       if (seatCover > floorY.current + up - 0.5) up = seatCover - floorY.current + 1.8;
-      camHeight.current += (floorY.current + up * (cover > 0 ? 1 : 0.85) - camHeight.current) * Math.min(1, dt * 6);
+      camHeight.current += (floorY.current + up - camHeight.current) * Math.min(1, dt * 6);
       camPos.set(seatX, camHeight.current, seatZ);
       camera.position.lerp(camPos, 1 - Math.exp(-dt * 6));
-      camTarget.set(p.x - sy * 1.2, floorY.current + 1.6, p.z - cy * 1.2);
+      camTarget.set(p.x, floorY.current + 1.45 + pitch * 0.25, p.z);
       camera.lookAt(camTarget);
     }
   });
@@ -145,6 +150,7 @@ export function LrtPlayer({
       rotY: rot.current,
       walking: moving.current,
       seated: seated.current,
+      lookPitch: view.pitch,
     }),
     [],
   );

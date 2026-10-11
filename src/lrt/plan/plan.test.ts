@@ -18,8 +18,8 @@ describe("lrt plan", () => {
   });
 
   it("has a usable guideway length that fits the city", () => {
-    expect(PATH_LENGTH).toBeGreaterThan(160);
-    expect(PATH_LENGTH).toBeLessThan(220);
+    expect(PATH_LENGTH).toBeGreaterThan(120);
+    expect(PATH_LENGTH).toBeLessThan(180);
   });
 
   it("path samples sit on TRACK_Z (same as stations / guideway — not city centre z=0)", () => {
@@ -36,12 +36,24 @@ describe("lrt plan", () => {
     expect(inRect(SPAWN.x, SPAWN.z, pusat.platform)).toBe(false);
   });
 
-  it("each station has street, canopy, and platform name boards", () => {
+  it("each station has one street fascia and two platform boards (no stacked canopy sign)", () => {
     for (const st of STATIONS) {
-      expect(st.nameBoards.some((b) => b.kind === "street")).toBe(true);
-      expect(st.nameBoards.some((b) => b.kind === "canopy")).toBe(true);
+      expect(st.nameBoards.filter((b) => b.kind === "street")).toHaveLength(1);
+      expect(st.nameBoards.filter((b) => b.kind === "canopy")).toHaveLength(0);
       expect(st.nameBoards.filter((b) => b.kind === "platform")).toHaveLength(2);
-      expect(st.serviceBoxes.length).toBeGreaterThanOrEqual(2);
+      expect(st.lift.maxX - st.lift.minX).toBeGreaterThan(2);
+      expect(st.serviceBoxes.length).toBeGreaterThanOrEqual(6);
+      // Lift stays in the street plaza — shaft clear of the station hall
+      expect(st.lift.minZ).toBeGreaterThan(st.platform.maxZ + 1.2);
+      expect(st.apron.maxZ).toBeLessThanOrEqual(st.lift.minZ + 0.01);
+      expect(st.apron.minZ).toBeLessThanOrEqual(st.platform.maxZ + 0.01);
+      // Fare walls seal the line — only gate aisles stay open
+      expect(st.fareBarriers.length).toBe(3);
+      for (const b of st.fareBarriers) {
+        expect(b.maxX - b.minX).toBeGreaterThan(0.4);
+        expect(inRect(st.entryGate.x, st.entryGate.z, b)).toBe(false);
+        expect(inRect(st.exitGate.x, st.exitGate.z, b)).toBe(false);
+      }
     }
   });
 
