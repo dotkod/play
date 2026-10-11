@@ -10,5 +10,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Kuala Lepak
 
-Read `docs/KUALA_LEPAK.md` before making changes. It covers the architecture, the
-engineering rules that keep the 3D city fast and stable (section 4), and the roadmap.
+Read `docs/CITY_V2.md` before changing the city, hub or Anne Maju's room: it explains how the
+city is generated from one plan and the rules that prevent overlaps, collision bugs and
+z-fighting. `docs/KUALA_LEPAK.md` covers the product vision and roadmap.

@@ -195,7 +195,7 @@ These were all learned the hard way. Breaking them causes crashes, leaks or jank
 14. Absolute timestamps vs offsets: "forever" must be `now + LARGE`, never a constant.
 15. Pausing shifts every stored timestamp by the paused duration (`shiftTimes` in `state.ts`).
 16. Leaderboard POSTs are range-checked server-side (`isPlausible`). Keep that for every new job.
-16a. **City plan (v2, since 0.11.0):** the city is generated from one grid in `src/city/plan`
+16a. **City plan (v2, since 0.11.0), full guide in `docs/CITY_V2.md`:** the city is generated from one grid in `src/city/plan`
     (`grid.ts` → roads, junctions, sidewalks, blocks; `lots.ts` → buildings; `props.ts` →
     lamps, trees, signals, markings; `lanes.ts` → traffic lanes; `colliders.ts` → collisions).
     Never place anything by hand in a scene: add it to the plan so rendering, collisions,

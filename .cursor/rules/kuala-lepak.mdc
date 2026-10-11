@@ -4,8 +4,13 @@ alwaysApply: true
 ---
 
 This repo is **Kuala Lepak**, a non-violent GTA-style Malaysian life game (Next.js 16 +
-React Three Fiber). Before writing code, read `docs/KUALA_LEPAK.md`, especially section 4
-"Engineering rules & gotchas". Key rules:
+React Three Fiber). Before touching the city, the hub or Anne Maju's room, read
+**`docs/CITY_V2.md`** (how the city is generated and the rules that stop overlaps and
+collision bugs). For product vision and roadmap see `docs/KUALA_LEPAK.md`. Key rules:
+
+- Never type a world coordinate into a component: everything placed comes from `src/city/plan`.
+- No coplanar faces (z-fighting) and no visibly intersecting merged parts; follow the y-layer table in `docs/CITY_V2.md`.
+- Vehicles only exist in `src/city/sim/traffic.ts`; keep its seeded tests green.
 
 - Never use drei `<Html>`; use the projected DOM overlay pattern.
 - Cache canvas textures at module level; never create textures per mount.
