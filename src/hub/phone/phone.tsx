@@ -23,32 +23,16 @@ const APP_ICON: Record<IconKind, { bg: string }> = {
 };
 
 /**
- * Which foldable to show: a book-style fold phone on small screens (landscape phones have
- * little height, and the open fold is wide), a clamshell flip phone on bigger screens.
+ * In-city handset: a small standard smartphone docks on the right so the city and
+ * character stay visible. No flip/fold — just a slab phone.
  */
-function useDeviceKind(): "fold" | "flip" {
-  const [kind, setKind] = useState<"fold" | "flip">("flip");
-  useEffect(() => {
-    const sync = () => setKind(Math.min(window.innerWidth, window.innerHeight) < 600 ? "fold" : "flip");
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
-  }, []);
-  return kind;
-}
-
-/** Closed for a beat (cover screen with the time), then unfolds. */
-const UNFOLD_MS = 420;
-
 export function Phone({ open, onClose }: { open: boolean; onClose: () => void }) {
   const lang = useLang();
   const tr = HUB_STRINGS[lang];
   const auth = useAuth();
   useProfile(); // re-render on inbox changes (unread badge)
-  const kind = useDeviceKind();
   const [app, setApp] = useState<AppId>("home");
   const [clock, setClock] = useState("9:41");
-  const [unfolded, setUnfolded] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -58,12 +42,7 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
     };
     tick();
     const id = setInterval(tick, 30_000);
-    const t = setTimeout(() => setUnfolded(true), UNFOLD_MS);
-    return () => {
-      clearInterval(id);
-      clearTimeout(t);
-      setUnfolded(false);
-    };
+    return () => clearInterval(id);
   }, [open]);
 
   if (!open) return null;
@@ -72,54 +51,35 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
     setApp("home");
     onClose();
   };
-  // On the fold the home screen stays on the left, so an app always shows on the right
-  const paneApp: AppId = kind === "fold" && app === "home" ? "mesej" : app;
   const subtitle = getAuth().username ? `@${getAuth().username}` : `${HUB.name} · v${HUB.version}`;
   const unread = unreadInboxCount();
 
-  const appView = (id: AppId) => (
-    <>
-      {id === "mesej" && <Mesej lang={lang} />}
-      {id === "profil" && <Profil lang={lang} auth={auth} />}
-      {id === "dompet" && <Dompet lang={lang} />}
-      {id === "tetapan" && <Tetapan lang={lang} auth={auth} />}
-    </>
-  );
-
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center px-3" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif" }}>
-      <button type="button" className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" aria-label={tr.close} onClick={dismiss} />
-      {!unfolded ? (
-        <CoverScreen kind={kind} clock={clock} unread={unread} />
-      ) : kind === "flip" ? (
-        <FlipShell>
+    <div
+      className="pointer-events-none absolute inset-0 z-40 flex items-center justify-end"
+      style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif" }}
+    >
+      {/* Tap empty city to put the phone away — no heavy modal dim */}
+      <button type="button" className="pointer-events-auto absolute inset-0 bg-transparent" aria-label={tr.close} onClick={dismiss} />
+      <div className="safe-pr pointer-events-auto relative z-10 flex h-full items-center py-3 pl-2">
+        <PhoneShell>
           <StatusBar clock={clock} dark={app !== "home"} />
           {app !== "home" && <NavBar title={titleOf(app, tr)} back={tr.phone} onBack={() => setApp("home")} />}
-          <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${app === "home" ? "px-5 pt-4" : ""}`}>
-            {app === "home" ? <HomeScreen tr={tr} unread={unread} onOpen={setApp} subtitle={subtitle} /> : appView(app)}
+          <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${app === "home" ? "px-3.5 pt-3" : ""}`}>
+            {app === "home" ? (
+              <HomeScreen tr={tr} unread={unread} onOpen={setApp} subtitle={subtitle} />
+            ) : (
+              <>
+                {app === "mesej" && <Mesej lang={lang} />}
+                {app === "profil" && <Profil lang={lang} auth={auth} />}
+                {app === "dompet" && <Dompet lang={lang} />}
+                {app === "tetapan" && <Tetapan lang={lang} auth={auth} />}
+              </>
+            )}
           </div>
           <HomeBar dark={app !== "home"} label={app === "home" ? tr.close : tr.phone} onClick={app === "home" ? dismiss : () => setApp("home")} />
-        </FlipShell>
-      ) : (
-        <FoldShell
-          left={
-            <>
-              <StatusBar clock={clock} dark={false} hole={false} />
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-2">
-                <HomeScreen tr={tr} unread={unread} onOpen={setApp} subtitle={subtitle} cols={3} />
-              </div>
-              <HomeBar dark={false} label={tr.close} onClick={dismiss} />
-            </>
-          }
-          right={
-            <>
-              <StatusBar clock="" dark />
-              <NavBar title={titleOf(paneApp, tr)} />
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{appView(paneApp)}</div>
-            </>
-          }
-        />
-      )}
+        </PhoneShell>
+      </div>
     </div>
   );
 }
@@ -130,80 +90,37 @@ function titleOf(app: AppId, tr: (typeof HUB_STRINGS)["ms"]) {
 
 const WALLPAPER = "bg-[radial-gradient(130%_90%_at_10%_-10%,#ff8a5c_0%,#e14bff_38%,#4b6dff_72%,#0b1224_100%)]";
 
-/** Outer screen of the closed phone: time, date and unread count, shown while it unfolds. */
-function CoverScreen({ kind, clock, unread }: { kind: "fold" | "flip"; clock: string; unread: number }) {
-  const flip = kind === "flip";
+/** Standard slab smartphone — right dock, ~9∶19.5, smaller than the old foldable. */
+function PhoneShell({ children }: { children: ReactNode }) {
   return (
     <div
-      className="phone-cover relative z-10 shrink-0 rounded-[18%] bg-[#151518] p-[4%] shadow-[0_28px_90px_rgba(0,0,0,0.6)] ring-1 ring-white/15"
-      style={flip ? { width: "min(300px, 70vw)", aspectRatio: "1 / 1.02" } : { height: "min(560px, calc(100dvh - 24px))", aspectRatio: "9 / 21", borderRadius: "14%" }}
-    >
-      {/* Camera bump */}
-      <div className="absolute top-[7%] left-[8%] flex gap-[6%]" style={{ width: flip ? "34%" : "60%" }}>
-        <span className="aspect-square w-1/2 rounded-full bg-black ring-4 ring-[#2a2a30]" />
-        <span className="aspect-square w-1/2 rounded-full bg-black ring-4 ring-[#2a2a30]" />
-      </div>
-      <div className={`flex h-full flex-col items-center justify-center rounded-[14%] text-white ${flip ? "mt-[10%] h-[72%] bg-black/60" : "bg-black/40"}`}>
-        <p className="text-[clamp(28px,8vh,52px)] font-semibold tabular-nums">{clock}</p>
-        {unread > 0 && <p className="mt-1 rounded-full bg-[#007aff] px-3 py-0.5 text-[13px] font-semibold">💬 {unread}</p>}
-      </div>
-    </div>
-  );
-}
-
-/** Clamshell: tall 22∶9 screen with a hinge crease across the middle. */
-function FlipShell({ children }: { children: ReactNode }) {
-  return (
-    <div
-      className="phone-flip-open relative z-10 shrink-0"
+      className="phone-rise relative shrink-0"
       style={{
-        width: "min(380px, calc(100vw - 24px), calc((100dvh - 24px) * 9 / 21))",
-        height: "min(887px, calc(100dvh - 24px), calc((100vw - 24px) * 21 / 9))",
+        width: "min(260px, 36vw, calc((100dvh - 32px) * 9 / 19.5))",
+        height: "min(560px, calc(100dvh - 32px), calc(36vw * 19.5 / 9))",
       }}
     >
-      <div className="relative box-border h-full w-full rounded-[11%/5%] bg-[#1c1c20] p-[2.6%] shadow-[0_28px_90px_rgba(0,0,0,0.6)] ring-1 ring-white/20">
-        {/* Hinge knuckles on both edges */}
-        <span className="pointer-events-none absolute top-[48.5%] -left-[1.2%] h-[3%] w-[1.6%] rounded-l bg-[#3a3a40]" />
-        <span className="pointer-events-none absolute top-[48.5%] -right-[1.2%] h-[3%] w-[1.6%] rounded-r bg-[#3a3a40]" />
-        <div className={`relative flex h-full min-h-0 flex-col overflow-hidden rounded-[9%/4%] bg-[#f2f2f7]`}>
+      <div className="relative box-border h-full w-full rounded-[2rem] bg-[#1a1a1e] p-[7px] shadow-[0_18px_50px_rgba(0,0,0,0.45)] ring-1 ring-white/20">
+        {/* Side buttons */}
+        <span className="pointer-events-none absolute top-[18%] -left-[3px] h-[8%] w-[3px] rounded-l bg-[#2e2e34]" />
+        <span className="pointer-events-none absolute top-[28%] -left-[3px] h-[12%] w-[3px] rounded-l bg-[#2e2e34]" />
+        <span className="pointer-events-none absolute top-[24%] -right-[3px] h-[14%] w-[3px] rounded-r bg-[#2e2e34]" />
+        <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.55rem] bg-[#f2f2f7]">
           <div className={`absolute inset-0 ${WALLPAPER}`} />
           <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
-          {/* Crease where the screen folds */}
-          <span className="pointer-events-none absolute inset-x-0 top-1/2 h-[10px] -translate-y-1/2 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.12)_45%,rgba(255,255,255,0.18)_55%,transparent)]" />
         </div>
       </div>
     </div>
   );
 }
 
-/** Book-style fold: wide inner screen split in two panes, crease down the middle. */
-function FoldShell({ left, right }: { left: ReactNode; right: ReactNode }) {
+function StatusBar({ clock, dark }: { clock: string; dark: boolean }) {
   return (
-    <div
-      className="phone-fold-open relative z-10 shrink-0"
-      style={{
-        height: "min(620px, calc(100dvh - 20px), calc((100vw - 24px) / 1.2))",
-        width: "min(744px, calc(100vw - 24px), calc((100dvh - 20px) * 1.2))",
-      }}
-    >
-      <div className="relative box-border h-full w-full rounded-[5%/6%] bg-[#1c1c20] p-[1.4%] shadow-[0_28px_90px_rgba(0,0,0,0.6)] ring-1 ring-white/20">
-        <div className="relative flex h-full overflow-hidden rounded-[4%/5%]">
-          <div className={`relative flex min-h-0 w-1/2 flex-col ${WALLPAPER}`}>{left}</div>
-          <div className="relative flex min-h-0 w-1/2 flex-col bg-[#f2f2f7]">{right}</div>
-          <span className="pointer-events-none absolute inset-y-0 left-1/2 w-[12px] -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(0,0,0,0.14)_45%,rgba(255,255,255,0.2)_55%,transparent)]" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusBar({ clock, dark, hole = true }: { clock: string; dark: boolean; hole?: boolean }) {
-  return (
-    <div className={`relative z-30 flex shrink-0 items-end justify-between px-6 pt-3 pb-1 text-[14px] font-semibold tracking-tight ${dark ? "text-black" : "text-white"}`}>
-      <span className="min-w-[54px] tabular-nums">{clock}</span>
+    <div className={`relative z-30 flex shrink-0 items-end justify-between px-4 pt-2.5 pb-0.5 text-[12px] font-semibold tracking-tight ${dark ? "text-black" : "text-white"}`}>
+      <span className="min-w-[44px] tabular-nums">{clock}</span>
       {/* Punch-hole camera */}
-      {hole && <span className="absolute top-3 left-1/2 size-[14px] -translate-x-1/2 rounded-full bg-black shadow-[inset_0_0_0_2px_rgba(255,255,255,0.08)]" />}
-      <div className="flex min-w-[54px] items-center justify-end gap-1.5 text-[11px]">
+      <span className="absolute top-2.5 left-1/2 size-[11px] -translate-x-1/2 rounded-full bg-black shadow-[inset_0_0_0_2px_rgba(255,255,255,0.08)]" />
+      <div className="flex min-w-[44px] items-center justify-end gap-1 text-[10px]">
         <SignalBars dark={dark} />
         <span className="opacity-90">5G</span>
         <Battery dark={dark} />
@@ -242,22 +159,19 @@ function HomeScreen({
   unread,
   onOpen,
   subtitle,
-  cols = 4,
 }: {
   tr: (typeof HUB_STRINGS)["ms"];
   unread: number;
   onOpen: (id: AppId) => void;
   subtitle: string;
-  /** Fewer columns on the fold's narrow home pane. */
-  cols?: 3 | 4;
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="mb-6 text-center">
-        <p className="text-[13px] font-medium tracking-wide text-white/75 drop-shadow-sm">{subtitle}</p>
+      <div className="mb-4 text-center">
+        <p className="text-[11px] font-medium tracking-wide text-white/75 drop-shadow-sm">{subtitle}</p>
       </div>
 
-      <div className={`grid ${cols === 3 ? "grid-cols-3" : "grid-cols-4"} gap-x-1 gap-y-5 px-0.5 sm:gap-x-2 sm:gap-y-6 sm:px-1`}>
+      <div className="grid grid-cols-4 gap-x-1 gap-y-4 px-0.5">
         <IosIcon kind="mesej" label={tr.appMesej} badge={unread} onClick={() => onOpen("mesej")} />
         <IosIcon kind="profil" label={tr.appProfil} onClick={() => onOpen("profil")} />
         <IosIcon kind="dompet" label={tr.appDompet} onClick={() => onOpen("dompet")} />
@@ -265,8 +179,8 @@ function HomeScreen({
         <IosIcon kind="kerja" label={tr.appKerja} soon />
       </div>
 
-      <div className="mt-auto mb-1 rounded-[28px] border border-white/25 bg-white/20 p-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.18)] backdrop-blur-2xl sm:rounded-[32px] sm:p-3.5">
-        <div className="grid grid-cols-4 place-items-center gap-1">
+      <div className="mt-auto mb-0.5 rounded-[22px] border border-white/25 bg-white/20 p-2 shadow-[0_8px_24px_rgba(0,0,0,0.18)] backdrop-blur-2xl">
+        <div className="grid grid-cols-4 place-items-center gap-0.5">
           <DockIcon kind="mesej" onClick={() => onOpen("mesej")} badge={unread} />
           <DockIcon kind="profil" onClick={() => onOpen("profil")} />
           <DockIcon kind="dompet" onClick={() => onOpen("dompet")} />
@@ -308,7 +222,7 @@ function IosIcon({
       className="relative flex w-full flex-col items-center gap-1.5 disabled:opacity-45 active:scale-95"
     >
       {/* Square tile — % of column so it never squashes when the shell scales */}
-      <span className="relative aspect-square w-[min(62px,100%)]">
+      <span className="relative aspect-square w-[min(48px,100%)]">
         <span
           className="absolute inset-0 grid place-items-center overflow-hidden rounded-[22%] shadow-[0_10px_24px_rgba(0,0,0,0.28)] ring-1 ring-white/25"
           style={{ background: APP_ICON[kind].bg }}
@@ -322,19 +236,19 @@ function IosIcon({
           </span>
         )}
       </span>
-      <span className="w-full truncate text-center text-[11px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{label}</span>
+      <span className="w-full truncate text-center text-[10px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">{label}</span>
     </button>
   );
 }
 
 function DockIcon({ kind, onClick, badge }: { kind: IconKind; onClick: () => void; badge?: number }) {
   return (
-    <button type="button" onClick={onClick} className="relative aspect-square w-[min(54px,100%)] active:scale-95">
+    <button type="button" onClick={onClick} className="relative aspect-square w-[min(42px,100%)] active:scale-95">
       <span
         className="absolute inset-0 grid place-items-center overflow-hidden rounded-[22%] shadow-[0_4px_12px_rgba(0,0,0,0.2)] ring-1 ring-white/30"
         style={{ background: APP_ICON[kind].bg }}
       >
-        <AppGlyph kind={kind} size={28} />
+        <AppGlyph kind={kind} size={22} />
       </span>
       <Badge n={badge ?? 0} />
     </button>

@@ -5,6 +5,9 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.16.2
+- Phone: standard handset on the right (no flip/fold), city stays visible behind it
+
 ### 0.16.1
 - Anne Maju door card: on phones it docks as a bottom sheet above the joystick so you can walk out; look pad stays free for a full camera orbit (Q/R on keyboard)
 
