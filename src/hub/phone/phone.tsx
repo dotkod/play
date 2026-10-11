@@ -62,10 +62,14 @@ export function Phone({ open, onClose }: { open: boolean; onClose: () => void })
       {/* Tap empty city to put the phone away — no heavy modal dim */}
       <button type="button" className="pointer-events-auto absolute inset-0 bg-transparent" aria-label={tr.close} onClick={dismiss} />
       <div className="safe-pr pointer-events-auto relative z-10 flex h-full items-center py-3 pl-2">
-        <PhoneShell>
+        <PhoneShell wallpaper={app === "home"}>
           <StatusBar clock={clock} dark={app !== "home"} />
           {app !== "home" && <NavBar title={titleOf(app, tr)} back={tr.phone} onBack={() => setApp("home")} />}
-          <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${app === "home" ? "px-3.5 pt-3" : ""}`}>
+          <div
+            className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${
+              app === "home" ? "px-3.5 pt-3" : "bg-[#f2f2f7]"
+            }`}
+          >
             {app === "home" ? (
               <HomeScreen tr={tr} unread={unread} onOpen={setApp} subtitle={subtitle} />
             ) : (
@@ -91,7 +95,7 @@ function titleOf(app: AppId, tr: (typeof HUB_STRINGS)["ms"]) {
 const WALLPAPER = "bg-[radial-gradient(130%_90%_at_10%_-10%,#ff8a5c_0%,#e14bff_38%,#4b6dff_72%,#0b1224_100%)]";
 
 /** Standard slab smartphone — right dock, ~9∶19.5, smaller than the old foldable. */
-function PhoneShell({ children }: { children: ReactNode }) {
+function PhoneShell({ children, wallpaper }: { children: ReactNode; wallpaper: boolean }) {
   return (
     <div
       className="phone-rise relative shrink-0"
@@ -106,7 +110,7 @@ function PhoneShell({ children }: { children: ReactNode }) {
         <span className="pointer-events-none absolute top-[28%] -left-[3px] h-[12%] w-[3px] rounded-l bg-[#2e2e34]" />
         <span className="pointer-events-none absolute top-[24%] -right-[3px] h-[14%] w-[3px] rounded-r bg-[#2e2e34]" />
         <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[1.55rem] bg-[#f2f2f7]">
-          <div className={`absolute inset-0 ${WALLPAPER}`} />
+          {wallpaper && <div className={`absolute inset-0 ${WALLPAPER}`} />}
           <div className="relative flex min-h-0 flex-1 flex-col">{children}</div>
         </div>
       </div>
@@ -116,7 +120,11 @@ function PhoneShell({ children }: { children: ReactNode }) {
 
 function StatusBar({ clock, dark }: { clock: string; dark: boolean }) {
   return (
-    <div className={`relative z-30 flex shrink-0 items-end justify-between px-4 pt-2.5 pb-0.5 text-[12px] font-semibold tracking-tight ${dark ? "text-black" : "text-white"}`}>
+    <div
+      className={`relative z-30 flex shrink-0 items-end justify-between px-4 pt-2.5 pb-0.5 text-[12px] font-semibold tracking-tight ${
+        dark ? "bg-[#f2f2f7] text-black" : "text-white"
+      }`}
+    >
       <span className="min-w-[44px] tabular-nums">{clock}</span>
       {/* Punch-hole camera */}
       <span className="absolute top-2.5 left-1/2 size-[11px] -translate-x-1/2 rounded-full bg-black shadow-[inset_0_0_0_2px_rgba(255,255,255,0.08)]" />
@@ -131,25 +139,30 @@ function StatusBar({ clock, dark }: { clock: string; dark: boolean }) {
 
 function NavBar({ title, back, onBack }: { title: string; back?: string; onBack?: () => void }) {
   return (
-    <div className="relative z-30 flex shrink-0 items-center border-b border-black/6 bg-[#f2f2f7]/92 px-1 pt-0.5 pb-2 backdrop-blur-xl">
+    <div className="relative z-30 flex shrink-0 items-center border-b border-black/6 bg-[#f2f2f7]/92 px-0.5 pt-0.5 pb-1 backdrop-blur-xl">
       {onBack ? (
-        <button type="button" onClick={onBack} className="relative z-10 flex min-h-11 min-w-[88px] items-center gap-0.5 rounded-xl px-2.5 py-2 text-[17px] font-normal text-[#007aff] active:opacity-60">
+        <button type="button" onClick={onBack} className="relative z-10 flex min-h-8 min-w-[64px] items-center gap-0.5 rounded-lg px-1.5 py-1 text-[13px] font-normal text-[#007aff] active:opacity-60">
           <ChevronLeft />
           <span>{back}</span>
         </button>
       ) : (
-        <span className="min-h-11 min-w-[88px]" />
+        <span className="min-h-8 min-w-[64px]" />
       )}
-      <p className="pointer-events-none absolute inset-x-0 text-center text-[17px] font-semibold text-black">{title}</p>
-      <span className="min-w-[88px]" aria-hidden />
+      <p className="pointer-events-none absolute inset-x-0 text-center text-[13px] font-semibold text-black">{title}</p>
+      <span className="min-w-[64px]" aria-hidden />
     </div>
   );
 }
 
 function HomeBar({ dark, label, onClick }: { dark: boolean; label: string; onClick: () => void }) {
   return (
-    <button type="button" aria-label={label} onClick={onClick} className="relative z-30 flex shrink-0 justify-center bg-transparent pt-1.5 pb-2.5">
-      <span className={`h-[5px] w-[134px] max-w-[45%] rounded-full ${dark ? "bg-black/30" : "bg-white/60"}`} />
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className={`relative z-30 flex shrink-0 justify-center pt-1 pb-1.5 ${dark ? "bg-[#f2f2f7]" : "bg-transparent"}`}
+    >
+      <span className={`h-[4px] w-[100px] max-w-[40%] rounded-full ${dark ? "bg-black/30" : "bg-white/60"}`} />
     </button>
   );
 }
@@ -195,7 +208,7 @@ function Badge({ n }: { n: number }) {
   if (n <= 0) return null;
   const label = n > 99 ? "99+" : String(n);
   return (
-    <span className="pointer-events-none absolute -top-1.5 -right-1.5 z-10 grid min-h-[20px] min-w-[20px] place-items-center rounded-full bg-[#ff3b30] px-1.5 text-[11px] leading-none font-bold text-white shadow-[0_2px_6px_rgba(0,0,0,0.35)] ring-2 ring-white/90">
+    <span className="pointer-events-none absolute -top-1 -right-1 z-10 grid min-h-[16px] min-w-[16px] place-items-center rounded-full bg-[#ff3b30] px-1 text-[9px] leading-none font-bold text-white shadow-[0_2px_4px_rgba(0,0,0,0.35)] ring-2 ring-white/90">
       {label}
     </span>
   );
@@ -256,7 +269,7 @@ function DockIcon({ kind, onClick, badge }: { kind: IconKind; onClick: () => voi
 }
 
 /** Flat white glyphs, Apple-home-screen style (no emoji). */
-function AppGlyph({ kind, size = 32 }: { kind: IconKind; size?: number }) {
+function AppGlyph({ kind, size = 24 }: { kind: IconKind; size?: number }) {
   const s = size;
   if (kind === "mesej") {
     return (
@@ -336,44 +349,42 @@ function Mesej({ lang }: { lang: "ms" | "en" }) {
   const tr = HUB_STRINGS[lang];
   if (!p.inbox.length) {
     return (
-      <div className="flex flex-col items-center px-8 py-16 text-center">
-        <span className="mb-3 grid size-16 place-items-center rounded-[18px] bg-gradient-to-br from-[#64d2ff] to-[#0a84ff] shadow-lg">
-          <AppGlyph kind="mesej" size={36} />
+      <div className="flex min-h-full flex-col items-center justify-center px-4 py-10 text-center">
+        <span className="mb-2 grid size-11 place-items-center rounded-[12px] bg-gradient-to-br from-[#64d2ff] to-[#0a84ff] shadow-md">
+          <AppGlyph kind="mesej" size={24} />
         </span>
-        <p className="text-[17px] font-semibold text-black">{tr.appMesej}</p>
-        <p className="mt-1 text-[15px] text-[#8e8e93]">{tr.inboxEmpty}</p>
+        <p className="text-[14px] font-semibold text-black">{tr.appMesej}</p>
+        <p className="mt-0.5 text-[12px] text-[#8e8e93]">{tr.inboxEmpty}</p>
       </div>
     );
   }
   return (
-    <div className="bg-[#f2f2f7] pb-4">
-      <p className="px-5 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appMesej}</p>
-      <div className="mx-3 overflow-hidden rounded-[14px] bg-white shadow-sm">
+    <div className="min-h-full bg-[#f2f2f7] pb-3">
+      <p className="px-3 pt-0.5 pb-2 text-[22px] leading-none font-bold tracking-tight text-black">{tr.appMesej}</p>
+      <div className="mx-2 overflow-hidden rounded-[12px] bg-white shadow-sm">
         {p.inbox.map((m, i) => {
           const who = m.from === "kak-yati" ? "Kak Yati" : m.from.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
           const initial = who.slice(0, 1).toUpperCase();
           return (
-            <div key={m.id} className={`flex gap-3 px-3.5 py-3.5 ${i > 0 ? "border-t border-black/5" : ""}`}>
-              <div className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#64d2ff] to-[#0a84ff] text-[17px] font-semibold text-white shadow-sm">
+            <div key={m.id} className={`flex gap-2 px-2.5 py-2.5 ${i > 0 ? "border-t border-black/5" : ""}`}>
+              <div className="grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#64d2ff] to-[#0a84ff] text-[12px] font-semibold text-white shadow-sm">
                 {initial}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className={`truncate text-[16px] ${m.read ? "font-semibold text-black" : "font-bold text-black"}`}>{who}</p>
-                  {!m.read && <span className="size-2.5 shrink-0 rounded-full bg-[#007aff]" />}
+                <div className="flex items-baseline justify-between gap-1.5">
+                  <p className={`truncate text-[13px] ${m.read ? "font-semibold text-black" : "font-bold text-black"}`}>{who}</p>
+                  {!m.read && <span className="size-1.5 shrink-0 rounded-full bg-[#007aff]" />}
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-[14px] leading-snug text-[#8e8e93]">{lang === "ms" ? m.bodyMs : m.bodyEn}</p>
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                  {!m.read && (
-                    <button
-                      type="button"
-                      className="rounded-full bg-[#e5e5ea] px-3.5 py-1.5 text-[13px] font-semibold text-[#007aff] active:opacity-70"
-                      onClick={() => markInboxRead(m.id)}
-                    >
-                      {tr.markRead}
-                    </button>
-                  )}
-                </div>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#8e8e93]">{lang === "ms" ? m.bodyMs : m.bodyEn}</p>
+                {!m.read && (
+                  <button
+                    type="button"
+                    className="mt-1.5 rounded-full bg-[#e5e5ea] px-2.5 py-1 text-[11px] font-semibold text-[#007aff] active:opacity-70"
+                    onClick={() => markInboxRead(m.id)}
+                  >
+                    {tr.markRead}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -391,33 +402,29 @@ function Profil({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof use
   const handle = auth.username ? `@${auth.username}` : "—";
 
   return (
-    <div className="bg-[#f2f2f7] px-3 pb-4">
-      <p className="px-2 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appProfil}</p>
+    <div className="flex min-h-full flex-col bg-[#f2f2f7] px-2 pb-3">
+      <p className="px-1.5 pt-0.5 pb-2 text-[22px] leading-none font-bold tracking-tight text-black">{tr.appProfil}</p>
 
-      <div className="mb-4 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#1c1c1e] via-[#2c2c2e] to-[#ee5a24] p-5 text-white shadow-lg">
-        <p className="text-[15px] font-semibold tracking-tight">{handle}</p>
-        <p className="mt-4 text-[40px] leading-none font-semibold tracking-tight tabular-nums">{tr.level(p.level)}</p>
-        <div className="mt-4">
-          <div className="mb-1.5 flex items-center justify-between text-[12px] text-white/65">
+      <div className="mb-3 overflow-hidden rounded-[14px] bg-gradient-to-br from-[#1c1c1e] via-[#2c2c2e] to-[#ee5a24] p-3.5 text-white shadow-md">
+        <p className="text-[12px] font-semibold tracking-tight">{handle}</p>
+        <p className="mt-2.5 text-[26px] leading-none font-semibold tracking-tight tabular-nums">{tr.level(p.level)}</p>
+        <div className="mt-2.5">
+          <div className="mb-1 flex items-center justify-between text-[10px] text-white/65">
             <span>{tr.profilXp}</span>
             <span className="tabular-nums">
               {into}/{XP_PER_LEVEL}
             </span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/15">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
             <div className="h-full rounded-full bg-amber-300" style={{ width: `${pct}%` }} />
           </div>
         </div>
       </div>
 
-      <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">{tr.profilLevel}</p>
-      <div className="mb-5 overflow-hidden rounded-[14px] bg-white shadow-sm">
-        <SettingsRow label={tr.wallet} trailing={<span className="text-[15px] font-semibold tabular-nums text-black">{rm(p.wallet)}</span>} />
-        <SettingsRow
-          label="XP"
-          border
-          trailing={<span className="text-[15px] font-semibold tabular-nums text-black">{p.xp}</span>}
-        />
+      <p className="mb-1 px-2.5 text-[10px] tracking-wide text-[#8e8e93] uppercase">{tr.profilLevel}</p>
+      <div className="overflow-hidden rounded-[12px] bg-white shadow-sm">
+        <SettingsRow label={tr.wallet} trailing={<span className="text-[13px] font-semibold tabular-nums text-black">{rm(p.wallet)}</span>} />
+        <SettingsRow label="XP" border trailing={<span className="text-[13px] font-semibold tabular-nums text-black">{p.xp}</span>} />
       </div>
     </div>
   );
@@ -427,22 +434,22 @@ function Dompet({ lang }: { lang: "ms" | "en" }) {
   const p = useProfile();
   const tr = HUB_STRINGS[lang];
   return (
-    <div className="bg-[#f2f2f7] px-3 pb-4">
-      <p className="px-2 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appDompet}</p>
+    <div className="flex min-h-full flex-col bg-[#f2f2f7] px-2 pb-3">
+      <p className="px-1.5 pt-0.5 pb-2 text-[22px] leading-none font-bold tracking-tight text-black">{tr.appDompet}</p>
 
-      <div className="mb-4 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#1c1c1e] via-[#2c2c2e] to-[#0a84ff] p-5 text-white shadow-lg">
-        <p className="text-[13px] font-medium tracking-[0.08em] text-white/70 uppercase">{tr.wallet}</p>
-        <p className="mt-3 text-[40px] leading-none font-semibold tracking-tight tabular-nums">{rm(p.wallet)}</p>
-        <p className="mt-4 text-[12px] text-white/55">Kuala Lepak · Touch n Lepak</p>
+      <div className="mb-3 overflow-hidden rounded-[14px] bg-gradient-to-br from-[#1c1c1e] via-[#2c2c2e] to-[#0a84ff] p-3.5 text-white shadow-md">
+        <p className="text-[10px] font-medium tracking-[0.08em] text-white/70 uppercase">{tr.wallet}</p>
+        <p className="mt-2 text-[26px] leading-none font-semibold tracking-tight tabular-nums">{rm(p.wallet)}</p>
+        <p className="mt-2.5 text-[10px] text-white/55">Kuala Lepak · Touch n Lepak</p>
       </div>
 
-      <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">Activity</p>
-      <div className="overflow-hidden rounded-[14px] bg-white shadow-sm">
-        {p.ledger.length === 0 && <p className="px-4 py-5 text-[15px] text-[#8e8e93]">{tr.noLedger}</p>}
+      <p className="mb-1 px-2.5 text-[10px] tracking-wide text-[#8e8e93] uppercase">Activity</p>
+      <div className="overflow-hidden rounded-[12px] bg-white shadow-sm">
+        {p.ledger.length === 0 && <p className="px-3 py-4 text-[12px] text-[#8e8e93]">{tr.noLedger}</p>}
         {p.ledger.map((e, i) => (
-          <div key={e.id} className={`flex items-center justify-between gap-3 px-4 py-3.5 ${i > 0 ? "border-t border-black/5" : ""}`}>
-            <p className="text-[15px] font-medium text-black">{lang === "ms" ? e.labelMs : e.labelEn}</p>
-            <p className={`text-[15px] font-semibold tabular-nums ${e.amount >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"}`}>
+          <div key={e.id} className={`flex items-center justify-between gap-2 px-3 py-2.5 ${i > 0 ? "border-t border-black/5" : ""}`}>
+            <p className="min-w-0 truncate text-[12px] font-medium text-black">{lang === "ms" ? e.labelMs : e.labelEn}</p>
+            <p className={`shrink-0 text-[12px] font-semibold tabular-nums ${e.amount >= 0 ? "text-[#34c759]" : "text-[#ff3b30]"}`}>
               {e.amount >= 0 ? "+" : ""}
               {rm(e.amount)}
             </p>
@@ -476,21 +483,21 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
   };
 
   return (
-    <div className="bg-[#f2f2f7] px-3 pb-6">
-      <p className="px-2 pt-1 pb-3 text-[34px] leading-none font-bold tracking-tight text-black">{tr.appTetapan}</p>
+    <div className="flex min-h-full flex-col bg-[#f2f2f7] px-2 pb-4">
+      <p className="px-1.5 pt-0.5 pb-2 text-[22px] leading-none font-bold tracking-tight text-black">{tr.appTetapan}</p>
 
-      <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">General</p>
-      <div className="mb-5 overflow-hidden rounded-[14px] bg-white shadow-sm">
+      <p className="mb-1 px-2.5 text-[10px] tracking-wide text-[#8e8e93] uppercase">General</p>
+      <div className="mb-3 overflow-hidden rounded-[12px] bg-white shadow-sm">
         <SettingsRow
           label="Language / Bahasa"
           trailing={
-            <div className="flex overflow-hidden rounded-full bg-[#e5e5ea] p-0.5 text-[12px] font-semibold">
+            <div className="flex overflow-hidden rounded-full bg-[#e5e5ea] p-0.5 text-[10px] font-semibold">
               {(["ms", "en"] as const).map((l) => (
                 <button
                   key={l}
                   type="button"
                   onClick={() => setLang(l)}
-                  className={`rounded-full px-2.5 py-1 ${lang === l ? "bg-white text-black shadow-sm" : "text-[#8e8e93]"}`}
+                  className={`rounded-full px-2 py-0.5 ${lang === l ? "bg-white text-black shadow-sm" : "text-[#8e8e93]"}`}
                 >
                   {l === "ms" ? "BM" : "EN"}
                 </button>
@@ -505,36 +512,36 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
             <button
               type="button"
               onClick={() => setMuted(!muted)}
-              className={`relative h-[31px] w-[51px] rounded-full transition ${muted ? "bg-[#e5e5ea]" : "bg-[#34c759]"}`}
+              className={`relative h-[24px] w-[40px] rounded-full transition ${muted ? "bg-[#e5e5ea]" : "bg-[#34c759]"}`}
             >
-              <span className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition ${muted ? "left-[2px]" : "left-[22px]"}`} />
+              <span className={`absolute top-[2px] size-[20px] rounded-full bg-white shadow transition ${muted ? "left-[2px]" : "left-[18px]"}`} />
             </button>
           }
         />
       </div>
 
-      <p className="mb-1.5 px-4 text-[13px] tracking-wide text-[#8e8e93] uppercase">{tr.cloudAccount}</p>
-      <div className="mb-5 overflow-hidden rounded-[14px] bg-white shadow-sm">
+      <p className="mb-1 px-2.5 text-[10px] tracking-wide text-[#8e8e93] uppercase">{tr.cloudAccount}</p>
+      <div className="mb-3 overflow-hidden rounded-[12px] bg-white shadow-sm">
         {auth.username ? (
           <>
-            <SettingsRow label="Signed in" trailing={<span className="text-[15px] text-[#8e8e93]">@{auth.username}</span>} />
+            <SettingsRow label="Signed in" trailing={<span className="max-w-[7rem] truncate text-[12px] text-[#8e8e93]">@{auth.username}</span>} />
             <button
               type="button"
-              className="w-full border-t border-black/5 px-4 py-3.5 text-left text-[17px] text-[#ff3b30] active:bg-black/5"
+              className="w-full border-t border-black/5 px-3 py-2.5 text-left text-[13px] text-[#ff3b30] active:bg-black/5"
               onClick={() => void logoutAccount()}
             >
               {tr.logout}
             </button>
           </>
         ) : (
-          <div className="space-y-3 p-4">
-            <div className="flex gap-2">
+          <div className="space-y-2 p-3">
+            <div className="flex gap-1.5">
               {(["register", "login"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
-                  className={`rounded-full px-3 py-1.5 text-[13px] font-semibold ${mode === m ? "bg-[#007aff] text-white" : "bg-[#e5e5ea] text-black"}`}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${mode === m ? "bg-[#007aff] text-white" : "bg-[#e5e5ea] text-black"}`}
                 >
                   {m === "register" ? tr.register : tr.login}
                 </button>
@@ -544,7 +551,7 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="username"
-              className="w-full rounded-[10px] bg-[#e5e5ea] px-3 py-2.5 text-[16px] text-black outline-none placeholder:text-[#8e8e93]"
+              className="w-full rounded-[8px] bg-[#e5e5ea] px-2.5 py-2 text-[13px] text-black outline-none placeholder:text-[#8e8e93]"
               autoComplete="username"
             />
             <input
@@ -552,24 +559,24 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
               onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="PIN · 6 digits"
               inputMode="numeric"
-              className="w-full rounded-[10px] bg-[#e5e5ea] px-3 py-2.5 text-[16px] text-black outline-none placeholder:text-[#8e8e93]"
+              className="w-full rounded-[8px] bg-[#e5e5ea] px-2.5 py-2 text-[13px] text-black outline-none placeholder:text-[#8e8e93]"
               autoComplete="current-password"
             />
-            {err && <p className="text-[13px] text-[#ff3b30]">{err}</p>}
+            {err && <p className="text-[11px] text-[#ff3b30]">{err}</p>}
             <button
               type="button"
               disabled={busy}
               onClick={() => void submit()}
-              className="w-full rounded-[12px] bg-[#007aff] py-3 text-[17px] font-semibold text-white disabled:opacity-50"
+              className="w-full rounded-[10px] bg-[#007aff] py-2 text-[13px] font-semibold text-white disabled:opacity-50"
             >
               {mode === "register" ? tr.register : tr.login}
             </button>
-            <p className="text-[12px] leading-snug text-[#8e8e93]">{tr.authHint}</p>
+            <p className="text-[10px] leading-snug text-[#8e8e93]">{tr.authHint}</p>
           </div>
         )}
       </div>
 
-      <p className="px-2 text-center text-[12px] text-[#8e8e93]">
+      <p className="mt-auto px-1.5 pt-2 text-center text-[10px] text-[#8e8e93]">
         {HUB.name} v{HUB.version}
         <br />
         {tr.madeIn}
@@ -580,8 +587,8 @@ function Tetapan({ lang, auth }: { lang: "ms" | "en"; auth: ReturnType<typeof us
 
 function SettingsRow({ label, trailing, border }: { label: string; trailing?: ReactNode; border?: boolean }) {
   return (
-    <div className={`flex items-center justify-between gap-3 px-4 py-3.5 ${border ? "border-t border-black/5" : ""}`}>
-      <p className="text-[17px] text-black">{label}</p>
+    <div className={`flex items-center justify-between gap-2 px-3 py-2.5 ${border ? "border-t border-black/5" : ""}`}>
+      <p className="min-w-0 truncate text-[13px] text-black">{label}</p>
       {trailing}
     </div>
   );
@@ -589,7 +596,7 @@ function SettingsRow({ label, trailing, border }: { label: string; trailing?: Re
 
 function ChevronLeft() {
   return (
-    <svg width="12" height="20" viewBox="0 0 12 20" fill="none" aria-hidden className="mr-0.5 shrink-0">
+    <svg width="9" height="14" viewBox="0 0 12 20" fill="none" aria-hidden className="mr-0.5 shrink-0">
       <path d="M10 2L2 10l8 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

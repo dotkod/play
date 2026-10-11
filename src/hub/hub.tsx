@@ -24,7 +24,7 @@ import { LandscapeGate } from "@/shared/landscape-gate";
 import { PHONE_DRAW_MS, player as playerShared, requestTeleport } from "@/world/player-bridge";
 import { AuthGate, AuthSplash } from "./auth-gate";
 import { CITY_TUTORIAL_FLAG, CityTutorial } from "./city-tutorial";
-import { bindKeyboard, input } from "./controls";
+import { bindKeyboard, input, moveVector } from "./controls";
 import { PhoneButton, rm, WalletHud } from "./hud";
 import { Phone } from "./phone/phone";
 import { HUB_STRINGS } from "./strings";
@@ -272,15 +272,35 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     sfx.chime();
     input.joy.x = 0;
     input.joy.y = 0;
-    playerShared.phoneHeld = true;
+    // Draw from pocket first; only mark "held" once the UI is up
+    playerShared.phoneHeld = false;
     playerShared.phoneDrawUntil = Date.now() + PHONE_DRAW_MS;
     setPhoneBusy(true);
     if (phoneTimer.current) clearTimeout(phoneTimer.current);
     phoneTimer.current = setTimeout(() => {
       phoneTimer.current = null;
+      playerShared.phoneHeld = true;
+      setPhoneBusy(false);
       setPhoneOpen(true);
     }, PHONE_DRAW_MS);
   };
+
+  // Never leave a dangling hold pose if the UI is closed
+  useEffect(() => {
+    if (phoneOpen || phoneBusy) return;
+    playerShared.phoneHeld = false;
+    playerShared.phoneDrawUntil = 0;
+  }, [phoneOpen, phoneBusy]);
+
+  // Walking while the phone is out → put it away (pocket)
+  useEffect(() => {
+    if (!phoneOpen) return;
+    const id = window.setInterval(() => {
+      const mv = moveVector();
+      if (Math.hypot(mv.x, mv.y) > 0.2) closePhone();
+    }, 48);
+    return () => clearInterval(id);
+  }, [phoneOpen]);
 
   /** Leave the restaurant: back onto the mat outside, facing the street. */
   const exitJob = () => {

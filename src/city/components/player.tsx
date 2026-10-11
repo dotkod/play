@@ -154,7 +154,8 @@ export function CityPlayer({
       floorY.current = 0;
       seated.current = false;
     }
-    const onPhone = shared.phoneHeld || Date.now() < shared.phoneDrawUntil;
+    // Freeze only during the draw animation; walking while held puts the phone away (hub closes it)
+    const drawing = Date.now() < shared.phoneDrawUntil;
 
     const refs: RideRefs = {
       p,
@@ -167,16 +168,16 @@ export function CityPlayer({
       sitLock,
       enterLatch,
     };
-    const mode = !onPhone && active ? tickRideSession(refs, dt, active, false) : "off";
+    const mode = !drawing && active ? tickRideSession(refs, dt, active, false) : "off";
 
     if (mode === "off") {
       seated.current = false;
       floorY.current = 0;
-      if (active && !onPhone) {
+      if (active && !drawing) {
         const turn = lookAxis();
         if (turn !== 0) view.yaw += turn * 2.2 * dt;
       }
-      const mv = active && !onPhone ? moveVector() : { x: 0, y: 0 };
+      const mv = active && !drawing ? moveVector() : { x: 0, y: 0 };
       const cy = Math.cos(view.yaw);
       const sy = Math.sin(view.yaw);
       const vx = mv.x * cy - mv.y * sy;
@@ -314,13 +315,15 @@ export function CityPlayer({
     () => (): Pose => {
       const now = Date.now();
       const drawing = now < shared.phoneDrawUntil;
+      // Walking puts the phone away — no outstretched hold while moving
+      const holding = shared.phoneHeld && !moving.current && !drawing;
       return {
         x: pos.current.x,
         z: pos.current.z,
         rotY: rot.current,
-        walking: moving.current && !drawing && !shared.phoneHeld && !seated.current,
+        walking: moving.current && !drawing && !holding && !seated.current,
         seated: seated.current,
-        phone: drawing ? "draw" : shared.phoneHeld ? "hold" : undefined,
+        phone: drawing ? "draw" : holding ? "hold" : undefined,
         phoneProgress: drawing ? 1 - (shared.phoneDrawUntil - now) / PHONE_DRAW_MS : 1,
         masked: atmosphere.haze !== "none",
       };

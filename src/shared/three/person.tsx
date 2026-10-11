@@ -103,6 +103,9 @@ export function Person({ look, getPose }: { look: Look; getPose: () => Pose }) {
         // Slight screen tilt while holding
         phone.current.rotation.x = p.phone === "hold" ? -0.35 : -0.15;
         phone.current.rotation.z = 0.1;
+      } else {
+        phone.current.rotation.x = 0;
+        phone.current.rotation.z = 0;
       }
     }
   });
