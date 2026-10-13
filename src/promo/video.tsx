@@ -8,69 +8,93 @@
 
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import { useEffect, useRef, useState } from "react";
+import { Vector3 } from "three";
+import { TRACK_Z } from "@/lrt/plan/constants";
+import { getShuttle, tickShuttle } from "@/lrt/sim/shuttle";
 import { ANNE, ANNE_CX, cameraAt, insideShop, type Key, servingView, setTimeOfDay } from "./scene";
 import { bridge, PromoCity } from "./stage";
 
 const SIZE = 1080;
 const FPS = 30;
-const DURATION = 15;
+const DURATION = 24;
 
 type Shot = { from: number; to: number; day: number; inside?: boolean; keys: Key[] };
+
+/** When each segment starts (seconds). */
+const T = { street: 3, lrt: 5.6, anne: 8.8, night: 12, soon: 14, end: 20.5 };
 
 function storyboard(): Shot[] {
   const v = servingView();
   const z0 = ANNE.rect.minZ;
   return [
-    // A: golden-hour aerial over Pusat Lepak
+    // Golden-ish aerial over Pusat Lepak with the logo
     {
       from: 0,
-      to: 3.4,
+      to: T.street,
       day: 0.62,
       keys: [
         { t: 0, pos: [ANNE_CX - 60, 46, z0 - 62], look: [4, 0, -4] },
-        { t: 3.4, pos: [ANNE_CX - 34, 34, z0 - 44], look: [14, 0, -8] },
+        { t: T.street, pos: [ANNE_CX - 36, 35, z0 - 46], look: [14, 0, -8] },
       ],
     },
-    // B: street level along the road, traffic and riders passing
+    // Over the road's centre line, above the traffic and clear of lamp arms
     {
-      from: 3.4,
-      to: 6.6,
+      from: T.street,
+      to: T.lrt,
       day: 0.5,
       keys: [
-        // Over the road's centre line, above the traffic and clear of lamp arms
-        { t: 3.4, pos: [-6, 4.6, z0 - 8.5], look: [12, 1.2, z0 - 7.5] },
-        { t: 6.6, pos: [18, 4.6, z0 - 8.5], look: [36, 1.2, z0 - 7.5] },
+        { t: T.street, pos: [-6, 4.6, z0 - 8.5], look: [12, 1.2, z0 - 7.5] },
+        { t: T.lrt, pos: [16, 4.6, z0 - 8.5], look: [34, 1.2, z0 - 7.5] },
       ],
     },
-    // C: up to Anne Maju's front, then in to the counter view
+    // The elevated LRT line along the north of the city
     {
-      from: 6.6,
-      to: 10,
+      from: T.lrt,
+      to: T.anne,
+      day: 0.55,
+      keys: [
+        { t: T.lrt, pos: [-34, 15, TRACK_Z - 20], look: [-6, 7, TRACK_Z] },
+        { t: T.anne, pos: [-8, 13, TRACK_Z - 18], look: [16, 7, TRACK_Z] },
+      ],
+    },
+    // Up to Anne Maju's front, then in to the counter view
+    {
+      from: T.anne,
+      to: T.night,
       day: 0.5,
       keys: [
-        { t: 6.6, pos: [ANNE_CX, 9, z0 - 18], look: [ANNE_CX, 1.6, z0 + 2] },
-        { t: 8.3, pos: [ANNE_CX, 7.6, z0 - 6], look: [ANNE_CX, 1, z0 + 4] },
-        { t: 10, pos: [v.pos.x, v.pos.y, v.pos.z], look: [v.look.x, v.look.y, v.look.z] },
+        { t: T.anne, pos: [ANNE_CX, 9, z0 - 18], look: [ANNE_CX, 1.6, z0 + 2] },
+        { t: T.anne + 1.6, pos: [ANNE_CX, 7.6, z0 - 6], look: [ANNE_CX, 1, z0 + 4] },
+        { t: T.night, pos: [v.pos.x, v.pos.y, v.pos.z], look: [v.look.x, v.look.y, v.look.z] },
       ],
     },
-    // D: night falls, lamps and windows on
+    // Night falls: low pass down Anne Maju's street, lit windows and lamp pools
     {
-      from: 10,
-      to: 12.8,
+      from: T.night,
+      to: T.soon,
       day: 0.875,
       keys: [
-        // Low pass down Anne Maju's street: lit windows, lamp pools, traffic lights
-        { t: 10, pos: [ANNE_CX - 36, 13, z0 - 24], look: [ANNE_CX - 8, 1, z0 - 4] },
-        { t: 12.8, pos: [ANNE_CX - 20, 10, z0 - 20], look: [ANNE_CX + 6, 1, z0 - 4] },
+        { t: T.night, pos: [ANNE_CX - 36, 13, z0 - 24], look: [ANNE_CX - 8, 1, z0 - 4] },
+        { t: T.soon, pos: [ANNE_CX - 22, 10, z0 - 20], look: [ANNE_CX + 6, 1, z0 - 4] },
       ],
     },
-    // E: end card over the night city
+    // Coming soon: slow high orbit at dusk behind the cards
     {
-      from: 12.8,
+      from: T.soon,
+      to: T.end,
+      day: 0.58,
+      keys: [
+        { t: T.soon, pos: [-70, 70, 70], look: [0, 0, 0] },
+        { t: T.end, pos: [-30, 64, 88], look: [0, 0, 0] },
+      ],
+    },
+    // End card over the night city
+    {
+      from: T.end,
       to: DURATION,
       day: 0.875,
       keys: [
-        { t: 12.8, pos: [ANNE_CX - 20, 10, z0 - 20], look: [ANNE_CX + 6, 1, z0 - 4] },
+        { t: T.end, pos: [ANNE_CX - 22, 10, z0 - 20], look: [ANNE_CX + 6, 1, z0 - 4] },
         { t: DURATION, pos: [ANNE_CX - 14, 12, z0 - 22], look: [ANNE_CX + 10, 1, z0 - 4] },
       ],
     },
@@ -144,42 +168,98 @@ function pop(t: number, start: number, dur = 0.35) {
   return k === 0 ? 0 : 1 + 0.12 * Math.sin(k * Math.PI) * (1 - k) * 2 - (1 - k) * (1 - k) * 0.6;
 }
 
+const SOON = [
+  { icon: "🛵", title: "Rider Laju", sub: "Hantar makanan, kejar rating", tone: "#1f9d55" },
+  { icon: "🅿️", title: "Cari Parking", sub: "Pusing-pusing, elak saman", tone: "#2f6fd6" },
+  { icon: "🌙", title: "Pasar Malam", sub: "Buka gerai, tawar-menawar", tone: "#7a3fb0" },
+  { icon: "🏙️", title: "Menara Berkembar", sub: "KLCC Lepak & daerah baru", tone: "#d8352a" },
+  { icon: "👥", title: "Kawan & Cerita", sub: "Watak, misi, telefon penuh", tone: "#e07b00" },
+];
+
+/** A coming-soon card sliding in from the right. */
+function soonCard(g: CanvasRenderingContext2D, item: (typeof SOON)[number], y: number, k: number) {
+  if (k <= 0) return;
+  const w = 760;
+  const h = 118;
+  const x = (SIZE - w) / 2 + (1 - Math.min(1, k)) * 600;
+  g.save();
+  g.globalAlpha = Math.min(1, k * 1.4);
+  roundRect(g, x, y + 10, w, h, 36);
+  g.fillStyle = "#1f1a17";
+  g.fill();
+  roundRect(g, x, y, w, h, 36);
+  g.fillStyle = "#fbf3e4";
+  g.fill();
+  g.lineWidth = 6;
+  g.strokeStyle = "#1f1a17";
+  g.stroke();
+  // Icon tile
+  roundRect(g, x + 18, y + 16, 86, 86, 24);
+  g.fillStyle = item.tone;
+  g.fill();
+  g.stroke();
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.font = `48px ${FONT}`;
+  g.fillText(item.icon, x + 61, y + 62);
+  g.textAlign = "left";
+  g.fillStyle = "#1f1a17";
+  g.font = `800 44px ${FONT}`;
+  g.fillText(item.title, x + 128, y + 44);
+  g.fillStyle = "rgba(31,26,23,0.6)";
+  g.font = `700 28px ${FONT}`;
+  g.fillText(item.sub, x + 128, y + 86);
+  // "Soon" tag
+  g.font = `800 24px ${FONT}`;
+  const tw = g.measureText("SOON").width + 28;
+  roundRect(g, x + w - tw - 22, y + 38, tw, 42, 21);
+  g.fillStyle = "#fcd34d";
+  g.fill();
+  g.lineWidth = 4;
+  g.stroke();
+  g.fillStyle = "#1f1a17";
+  g.textAlign = "center";
+  g.fillText("SOON", x + w - tw / 2 - 22, y + 60);
+  g.restore();
+}
+
 function captions(g: CanvasRenderingContext2D, t: number) {
-  // A
-  if (t < 3.4) {
+  if (t < T.street) {
     const a = pop(t, 0.25);
     if (a > 0) wordmark(g, SIZE / 2, 300, 0.95 * a);
-    const b = pop(t, 1.1);
+    const b = pop(t, 1.0);
     if (b > 0) sticker(g, "Bandar 3D ala Malaysia 🇲🇾", SIZE / 2, 560, 46 * b, "#fbf3e4", "#1f1a17", -0.03);
-  }
-  // B
-  if (t >= 3.5 && t < 6.6) {
-    const a = pop(t, 3.6);
+  } else if (t < T.lrt) {
+    const a = pop(t, T.street + 0.15);
     if (a > 0) sticker(g, "Jalan raya hidup. Rider merata. 🛵", SIZE / 2, 900, 44 * a, "#fcd34d");
-  }
-  // C
-  if (t >= 6.7 && t < 10) {
-    const a = pop(t, 6.8);
+  } else if (t < T.anne) {
+    const a = pop(t, T.lrt + 0.15);
+    if (a > 0) sticker(g, "Naik LRT Laluan Kelana 🚆", SIZE / 2, 900, 46 * a, "#d8352a", "#ffffff", -0.02);
+  } else if (t < T.night) {
+    const a = pop(t, T.anne + 0.15);
     if (a > 0) sticker(g, "Kerja pertama: Anne Maju 🍵", SIZE / 2, 130, 48 * a, "#d8352a", "#ffffff", -0.02);
-    const b = pop(t, 8.6);
+    const b = pop(t, T.anne + 1.9);
     if (b > 0) sticker(g, "“Anne, teh tarik kurang manis satu!”", SIZE / 2, 930, 38 * b, "#ffffff", "#1f1a17", 0.02);
-  }
-  // D
-  if (t >= 10.1 && t < 12.8) {
-    const a = pop(t, 10.2);
+  } else if (t < T.soon) {
+    const a = pop(t, T.night + 0.15);
     if (a > 0) sticker(g, "Siang ke malam, ikut jam kau 🌙", SIZE / 2, 900, 44 * a, "#fbf3e4");
-  }
-  // E
-  if (t >= 12.8) {
-    const k = Math.min(1, (t - 12.8) / 0.4);
+  } else if (t < T.end) {
+    const k = Math.min(1, (t - T.soon) / 0.4);
+    g.fillStyle = `rgba(31,26,23,${0.5 * k})`;
+    g.fillRect(0, 0, SIZE, SIZE);
+    const a = pop(t, T.soon + 0.15);
+    if (a > 0) sticker(g, "AKAN DATANG 👀", SIZE / 2, 120, 58 * a, "#fcd34d", "#1f1a17", -0.03);
+    SOON.forEach((item, i) => soonCard(g, item, 220 + i * 150, (t - (T.soon + 0.7 + i * 0.75)) / 0.35));
+  } else {
+    const k = Math.min(1, (t - T.end) / 0.4);
     g.fillStyle = `rgba(31,26,23,${0.55 * k})`;
     g.fillRect(0, 0, SIZE, SIZE);
-    const a = pop(t, 12.9);
+    const a = pop(t, T.end + 0.1);
     if (a > 0) wordmark(g, SIZE / 2, 380, 1.0 * a);
-    const b = pop(t, 13.4);
+    const b = pop(t, T.end + 0.6);
     if (b > 0) sticker(g, "Main percuma: kl.dotkod.com", SIZE / 2, 690, 46 * b, "#fcd34d");
-    const c = pop(t, 13.7);
-    if (c > 0) sticker(g, "@kualalepak", SIZE / 2, 820, 44 * c, "#1f1a17", "#fbf3e4");
+    const c = pop(t, T.end + 0.9);
+    if (c > 0) sticker(g, "Follow @kualalepak untuk update", SIZE / 2, 820, 40 * c, "#1f1a17", "#fbf3e4");
   }
 }
 
@@ -197,7 +277,7 @@ async function record(onProgress: (k: number) => void) {
   FONT = getComputedStyle(document.body).fontFamily || FONT;
   const b = await bridge();
   const shots = storyboard();
-  const cuts = shots.slice(1).map((s) => s.from).filter((c) => c < 12.8);
+  const cuts = shots.slice(1).map((s) => s.from);
 
   const comp = document.createElement("canvas");
   comp.width = SIZE;
@@ -221,12 +301,29 @@ async function record(onProgress: (k: number) => void) {
   encoder.configure(config);
 
   const total = FPS * DURATION;
+  let trainX: number | null = null;
   for (let i = 0; i < total; i++) {
     const t = i / FPS;
     const shot = shots.find((s) => t >= s.from && t < s.to) ?? shots[shots.length - 1];
     setTimeOfDay(shot.day);
-    insideShop(!!shot.inside || (shot.from === 6.6 && t > 8.9));
-    const c = cameraAt(shot.keys, t);
+    insideShop(!!shot.inside || (shot.from === T.anne && t > T.anne + 2.3));
+    let c = cameraAt(shot.keys, t);
+    // LRT segment: track the train itself (it may be cruising or dwelling at a station)
+    if (shot.from === T.lrt) {
+      if (trainX === null) {
+        // Skip ahead to the moment it pulls out, so the segment shows it moving
+        let guard = 0;
+        while (getShuttle().phase !== "dwell" && guard++ < 3000) tickShuttle(1 / 30);
+        while (getShuttle().phase === "dwell" && guard++ < 6000) tickShuttle(1 / 30);
+      }
+      const tr = getShuttle();
+      trainX = trainX === null ? tr.x : trainX + (tr.x - trainX) * 0.12;
+      const k = (t - T.lrt) / (T.anne - T.lrt);
+      c = {
+        pos: new Vector3(trainX - 20 + k * 6, tr.y + 7, TRACK_Z - 17),
+        look: new Vector3(trainX + 2, tr.y + 0.5, TRACK_Z),
+      };
+    }
     b.camera.fov = 50;
     b.camera.updateProjectionMatrix();
     b.camera.position.copy(c.pos);
