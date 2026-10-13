@@ -4,7 +4,7 @@
  * Needs the dev server running:  pnpm dev  (then)  node scripts/promo.mjs [base-url] [only]
  *   only: avatar | monogram | wordmark | post-welcome | post-anne | video
  */
-import { mkdirSync, writeFileSync, appendFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, appendFileSync, existsSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer-core";
