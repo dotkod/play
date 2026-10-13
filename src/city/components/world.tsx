@@ -31,7 +31,31 @@ type Props = {
   active?: boolean;
   /** Fixed camera for the share image (no player). */
   poster?: boolean;
+  /**
+   * Marketing renders (/promo): frames are stepped by hand through `window.__klPromo`, so
+   * captures are deterministic and smooth however long each frame takes to grab.
+   */
+  promo?: boolean;
 };
+
+export type PromoBridge = {
+  /** Render the frame at time t (seconds since start). */
+  advance: (t: number) => void;
+  camera: import("three").PerspectiveCamera;
+  canvas: HTMLCanvasElement;
+};
+
+function PromoHandle() {
+  const { advance, camera, gl } = useThree();
+  useEffect(() => {
+    (window as unknown as { __klPromo: PromoBridge }).__klPromo = {
+      advance: (t) => advance(t, true),
+      camera: camera as import("three").PerspectiveCamera,
+      canvas: gl.domElement,
+    };
+  }, [advance, camera, gl]);
+  return null;
+}
 
 /** Share-image camera: high over the Anne Maju junction, looking along the street. */
 function PosterCamera() {
@@ -59,7 +83,7 @@ function Clock({ active }: { active: boolean }) {
   return null;
 }
 
-export default function CityWorld({ spawn, onZone, active = true, poster = false }: Props) {
+export default function CityWorld({ spawn, onZone, active = true, poster = false, promo = false }: Props) {
   const [dpr, setDpr] = useState(1.5);
   const [shadows, setShadows] = useState(true);
   const wrap = useRef<HTMLDivElement>(null);
@@ -67,18 +91,22 @@ export default function CityWorld({ spawn, onZone, active = true, poster = false
   return (
     <div ref={wrap} className="relative h-full w-full">
       <Canvas
-        frameloop={frameloop}
+        frameloop={promo ? "never" : frameloop}
         shadows
-        dpr={dpr}
+        dpr={promo ? 1 : dpr}
         camera={{ fov: 50, position: [spawn.x, 11, spawn.z + 8.5], near: 0.5, far: 380 }}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: promo }}
       >
-        <PerformanceMonitor
-          onDecline={() => {
-            if (dpr > 1) setDpr(1);
-            else setShadows(false);
-          }}
-        />
+        {promo ? (
+          <PromoHandle />
+        ) : (
+          <PerformanceMonitor
+            onDecline={() => {
+              if (dpr > 1) setDpr(1);
+              else setShadows(false);
+            }}
+          />
+        )}
         <Clock active={active} />
         <DevHandle />
         <LightingRig shadows={shadows} />
@@ -93,7 +121,7 @@ export default function CityWorld({ spawn, onZone, active = true, poster = false
         <CityTaxiRide />
         <CityPedestrians />
         <RainFX />
-        {poster ? <PosterCamera /> : <CityPlayer spawn={spawn} onZone={onZone} active={active} />}
+        {promo ? null : poster ? <PosterCamera /> : <CityPlayer spawn={spawn} onZone={onZone} active={active} />}
       </Canvas>
     </div>
   );
