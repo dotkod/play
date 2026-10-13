@@ -7,6 +7,7 @@ import { getAtmosphere, subscribeAtmosphere, type AtmosphereSnapshot } from "@/w
 import { gameClockLabel, presetForFrac, type LightPresetId } from "@/world/lighting";
 import { Logo } from "@/shared/logo";
 import { useLang } from "@/shared/lang";
+import { usePlayerCounts } from "./presence";
 import { HUB_STRINGS } from "./strings";
 
 function useAtmosphere(): AtmosphereSnapshot {
@@ -50,6 +51,7 @@ export function WalletHud({ started }: { started: boolean }) {
   const [clock, setClock] = useState(() => gameClockLabel());
   const [period, setPeriod] = useState(() => presetForFrac().id);
   const atmo = useAtmosphere();
+  const players = usePlayerCounts(started ? auth.username : null);
   useEffect(() => {
     if (!started) return;
     const tick = () => {
@@ -97,6 +99,20 @@ export function WalletHud({ started }: { started: boolean }) {
                 </div>
               </div>
             </div>
+
+            {players && (
+              <>
+                <span className="mb-1 hidden h-7 w-px bg-ink/50 sm:block" aria-hidden />
+                <div className="leading-none" title={tr.playersTitle}>
+                  <p className={`flex items-center gap-1.5 text-lg sm:text-xl ${statNum}`}>
+                    <span className="size-2.5 rounded-full bg-emerald-400 ring-2 ring-ink" aria-hidden />
+                    {players.online.toLocaleString()}
+                  </p>
+                  <p className={`mt-0.5 text-[10px] tracking-wide uppercase ${statSub}`}>{tr.onlineNow}</p>
+                  <p className={`mt-1 text-[10px] leading-tight ${statSub}`}>{tr.playersTotal(players.total.toLocaleString())}</p>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

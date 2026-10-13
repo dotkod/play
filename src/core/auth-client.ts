@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { trackEvent } from "./analytics";
 import { getProfile, replaceProfile, setSignedIn } from "./profile";
 
 type AuthState = { username: string | null; ready: boolean };
@@ -63,6 +64,7 @@ export async function registerAccount(username: string, pin: string): Promise<En
   // Stash before notify — Hub's effect runs as soon as username updates
   stashAuthHello(true);
   notify();
+  trackEvent("sign_up");
   return { username: data.username ?? username, isNew: true };
 }
 
@@ -79,6 +81,7 @@ export async function loginAccount(username: string, pin: string): Promise<Enter
   // Before notify + profile fetch — otherwise Hub takes hello while still null
   stashAuthHello(false);
   notify();
+  trackEvent("login");
   const pr = await fetch("/api/profile");
   if (pr.ok) {
     const body = (await pr.json()) as { profile?: unknown };

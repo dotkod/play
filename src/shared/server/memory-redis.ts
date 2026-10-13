@@ -75,17 +75,44 @@ export class MemoryRedis {
     return Object.keys(values).length;
   }
 
-  async zadd(key: string, opts: { gt?: boolean }, ...entries: ZEntry[]) {
+  async zadd(key: string, first: ZEntry | { gt?: boolean; nx?: boolean }, ...rest: ZEntry[]) {
     this.alive(key);
+    const opts = "member" in first ? {} : first;
+    const entries = "member" in first ? [first, ...rest] : rest;
     const z = this.zsets.get(key) ?? new Map<string, number>();
     let added = 0;
     for (const { score, member } of entries) {
       const prev = z.get(member);
       if (prev == null) added++;
+      if (prev != null && opts.nx) continue;
       if (prev == null || !opts.gt || score > prev) z.set(member, score);
     }
     this.zsets.set(key, z);
     return added;
+  }
+
+  async zcard(key: string) {
+    this.alive(key);
+    return this.zsets.get(key)?.size ?? 0;
+  }
+
+  async zrem(key: string, ...members: string[]) {
+    const z = this.zsets.get(key);
+    return members.filter((m) => z?.delete(m)).length;
+  }
+
+  async zremrangebyscore(key: string, min: number, max: number) {
+    const z = this.zsets.get(key);
+    if (!z) return 0;
+    let n = 0;
+    for (const [m, sc] of z) if (sc >= min && sc <= max && z.delete(m)) n++;
+    return n;
+  }
+
+  async scan(_cursor: string | number, opts?: { match?: string }): Promise<[string, string[]]> {
+    const re = new RegExp(`^${(opts?.match ?? "*").replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
+    const keys = [...new Set([...this.kv.keys(), ...this.hashes.keys(), ...this.zsets.keys()])];
+    return ["0", keys.filter((k) => re.test(k))];
   }
 
   async zscore(key: string, member: string) {

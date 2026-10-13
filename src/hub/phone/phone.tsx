@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getAuth, loginAccount, logoutAccount, registerAccount, useAuth } from "@/core/auth-client";
 import { XP_PER_LEVEL, addMoney, markInboxRead, spendMoney, unreadInboxCount, useProfile } from "@/core/profile";
 import { fare, rideBusy } from "@/lrt/components/fare";
+import { floorYAt } from "@/lrt/plan";
 import { sfx, setMuted, useMuted } from "@/shared/audio";
 import { setLang, useLang } from "@/shared/lang";
 import { player } from "@/world/player-bridge";
@@ -481,6 +482,11 @@ function Teksi({
   const order = (destId: string) => {
     if (taxiBusy() || rideBusy() || fare.riding) {
       onToast?.(tr.taxiBusy);
+      return;
+    }
+    // Up on a station deck or inside the paid zone, the walk to the kerb would cut through the station
+    if (fare.paid || floorYAt(player.x, player.z) > 0.5) {
+      onToast?.(tr.taxiNotHere);
       return;
     }
     const ok = spendMoney(TAXI_FARE_SEN, "Teksi Kumar", "Kumar's taxi");

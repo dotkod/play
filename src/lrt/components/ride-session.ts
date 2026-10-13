@@ -251,7 +251,6 @@ function applyLift(
   if (liftCooldown > 0) liftCooldown = Math.max(0, liftCooldown - dt);
 
   for (const st of STATIONS) {
-    const c = liftCenter(st);
     const L = liftByStation[st.id]!;
     const inside = inLiftCabin(p.x, p.z, st);
     const midZ = (st.lift.minZ + st.lift.maxZ) / 2;

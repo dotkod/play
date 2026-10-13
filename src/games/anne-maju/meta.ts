@@ -20,6 +20,5 @@ export const GAME = {
     "mamak simulator",
   ],
   ogImage: "/og/anne-maju.jpg",
-  ogBackground: "public/og/anne-maju-bare.jpg",
   storageKey: "anne-maju",
 };

@@ -25,6 +25,13 @@ const SEAT_Y = 0.52;
 const CURB_OUT = 1.55;
 const LOOK = 14;
 const MIN_GAP = 1.8;
+/** Player must be this close to the kerb before the board walk starts (it ignores walls). */
+const BOARD_RANGE = 6;
+/** Waiting longer than this at the kerb: Kumar drives off (the hub refunds the fare). */
+const WAIT_MAX = 90;
+/** Blocked this long (e.g. nose to nose with cross traffic): squeeze past for a moment. */
+const STUCK_MAX = 2.5;
+const GHOST_FOR = 1.5;
 const { width: TAXI_W, len: TAXI_LEN } = VEHICLE_SIZE.taxi;
 
 let peers: TaxiPeer[] = [];
@@ -45,7 +52,7 @@ export const taxi = {
   path: [] as PathPt[],
   pathI: 0,
   dropSidewalk: { x: 0, z: 0 },
-  prompt: null as null | "arriving" | "boarding" | "riding" | "alighting",
+  prompt: null as null | "arriving" | "waiting" | "boarding" | "riding" | "alighting",
   toast: null as string | null,
   /** Board: open → toCurb → toSeat → close. Alight: open → toCurb → toWalk → close. */
   boardStep: "open" as "open" | "toCurb" | "toSeat" | "close" | "toWalk",
@@ -53,6 +60,11 @@ export const taxi = {
   curbWorld: { x: 0, z: 0 },
   doorWorld: { x: 0, z: 0 },
   seatWorld: { x: 0, z: 0 },
+  /** Seconds parked at the kerb waiting for the player. */
+  waited: 0,
+  /** Seconds blocked by a peer; past STUCK_MAX the taxi ignores peers for GHOST_FOR. */
+  stuck: 0,
+  ghost: 0,
 };
 
 export function taxiBusy() {
@@ -82,6 +94,9 @@ export function resetTaxi() {
   taxi.prompt = null;
   taxi.toast = null;
   taxi.boardStep = "open";
+  taxi.waited = 0;
+  taxi.stuck = 0;
+  taxi.ghost = 0;
 }
 
 function lanePos(l: Lane, s: number) {
@@ -191,6 +206,7 @@ function updateDoorWorld() {
 
 /** Cap speed so we don't rear-end traffic peers. */
 function peerSpeedCap(want: number): number {
+  if (taxi.ghost > 0) return want;
   const fx = Math.sin(taxi.rotY);
   const fz = Math.cos(taxi.rotY);
   let cap = want;
@@ -238,11 +254,19 @@ export type { TaxiDest };
 
 function advancePath(speed: number, dt: number): boolean {
   if (taxi.pathI >= taxi.path.length - 1) return true;
+  taxi.ghost = Math.max(0, taxi.ghost - dt);
   const capped = peerSpeedCap(speed);
   if (capped < 0.05) {
+    // Traffic yields to the taxi and the taxi yields to traffic: break a standoff
+    taxi.stuck += dt;
+    if (taxi.stuck > STUCK_MAX) {
+      taxi.stuck = 0;
+      taxi.ghost = GHOST_FOR;
+    }
     updateDoorWorld();
     return false;
   }
+  taxi.stuck = 0;
   let budget = capped * dt;
   while (budget > 0 && taxi.pathI < taxi.path.length - 1) {
     const a = taxi.path[taxi.pathI]!;
@@ -307,6 +331,16 @@ export function tickTaxiRide(refs: TaxiRefs, dt: number): TaxiMode {
     taxi.prompt = "arriving";
     const done = advancePath(SPEED_ARRIVE, dt);
     if (done) {
+      // Parked: wait until the player is back at the kerb (the board walk ignores walls)
+      if (Math.hypot(refs.p.x - taxi.curbWorld.x, refs.p.z - taxi.curbWorld.z) > BOARD_RANGE) {
+        taxi.prompt = "waiting";
+        taxi.waited += dt;
+        if (taxi.waited > WAIT_MAX) {
+          resetTaxi();
+          taxi.toast = "missed";
+        }
+        return "off";
+      }
       taxi.phase = "boarding";
       taxi.prompt = "boarding";
       taxi.door = 0;

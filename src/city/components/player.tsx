@@ -185,7 +185,6 @@ export function CityPlayer({
       if (active && !drawing) {
         const turn = lookAxis();
         if (turn !== 0) view.yaw += turn * 2.2 * dt;
-        tickLookPitch(dt);
       }
       const mv = active && !drawing ? moveVector() : { x: 0, y: 0 };
       const cy = Math.cos(view.yaw);

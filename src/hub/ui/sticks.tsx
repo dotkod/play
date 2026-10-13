@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { input } from "../controls";
 
 // Thumb stick for touch screens, bottom-left
@@ -9,6 +9,14 @@ export function Joystick() {
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const pointer = useRef<number | null>(null);
   const R = 46;
+  // Hidden mid-drag (a ride starts, the phone opens): don't leave the player walking
+  useEffect(
+    () => () => {
+      input.joy.x = 0;
+      input.joy.y = 0;
+    },
+    [],
+  );
 
   const move = (e: React.PointerEvent) => {
     const rect = base.current!.getBoundingClientRect();
@@ -58,6 +66,14 @@ export function LookPad() {
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const pointer = useRef<number | null>(null);
   const R = 46;
+  // Hidden mid-drag: don't leave the camera spinning
+  useEffect(
+    () => () => {
+      input.look = 0;
+      input.lookY = 0;
+    },
+    [],
+  );
 
   const move = (e: React.PointerEvent) => {
     const rect = base.current!.getBoundingClientRect();

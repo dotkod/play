@@ -12,6 +12,7 @@ import {
   type UserRecord,
 } from "@/shared/server/auth";
 import { getRedis } from "@/shared/server/redis";
+import { addPlayer } from "@/shared/server/stats";
 
 export async function POST(req: NextRequest) {
   const redis = getRedis();
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
   const record: UserRecord = { pinHash, salt, createdAt: Date.now() };
   const created = await redis.set(userKey(username), record, { nx: true });
   if (created !== "OK") return NextResponse.json({ error: "Username dah diambil" }, { status: 409 });
+  await addPlayer(redis, username, record.createdAt);
 
   if (body?.profile && typeof body.profile === "object" && !profileTooBig(body.profile)) {
     const profile = { ...(body.profile as object), username, updatedAt: Date.now() };

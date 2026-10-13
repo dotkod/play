@@ -8,7 +8,7 @@ export const ogSize = { width: 1200, height: 630 };
 
 let background: Promise<string> | null = null;
 const loadBackground = () =>
-  (background ??= readFile(join(process.cwd(), GAME.ogBackground)).then((b) => `data:image/jpeg;base64,${b.toString("base64")}`));
+  (background ??= readFile(join(process.cwd(), "public/og/anne-maju-bare.jpg")).then((b) => `data:image/jpeg;base64,${b.toString("base64")}`));
 
 const stroke = "#1f1a17";
 

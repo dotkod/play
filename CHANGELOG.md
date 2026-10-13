@@ -5,6 +5,13 @@ next to the short commit of the deploy.
 
 ## Kuala Lepak
 
+### 0.17.0
+- HUD: players online now + total players
+- Teksi: Kumar waits at the kerb until you walk back (no more walking through walls to the car); drives off after 90 s and refunds you
+- Teksi: can't be called from a station deck or the paid zone; no more standoffs with cross traffic
+- Touch: hiding the sticks mid-drag no longer leaves you walking or the camera spinning
+- Look up/down speed fixed (was double on foot)
+
 ### 0.16.28
 - Teksi: door opens for board/exit (no more walking through the car); taxi brakes for traffic and traffic brakes for the taxi
 

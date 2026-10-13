@@ -10,12 +10,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BUILDINGS, inRect, roomRect, SPAWN } from "@/city/plan";
 import { CityMapModal } from "@/city/components/city-map";
 import { CityMinimap } from "@/city/components/minimap";
-import { taxiDestById } from "@/city/sim/taxi-dests";
+import { TAXI_FARE_SEN, taxiDestById } from "@/city/sim/taxi-dests";
 import { taxi } from "@/city/sim/taxi-ride";
+import { bindGameAnalytics, trackEvent } from "@/core/analytics";
 import { logoutAccount, refreshAuth, takeAuthHello, useAuth } from "@/core/auth-client";
 import { emit } from "@/core/events";
 import { JOB_RESULT_KEY, settleJobResults, type JobResult } from "@/core/job-handoff";
-import { getProfile } from "@/core/profile";
+import { addMoney, getProfile } from "@/core/profile";
 import { cancelDestPick, fare, formatRm, groundScripted, rideBusy } from "@/lrt/components/fare";
 import { LrtDestPicker } from "@/lrt/components/dest-picker";
 import { STATIONS } from "@/lrt/plan";
@@ -47,7 +48,8 @@ const LrtSandbox = dynamic(() => import("@/lrt").then((m) => m.LrtSandbox), {
 /** Preview the immersive LRT line without mounting the live city. */
 function useLrtSandbox() {
   const [on] = useState(() => {
-    if (typeof window === "undefined") return false;
+    // Dev preview only: players in production always get the live city
+    if (typeof window === "undefined" || process.env.NODE_ENV === "production") return false;
     try {
       return new URLSearchParams(window.location.search).get("lrt") === "1";
     } catch {
@@ -255,7 +257,10 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
     unlockAudio();
     sfx.start();
     setStarted(true);
+    trackEvent("city_start", { touch });
   };
+
+  useEffect(() => bindGameAnalytics(), []);
 
   const closePhone = () => {
     if (phoneTimer.current) {
@@ -390,6 +395,7 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
       }
       // Taxi status chip (wins over LRT while a ride is active)
       if (taxi.prompt === "arriving" || taxi.prompt === "boarding") setLrtPrompt(tr.taxiArriving);
+      else if (taxi.prompt === "waiting") setLrtPrompt(tr.taxiWaiting);
       else if (taxi.prompt === "riding") setLrtPrompt(tr.taxiRiding);
       else if (taxi.prompt === "alighting") setLrtPrompt(tr.taxiAlighting);
       if (taxi.toast?.startsWith("arrived:")) {
@@ -397,6 +403,10 @@ export function Hub({ initialJob }: { initialJob?: string } = {}) {
         taxi.toast = null;
         const name = dest ? (lang === "ms" ? dest.nameMs : dest.nameEn) : "";
         flash(tr.taxiArrived(name));
+      } else if (taxi.toast === "missed") {
+        taxi.toast = null;
+        addMoney(TAXI_FARE_SEN, "Teksi refund", "Taxi refund");
+        flash(tr.taxiMissed);
       } else if (taxi.toast) {
         taxi.toast = null;
       }

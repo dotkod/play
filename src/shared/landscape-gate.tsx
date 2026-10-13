@@ -6,11 +6,11 @@ import { Logo } from "@/shared/logo";
 const COPY = {
   ms: {
     title: "Pusing ke landscape",
-    sub: "Kuala Lepak main melintang — putar phone kau.",
+    sub: "Kuala Lepak main melintang. Putar phone kau.",
   },
   en: {
     title: "Turn to landscape",
-    sub: "Kuala Lepak plays sideways — rotate your phone.",
+    sub: "Kuala Lepak plays sideways. Rotate your phone.",
   },
 } as const;
 
